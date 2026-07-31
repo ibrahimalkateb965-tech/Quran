@@ -1,0 +1,6 @@
+{
+  "name": "القرآن للمكفوفين",
+  "description": "تطبيق القرآن الكريم المخصص للمكفوفين وضعاف البصر بالواجهة الصوتية والإيماءات باللغة العربية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

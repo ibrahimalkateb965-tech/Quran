@@ -1,0 +1,44 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer Audio Sound Waves -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M30,54 A24,24 0 0,1 30,36 M78,54 A24,24 0 0,0 78,36" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M24,60 A32,32 0 0,1 24,30 M84,60 A32,32 0 0,0 84,30" />
+
+    <!-- Crescent Moon Accent -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M54,26 C48,26 43,30 43,37 C43,44 48,48 54,48 C51,48 47,44 47,37 C47,30 51,26 54,26 Z" />
+        
+    <!-- Star Accent -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M56,33 L57.5,36 L61,36 L58,38 L59,41 L56,39 L53,41 L54,38 L51,36 L54.5,36 Z" />
+
+    <!-- Open Quran Book Graphic -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M34,55 C42,52 50,56 54,58 C58,56 66,52 74,55 L74,75 C66,72 58,76 54,78 C50,76 42,72 34,75 Z" />
+    <path
+        android:fillColor="#0D281E"
+        android:pathData="M53,58 L55,58 L55,78 L53,78 Z" />
+    <!-- Book Page Accent Lines -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#0D281E"
+        android:strokeWidth="1.2"
+        android:pathData="M38,61 C43,59 48,62 51,63 M38,66 C43,64 48,67 51,68 M57,63 C60,62 65,59 70,61 M57,68 C60,67 65,64 70,66" />
+</vector>

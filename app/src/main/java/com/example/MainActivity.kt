@@ -1,0 +1,67 @@
+package com.example
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
+import com.example.ui.screens.QuranPlayerScreen
+import com.example.ui.theme.QuranBlindTheme
+import com.example.ui.viewmodel.QuranViewModel
+
+class MainActivity : ComponentActivity() {
+
+    private val viewModel: QuranViewModel by viewModels()
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
+        if (!recordAudioGranted) {
+            viewModel.announce("تنبيه: صلاحية الميكروفون مطلوبة لتفعيل الأوامر الصوتية.")
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notificationsGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
+            if (!notificationsGranted && recordAudioGranted) { // Don't announce both at exactly the same time if both denied
+                viewModel.announce("تنبيه: صلاحية الإشعارات مطلوبة لتشغيل الصوت في الخلفية.")
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        checkAndRequestPermissions()
+
+        setContent {
+            QuranBlindTheme {
+                QuranPlayerScreen(viewModel = viewModel)
+            }
+        }
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+        }
+    }
+}

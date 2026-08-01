@@ -2,6 +2,10 @@ package com.example.accessibility
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -26,6 +30,8 @@ sealed class VoiceCommandResult {
 class VoiceCommandManager(private val context: Context) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     fun startListening(
         onResult: (VoiceCommandResult) -> Unit,
@@ -37,55 +43,67 @@ class VoiceCommandManager(private val context: Context) {
         }
 
         stopListening()
+        requestAudioFocus()
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    isListening = true
-                    onStatusChange(true)
-                }
-
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {
-                    isListening = false
-                    onStatusChange(false)
-                }
-
-                override fun onError(error: Int) {
-                    isListening = false
-                    onStatusChange(false)
-                    val errorMsg = when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> "لم أستطع فهم الأمر الصوتي، يرجى المحاولة مرة أخرى"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "لم يتم التحدث بأي أمر صوتی"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "صلاحية الميكروفون غير ممنوحة"
-                        SpeechRecognizer.ERROR_NETWORK -> "لا يوجد اتصال بالإنترنت للتعرف على الصوت"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "انتهى وقت الاتصال بالإنترنت"
-                        SpeechRecognizer.ERROR_CLIENT -> "خطأ في خدمة جوجل الصوتية، قد يحتاج تطبيق جوجل للتحديث"
-                        SpeechRecognizer.ERROR_SERVER -> "خطأ في خادم جوجل للتعرف الصوتي"
-                        SpeechRecognizer.ERROR_AUDIO -> "مشكلة في تسجيل الصوت من الميكروفون"
-                        else -> "حدث خطأ في التعرف على الصوت (رمز الخطأ: $error)"
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        isListening = true
+                        onStatusChange(true)
                     }
-                    onResult(VoiceCommandResult.Error(errorMsg))
-                }
 
-                override fun onResults(results: Bundle?) {
-                    isListening = false
-                    onStatusChange(false)
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val spokenText = matches?.firstOrNull()
-                    if (!spokenText.isNullOrBlank()) {
-                        val parsed = parseCommand(spokenText)
-                        onResult(parsed)
-                    } else {
-                        onResult(VoiceCommandResult.Error("لم أستطع فهم الأمر"))
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {
+                        isListening = false
+                        onStatusChange(false)
+                        abandonAudioFocus()
                     }
-                }
 
-                override fun onPartialResults(partialResults: Bundle?) {}
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
+                    override fun onError(error: Int) {
+                        isListening = false
+                        onStatusChange(false)
+                        abandonAudioFocus()
+                        val errorMsg = when (error) {
+                            SpeechRecognizer.ERROR_NO_MATCH -> "لم أستطع فهم الأمر الصوتي، يرجى المحاولة مرة أخرى"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "لم يتم التحدث بأي أمر صوتی"
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "صلاحية الميكروفون غير ممنوحة"
+                            SpeechRecognizer.ERROR_NETWORK -> "لا يوجد اتصال بالإنترنت للتعرف على الصوت"
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "انتهى وقت الاتصال بالإنترنت"
+                            SpeechRecognizer.ERROR_CLIENT -> "خطأ في خدمة جوجل الصوتية، قد يحتاج تطبيق جوجل للتحديث"
+                            SpeechRecognizer.ERROR_SERVER -> "خطأ في خادم جوجل للتعرف الصوتي"
+                            SpeechRecognizer.ERROR_AUDIO -> "مشكلة في تسجيل الصوت من الميكروفون"
+                            else -> "حدث خطأ في التعرف على الصوت (رمز الخطأ: $error)"
+                        }
+                        onResult(VoiceCommandResult.Error(errorMsg))
+                    }
+
+                    override fun onResults(results: Bundle?) {
+                        isListening = false
+                        onStatusChange(false)
+                        abandonAudioFocus()
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val spokenText = matches?.firstOrNull()
+                        if (!spokenText.isNullOrBlank()) {
+                            val parsed = parseCommand(spokenText)
+                            onResult(parsed)
+                        } else {
+                            onResult(VoiceCommandResult.Error("لم أستطع فهم الأمر"))
+                        }
+                    }
+
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+        } catch (e: Exception) {
+            isListening = false
+            onStatusChange(false)
+            abandonAudioFocus()
+            onResult(VoiceCommandResult.Error("خدمة التعرف الصوتي غير متوفرة على جهازك: ${e.message}"))
+            return
         }
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -101,10 +119,12 @@ class VoiceCommandManager(private val context: Context) {
         } catch (e: SecurityException) {
             isListening = false
             onStatusChange(false)
+            abandonAudioFocus()
             onResult(VoiceCommandResult.Error("صلاحية الميكروفون غير ممنوحة للتطبيق"))
         } catch (e: Exception) {
             isListening = false
             onStatusChange(false)
+            abandonAudioFocus()
             onResult(VoiceCommandResult.Error("تعذر بدء التعرف الصوتي: ${e.message}"))
         }
     }
@@ -116,11 +136,37 @@ class VoiceCommandManager(private val context: Context) {
         }
         speechRecognizer?.destroy()
         speechRecognizer = null
+        abandonAudioFocus()
     }
 
-    private fun parseCommand(text: String): VoiceCommandResult {
+    private fun requestAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val attr = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                .setAudioAttributes(attr)
+                .build()
+            audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
+        }
+    }
+
+    private fun parseCommand(rawText: String): VoiceCommandResult {
         // Normalization to handle speech-to-text variations
-        val clean = text.trim()
+        val clean = rawText.trim()
             .replace("أ", "ا")
             .replace("إ", "ا")
             .replace("آ", "ا")
@@ -192,7 +238,7 @@ class VoiceCommandManager(private val context: Context) {
             }
         }
 
-        return VoiceCommandResult.UnknownCommand(clean)
+        return VoiceCommandResult.UnknownCommand(rawText)
     }
 
     private fun parseArabicNumberWord(text: String): Int? {

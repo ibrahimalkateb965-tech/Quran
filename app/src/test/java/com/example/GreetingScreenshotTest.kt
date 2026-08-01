@@ -22,7 +22,7 @@ class GreetingScreenshotTest {
 
   @Test
   fun greeting_screenshot() {
-    composeTestRule.setContent { QuranBlindTheme { Text("القرآن للمكفوفين") } }
+    composeTestRule.setContent { QuranBlindTheme { Text("مُعين") } }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
   }

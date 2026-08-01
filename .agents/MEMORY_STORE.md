@@ -176,3 +176,9 @@
 | **الوكلاء الأصليون** | 23 | (راجع sub_agents.yaml للقائمة الكاملة) |
 
 </div>
+- id: BUG-2026-08-01-002
+  type: bug-fix
+  timestamp: "2026-08-01T15:34:00+03:00"
+  agents: [persistent-memory-engine, debugger, android-testing]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف وتعارض الميكروفون عند الاستماع، وفشل اختبارات VoiceCommandManagerTest."
+  resolution: "إدارة الـ Audio Focus بشكل صارم في VoiceCommandManager (requestAudioFocus و abandonAudioFocus). تعديل VoiceCommandManager ليعيد النص الخام. وتجاوز اختبارات VoiceCommandManagerTest بعد عمل Mock لـ AudioManager لمنع ClassCastException."

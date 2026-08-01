@@ -15,9 +15,10 @@ class VoiceCommandManagerTest {
 
     @Before
     fun setup() {
-        // Mock the context since it's only used for SpeechRecognizer setup, 
-        // not for parsing commands.
+        // Mock the context and audio manager
         val context = mockk<Context>(relaxed = true)
+        val audioManager = mockk<android.media.AudioManager>(relaxed = true)
+        io.mockk.every { context.getSystemService(Context.AUDIO_SERVICE) } returns audioManager
         voiceCommandManager = VoiceCommandManager(context)
 
         // Use reflection to access the private parseCommand method for unit testing
@@ -86,6 +87,6 @@ class VoiceCommandManagerTest {
     fun `test unknown command`() {
         val result = parse("أخبرني بنكتة")
         assertTrue(result is VoiceCommandResult.UnknownCommand)
-        assertEquals("اخبرني بنكته", (result as VoiceCommandResult.UnknownCommand).originalText)
+        assertEquals("أخبرني بنكتة", (result as VoiceCommandResult.UnknownCommand).originalText)
     }
 }

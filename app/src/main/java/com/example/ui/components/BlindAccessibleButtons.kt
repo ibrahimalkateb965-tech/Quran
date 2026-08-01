@@ -80,7 +80,8 @@ fun BlindAccessibleButton(
                 onClickLabel = onClickLabel,
                 onClick = { if (enabled) onClick() },
                 onSingleTap = { if (enabled) onSingleTap() }
-            )
+            ),
+        contentAlignment = Alignment.Center
     ) {
         // Render the actual button but make it technically disabled (or ignore pointer events) 
         // so our Box modifier handles the touches. Wait, if it's disabled, colors change.
@@ -93,7 +94,9 @@ fun BlindAccessibleButton(
         ) {}
         
         Box(
-            modifier = Modifier.padding(contentPadding),
+            modifier = Modifier
+                .matchParentSize()
+                .padding(contentPadding),
             contentAlignment = Alignment.Center
         ) {
             content()

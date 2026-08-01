@@ -28,31 +28,24 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
             isInitialized = true
             
             try {
-                // أولاً نأخذ الصوت الافتراضي للجهاز (الذي خصصه المستخدم في الإعدادات)
-                val defaultVoice = tts?.defaultVoice
-                
-                // إذا كان الصوت الافتراضي يدعم العربية (لغة الهاتف عربية)، نستخدمه مباشرة كما هو
-                if (defaultVoice != null && defaultVoice.locale.language.startsWith("ar")) {
-                    tts?.voice = defaultVoice
-                    Log.d("SpeechManager", "Using default system voice for Arabic: ${defaultVoice.name}")
+                val currentVoice = tts?.voice ?: tts?.defaultVoice
+                val isAlreadyArabic = currentVoice?.locale?.language?.startsWith("ar") == true
+
+                if (!isAlreadyArabic) {
+                    val result = tts?.setLanguage(Locale("ar"))
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.e("SpeechManager", "اللغة العربية غير مدعومة أو ملفاتها مفقودة في محرك الـ TTS الحالي")
+                    }
                 } else {
-                    // إذا لغة الهاتف ليست عربية، نحاول البحث عن الصوت الذي يحتوي على كلمة 'male' 
-                    // في الأصوات العربية المثبتة، أو نكتفي بضبط اللغة العربية
-                    val arabicVoices = tts?.voices?.filter { it.locale.language.startsWith("ar") }
-                    val maleVoice = arabicVoices?.firstOrNull { 
-                        it.name.contains("male", ignoreCase = true) || it.name.endsWith("-local") 
-                    }
-                    
-                    if (maleVoice != null) {
-                        tts?.voice = maleVoice
-                        Log.d("SpeechManager", "Using found male voice: ${maleVoice.name}")
-                    } else {
-                        tts?.setLanguage(Locale("ar"))
-                    }
+                    // السر هنا: إذا كان الصوت الافتراضي عربياً، لا تستدعي setLanguage أبداً!
+                    // استدعاء setLanguage يلغي اختيار المستخدم للصوت (مثلاً الذكري) ويرجعه للصوت الأنثوي الافتراضي للمحرك.
+                    Log.d("SpeechManager", "صوت النظام الافتراضي عربي بالفعل، تم اعتماده كما هو للحفاظ على نبرة المستخدم.")
                 }
             } catch (e: Exception) {
                 tts?.setLanguage(Locale("ar"))
             }
+        } else {
+            Log.e("SpeechManager", "فشل تهيئة محرك النطق TextToSpeech: $status")
         }
     }
 

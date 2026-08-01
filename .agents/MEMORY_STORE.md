@@ -1,6 +1,6 @@
 <div dir="rtl">
 
-# مخزن الذاكرة المركزي لنظام Autovem (MEMORY_STORE.md)
+# مخزن الذاكرة المركزي لمشروع Blind App (MEMORY_STORE.md)
 
 > [!IMPORTANT]
 > هذا الملف هو السجل المركزي للذاكرة المستدامة. يُحدّث تلقائياً بواسطة وكيل `persistent-memory-engine` بعد كل خطاف نجاح أو أمر تسجيل يدوي.
@@ -70,7 +70,7 @@
 ## سجل القرارات المعمارية (Architecture Decisions)
 
 ```yaml
-- id: ADR-2026-07-21-001
+- id: ADR-2026-08-01-001
   type: decision
   timestamp: "2026-07-21T11:00:00+03:00"
   agents: [code-architect, agent-optimizer]
@@ -111,56 +111,51 @@
   timestamp: "2026-07-21T16:50:00+03:00"
   agents: [persistent-memory-engine, code-architect]
   context: "نمط الإيقاظ الفردي لبوتات التطوير (One-Shot Polling Pattern)"
-  content: "لتفعيل دورة اتصال ثنائية الاتجاه بين بوت تليجرام والمحرر (IDE) دون استهلاك المعالج ودون نوم الوكيل، تم اعتماد نمط (One-Shot Polling). يقوم السكربت `poll_once.py` بالدوران في الخلفية حتى يستقبل رسالة واحدة من المستخدم، يكتبها في `telegram_request.json` ثم يغلق نفسه (exit 0). هذا الإغلاق يوقظ بيئة التطوير تلقائياً لتقوم بمعالجة الطلب، إرسال الرد، ومن ثم إعادة تشغيل السكربت مجدداً."
-  tags: [one-shot-polling, lifecycle, background-tasks, process-wakeup]
-  status: active
-```
-
----
-
-## سجل تفضيلات المستخدم (User Preferences)
+  content: "لتفعيل دورة ا�## سجل الأخطاء المحلولة والقائمة (Resolved & Pending Bugs)
 
 ```yaml
-- id: PREF-2026-07-21-001
-  type: preference
-  timestamp: "2026-07-21T11:00:00+03:00"
-  agents: [linguistic-assistant]
-  context: "تفضيلات اللغة والتنسيق"
-  content: "جميع الردود باللغة العربية الفصحى مع تنسيق RTL. مهارات متخصصة فعلياً بدون دمج. اسم النظام: Autovem"
-  tags: [language, rtl, naming]
-  status: active
-
-- id: PREF-2026-07-21-002
-  type: preference
-  timestamp: "2026-07-21T11:50:00+03:00"
-  agents: [persistent-memory-engine]
-  context: "ترتيب أعمدة جداول الخطافات وتسهيل النسخ"
-  content: "تفضيل وضع المحفزات (Triggers) قبل أسماء الوكلاء المسئولين في جداول وملفات الخطافات لسهولة النسخ المباشر للمحفز في واجهات المستخدم والبطاقات."
-  tags: [ui-preference, hooks, triggers-order]
-  status: active
-
-- id: PREF-2026-07-24-001
-  type: preference
-  timestamp: "2026-07-24T15:20:00+03:00"
-  agents: [persistent-memory-engine, frontend-design-builder]
-  context: "تصدير ملف الإكسيل لتطبيق مكتبة الأوامر (Prompt Library)"
-  content: "عند بناء ملف الإكسيل الخاص بالخطافات لتطبيق الويب، يجب الالتزام الصارم بتخصيص العمود الثالث ليكون (المحفزات - Triggers فقط) لضمان أن زر النسخ في التطبيق ينسخ المحفز فقط لتشغيل الوكيل، بينما يتم عزل (الوصف والتفاصيل) في عمود مستقل (الأخير) ليتم عرضه للمستخدم كمعلومات دون أن يتداخل مع النص المنسوخ."
+- id: MEM-2026-08-01-001
+  type: bug-fix
+  timestamp: "2026-08-01T01:25:00+03:00"
+  agents: [persistent-memory-engine, android-kotlin-pro, debugger]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف (صوت أنثوي بدلاً من المألوف)"
+  content: "الدروس المستفادة من هذه المرحلة:\n1. منع الميكروفون من العمل أثناء النطق لتفادي تعارض Audio Focus.\n2. ضرورة إضافة `<queries>` لخدمة `RecognitionService` في أندرويد 11+.\n3. تطبيق تطبيع الحروف العربية للنصوص الملتقطة بالصوت (Normalization).\n\nالمشكلة المتبقية: لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب في جلسة العمل القادمة إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
+  tags: [tts, accessibility, speech-recognizer, pending]
+  status: pending_investigation
+```�طافات لتطبيق الويب، يجب الالتزام الصارم بتخصيص العمود الثالث ليكون (المحفزات - Triggers فقط) لضمان أن زر النسخ في التطبيق ينسخ المحفز فقط لتشغيل الوكيل، بينما يتم عزل (الوصف والتفاصيل) في عمود مستقل (الأخير) ليتم عرضه للمستخدم كمعلومات دون أن يتداخل مع النص المنسوخ."
   tags: [excel-export, ui-preference, prompt-library, copy-action]
   status: active
 ```
 
 ---
 
-## سجل الأخطاء المحلولة (Resolved Bugs)
+## سجل الأخطاء المحلولة والقائمة (Resolved & Pending Bugs)
 
 ```yaml
-- id: MEM-2026-07-21-007
+- id: BUG-2026-08-01-001
+  type: bug-fix
+  timestamp: "2026-08-01T01:25:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف (صوت أنثوي بدلاً من المألوف)"
+  content: "لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
+  tags: [tts, accessibility, pending]
+  status: pending_investigation
+```
+
+</div>7-21-007
   type: bug-fix
   timestamp: "2026-07-21T21:23:00+03:00"
   agents: [persistent-memory-engine, debugger]
   context: "فشل إنشاء سجل جديد (Failed to create record) في PocketBase مع بيانات استجابة فارغة (data: {})"
   content: "عند إرسال طلب لإنشاء سجل يحتوي على حقول علاقات (Relations)، يجب التأكد أن قيمة الحقل المُرسلة هي الـ ID الخاص بالعنصر (وهو نص مكون من 15 حرفاً). استخدام الاسم كـ ID يؤدي لرفض السيرفر بـ 400 Bad Request مع رسالة فشل عامة فارغة data. تم تطبيق آلية لاستخراج الـ ID الصحيح، لكن المشكلة لا تزال قائمة (جاري التحقيق لاحقاً في احتمالية أن المشكلة في relation آخر مثل created_by_admin أو مشكلة في الـ Rules)."
   tags: [pocketbase, bug-fix, relations, api, pending]
+- id: MEM-2026-08-01-001
+  type: bug-fix
+  timestamp: "2026-08-01T01:25:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف (صوت أنثوي بدلاً من المألوف)"
+  content: "الدروس المستفادة من هذه المرحلة:\n1. منع الميكروفون من العمل أثناء النطق لتفادي تعارض Audio Focus.\n2. ضرورة إضافة `<queries>` لخدمة `RecognitionService` في أندرويد 11+.\n3. تطبيق تطبيع الحروف العربية للنصوص الملتقطة بالصوت (Normalization).\n\nالمشكلة المتبقية: لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب في جلسة العمل القادمة إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
+  tags: [tts, accessibility, speech-recognizer, pending]
   status: pending_investigation
 ```
 

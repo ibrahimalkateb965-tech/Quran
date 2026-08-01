@@ -7,6 +7,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 
+import androidx.compose.ui.composed
+import androidx.compose.ui.platform.LocalContext
+import android.view.accessibility.AccessibilityManager
+import android.content.Context
+import androidx.compose.foundation.clickable
+
 /**
  * A custom modifier that requires a physical double-tap to activate when TalkBack is OFF,
  * but still correctly responds to TalkBack's virtual click (which is triggered by the user's
@@ -18,25 +24,26 @@ fun Modifier.blindAccessibleClickable(
     role: Role? = null,
     onSingleTap: () -> Unit = {},
     onClick: () -> Unit
-): Modifier {
-    return this
-        .combinedClickable(
+): Modifier = composed {
+    val context = LocalContext.current
+    val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+    val isTalkBackEnabled = am.isTouchExplorationEnabled
+
+    if (isTalkBackEnabled) {
+        // إذا كان TalkBack الخاص بالهاتف مفعلاً، نستخدم clickable القياسي.
+        // نظام TalkBack سيحول الضغطة المزدوجة التخيلية إلى onClick مباشرة بشكل سليم.
+        this.clickable(
+            onClickLabel = onClickLabel,
             role = role,
-            onClick = { 
-                // When TalkBack is OFF, physical single tap lands here.
-                onSingleTap() 
-            },
-            onDoubleClick = { 
-                // When TalkBack is OFF, physical double tap lands here.
-                onClick() 
-            }
+            onClick = onClick
         )
-        // Override the semantics so TalkBack's ACTION_CLICK maps to the actual action,
-        // ignoring the empty or single-tap-only onClick above.
-        .semantics(mergeDescendants = true) {
-            onClick(label = onClickLabel, action = {
-                onClick()
-                true
-            })
-        }
+    } else {
+        // إذا كان TalkBack معطلاً، نستخدم المنطق المخصص لتطبيقنا (المساعد الداخلي).
+        // ضغطة واحدة = نطق، ضغطتين = تفعيل.
+        this.combinedClickable(
+            role = role,
+            onClick = onSingleTap,
+            onDoubleClick = onClick
+        )
+    }
 }

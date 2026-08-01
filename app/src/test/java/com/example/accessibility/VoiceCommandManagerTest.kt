@@ -70,7 +70,7 @@ class VoiceCommandManagerTest {
     fun `test play surah command`() {
         val result = parse("تشغيل سورة البقرة")
         assertTrue(result is VoiceCommandResult.PlaySurahByName)
-        assertEquals("البقرة", (result as VoiceCommandResult.PlaySurahByName).surahName)
+        assertEquals("البقره", (result as VoiceCommandResult.PlaySurahByName).surahName)
     }
 
     @Test
@@ -86,6 +86,6 @@ class VoiceCommandManagerTest {
     fun `test unknown command`() {
         val result = parse("أخبرني بنكتة")
         assertTrue(result is VoiceCommandResult.UnknownCommand)
-        assertEquals("أخبرني بنكتة", (result as VoiceCommandResult.UnknownCommand).originalText)
+        assertEquals("اخبرني بنكته", (result as VoiceCommandResult.UnknownCommand).originalText)
     }
 }

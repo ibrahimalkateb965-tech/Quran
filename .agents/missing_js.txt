@@ -1,0 +1,139 @@
+        let activeTab = "الكل (All)";
+        let currentlyRendered = []; // Global array to prevent quote/backtick escaping issues in HTML attributes
+
+        // Initialize UI
+        document.addEventListener("DOMContentLoaded", () => {
+            renderTabs();
+            renderCards();
+            
+            // Search Input listener
+            document.getElementById("searchInput").addEventListener("input", () => {
+                renderCards();
+            });
+
+            // Excel File parser listener
+            document.getElementById("excelFile").addEventListener("change", handleFile, false);
+        });
+
+        // Render Navigation Tabs
+        function renderTabs() {
+            const container = document.getElementById("tabsContainer");
+            container.innerHTML = "";
+            
+            // Add "ALL" tab first
+            const allTab = document.createElement("div");
+            allTab.className = `tab ${activeTab === "الكل (All)" ? 'active' : ''}`;
+            allTab.textContent = "الكل (All)";
+            allTab.onclick = () => {
+                activeTab = "الكل (All)";
+                renderTabs();
+                renderCards();
+            };
+            container.appendChild(allTab);
+            
+            // Add individual sheet tabs
+            Object.keys(libraryData).forEach(sheetName => {
+                if(sheetName === "الملخص العام") return; // Skip summary from tabs if you want, or leave it. Actually the original code probably didn't skip it, but let's just add it.
+                // Wait, if it didn't skip it, it would show "الملخص العام" as a tab.
+                const tab = document.createElement("div");
+                tab.className = `tab ${sheetName === activeTab ? 'active' : ''}`;
+                tab.textContent = sheetName;
+                tab.onclick = () => {
+                    activeTab = sheetName;
+                    renderTabs();
+                    renderCards();
+                };
+                container.appendChild(tab);
+            });
+        }
+
+        function escapeHtml(unsafe) {
+            return (unsafe || "").toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        // Render Cards
+        function renderCards() {
+            const grid = document.getElementById("promptsGrid");
+            grid.innerHTML = "";
+            currentlyRendered = [];
+
+            const query = document.getElementById("searchInput").value.toLowerCase();
+            
+            let dataToRender = [];
+            if (activeTab === "الكل (All)") {
+                dataToRender = libraryData["الملخص العام"] || [];
+            } else {
+                dataToRender = libraryData[activeTab] || [];
+            }
+
+            if (query) {
+                dataToRender = dataToRender.filter(item => {
+                    const searchable = (item.Name + " " + item.Prompt + " " + (item.Details || "") + " " + (item.Goal || "")).toLowerCase();
+                    return searchable.includes(query);
+                });
+            }
+
+            if (dataToRender.length === 0) {
+                grid.innerHTML = `<div class="empty-state"><i class="fa-solid fa-ghost empty-icon"></i><p>لم يتم العثور على أي خطاف يطابق بحثك...</p></div>`;
+                return;
+            }
+
+            dataToRender.forEach((item, index) => {
+                currentlyRendered.push(item);
+                const card = document.createElement("div");
+                card.className = "prompt-card";
+
+                // Build agent pills
+                let agentsHtml = '';
+                if (item.Agents) {
+                    const agentsList = item.Agents.split(',').map(a => a.trim());
+                    agentsList.forEach(agent => {
+                        agentsHtml += `<span class="agent-pill">${escapeHtml(agent)}</span>`;
+                    });
+                }
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <span class="card-no">#${item.No}</span>
+                            <span class="sheet-tag" title="${escapeHtml(item.Name)}">${escapeHtml(item.Name)}</span>
+                        </div>
+                        <button class="btn-copy" onclick="copyByIndex(this, ${index})" title="نسخ المحفز">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                    
+                    <h3 class="card-title">${escapeHtml(item.Name)}</h3>
+                    
+                    ${item.Prompt ? `<div class="card-prompt ${/[a-zA-Z]/.test(item.Prompt) ? '' : 'rtl-text'}">${escapeHtml(item.Prompt)}</div>` : ''}
+
+                    ${agentsHtml ? `
+                        <div class="card-agents">
+                            <div class="agents-label">الوكلاء المتخصصين:</div>
+                            ${agentsHtml}
+                        </div>
+                    ` : ''}
+
+                    ${(item.Goal || item.Details) ? `
+                        <div class="card-details">
+                            ${item.Goal ? `
+                            <div class="details-section">
+                                <span class="details-title goal-title"><i class="fa-solid fa-bullseye"></i> الهدف:</span>
+                                <div class="details-body">${escapeHtml(item.Goal)}</div>
+                            </div>
+                            ` : ''}
+                            
+                            ${(item.Goal && item.Details) ? `<div class="details-divider"></div>` : ''}
+
+                            ${item.Details ? `
+                            <div class="details-section">
+                                <span class="details-title"><i class="fa-solid fa-list-check"></i> التفاصيل والإجراءات:</span>
+                                <div class="details-body">${marked.parse(item.Details || "")}</div>
+                            </div>
+                            ` : ''}
+                        </div>

@@ -32,7 +32,7 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
                 val isAlreadyArabic = currentVoice?.locale?.language?.startsWith("ar") == true
 
                 if (!isAlreadyArabic) {
-                    val result = tts?.setLanguage(Locale("ar"))
+                    val result = tts?.setLanguage(Locale.Builder().setLanguage("ar").build())
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                         Log.e("SpeechManager", "اللغة العربية غير مدعومة أو ملفاتها مفقودة في محرك الـ TTS الحالي")
                     }
@@ -42,7 +42,7 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
                     Log.d("SpeechManager", "صوت النظام الافتراضي عربي بالفعل، تم اعتماده كما هو للحفاظ على نبرة المستخدم.")
                 }
             } catch (e: Exception) {
-                tts?.setLanguage(Locale("ar"))
+                tts?.setLanguage(Locale.Builder().setLanguage("ar").build())
             }
         } else {
             Log.e("SpeechManager", "فشل تهيئة محرك النطق TextToSpeech: $status")

@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,8 +34,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
@@ -61,6 +63,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,9 +164,10 @@ fun QuranPlayerScreen(
                     HeaderBar(
                         onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
                         onOpenReciters = { viewModel.toggleReciterDialog(true) },
-                        onOpenHelp = { viewModel.toggleHelpDialog(true) },
                         onToggleScreenOff = { viewModel.toggleScreenOffMode() },
                         isScreenOffMode = uiState.isScreenOffMode,
+                        isContinuousPlayEnabled = uiState.isContinuousPlayEnabled,
+                        onToggleContinuousPlay = { viewModel.toggleContinuousPlay() },
                         onSingleTapAnnounce = { viewModel.announce(it) }
                     )
 
@@ -214,57 +219,58 @@ fun QuranPlayerScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 3-Ayah List Display
-                    Column(
+                    // HorizontalPager for Ayahs
+                    val pagerState = rememberPagerState(
+                        initialPage = uiState.currentAyahIndex,
+                        pageCount = { ayahs.size }
+                    )
+
+                    // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
+                    LaunchedEffect(uiState.currentAyahIndex) {
+                        if (pagerState.currentPage != uiState.currentAyahIndex && uiState.currentAyahIndex in ayahs.indices) {
+                            pagerState.animateScrollToPage(uiState.currentAyahIndex)
+                        }
+                    }
+
+                    // Sync Pager state to ViewModel (when user swipes)
+                    LaunchedEffect(pagerState) {
+                        snapshotFlow { pagerState.currentPage }.collect { page ->
+                            // Read fresh state to avoid stale capture
+                            val currentIndex = viewModel.uiState.value.currentAyahIndex
+                            if (page != currentIndex && page in ayahs.indices) {
+                                viewModel.goToAyah(page)
+                            }
+                        }
+                    }
+
+                    HorizontalPager(
+                        state = pagerState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        val currentIndex = uiState.currentAyahIndex
-                        
-                        // Previous Ayah Card
-                        val prevAyah = ayahs.getOrNull(currentIndex - 1)
-                        if (prevAyah != null) {
-                            AyahCard(
-                                ayah = prevAyah,
-                                label = "الآية السابقة",
-                                isCurrent = false,
-                                onClick = { viewModel.playPreviousAyah() },
-                                onSingleTap = { viewModel.announce("الآية ${prevAyah.numberInSurah} السابقة") },
-                                modifier = Modifier.weight(1f)
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                        
-                        // Current Ayah Card
-                        val currAyah = ayahs.getOrNull(currentIndex)
-                        if (currAyah != null) {
-                            AyahCard(
-                                ayah = currAyah,
-                                label = "الآية الحالية",
-                                isCurrent = true,
-                                isPlaying = uiState.isPlaying,
-                                onClick = { viewModel.togglePlayback() },
-                                onSingleTap = { viewModel.announce("الآية ${currAyah.numberInSurah} الحالية") },
-                                modifier = Modifier.weight(1.3f)
-                            )
-                        }
-                        
-                        // Next Ayah Card
-                        val nextAyah = ayahs.getOrNull(currentIndex + 1)
-                        if (nextAyah != null) {
-                            AyahCard(
-                                ayah = nextAyah,
-                                label = "الآية التالية",
-                                isCurrent = false,
-                                onClick = { viewModel.playNextAyah() },
-                                onSingleTap = { viewModel.announce("الآية ${nextAyah.numberInSurah} التالية") },
-                                modifier = Modifier.weight(1f)
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
+                            .weight(1f)
+                    ) { page ->
+                        val ayah = ayahs.getOrNull(page)
+                        if (ayah != null) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                AyahCard(
+                                    ayah = ayah,
+                                    isCurrent = (page == uiState.currentAyahIndex),
+                                    isPlaying = (page == uiState.currentAyahIndex) && uiState.isPlaying,
+                                    onClick = { },
+                                    onDoubleTap = { viewModel.togglePlayback() },
+                                    onSingleTap = { },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                AyahNumberCard(number = ayah.numberInSurah)
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
                         }
                     }
 
@@ -284,14 +290,7 @@ fun QuranPlayerScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Accessibility Voice Command Big Button
-                    BigVoiceMicrophoneButton(
-                        isListening = uiState.isListeningVoice,
-                        onClick = { viewModel.startVoiceCommand() },
-                        onSingleTapAnnounce = { viewModel.announce(it) }
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
+                    // Spacer(modifier = Modifier.height(10.dp))
 
                     // Primary Playback & Control Panel
                     ControlPanel(
@@ -363,18 +362,6 @@ fun QuranPlayerScreen(
                     )
                 }
 
-                // Voice Guide Sheet
-                if (uiState.showHelpDialog) {
-                    VoiceCommandGuideSheet(
-                        onSpeakGuide = {
-                            viewModel.announce(
-                                "دليل الأوامر الصوتية. قل: تشغيل سورة كذا، أو الآية كذا، أو توقف، أو تشغيل، أو التالي، أو تكرار، أو أسماء القراء، أو قائمة السور."
-                            )
-                        },
-                        onDismiss = { viewModel.toggleHelpDialog(false) },
-                        onAnnounce = { viewModel.announce(it) }
-                    )
-                }
             }
         }
     }
@@ -436,9 +423,10 @@ fun GestureHintChip(label: String) {
 fun HeaderBar(
     onOpenSurahIndex: () -> Unit,
     onOpenReciters: () -> Unit,
-    onOpenHelp: () -> Unit,
     onToggleScreenOff: () -> Unit,
     isScreenOffMode: Boolean,
+    isContinuousPlayEnabled: Boolean,
+    onToggleContinuousPlay: () -> Unit,
     onSingleTapAnnounce: (String) -> Unit
 ) {
     Row(
@@ -452,68 +440,73 @@ fun HeaderBar(
 
         // Action Buttons Row
         Row(verticalAlignment = Alignment.CenterVertically) {
-            BlindAccessibleIconButton(
+            HeaderAccessibleButton(
                 onClick = onOpenSurahIndex,
                 onClickLabel = "فتح فهرس السور",
                 onSingleTap = { onSingleTapAnnounce("فهرس السور") },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(DarkImmersiveCard, CircleShape)
-                    .border(1.dp, DarkImmersiveBorder, CircleShape)
-                    .testTag("surah_index_button")
-            ) {
-                Icon(Icons.Default.List, contentDescription = "فهرس السور", tint = AccessibleGold)
-            }
-
+                testTag = "surah_index_button",
+                icon = Icons.AutoMirrored.Filled.List,
+                contentDescription = "فهرس السور"
+            )
             Spacer(modifier = Modifier.width(6.dp))
-
-            BlindAccessibleIconButton(
+            HeaderAccessibleButton(
                 onClick = onOpenReciters,
                 onClickLabel = "تغيير القارئ المفضل",
                 onSingleTap = { onSingleTapAnnounce("اختيار القارئ") },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(DarkImmersiveCard, CircleShape)
-                    .border(1.dp, DarkImmersiveBorder, CircleShape)
-                    .testTag("reciter_select_button")
-            ) {
-                Icon(Icons.Default.Person, contentDescription = "اختيار القارئ", tint = AccessibleGold)
-            }
-
+                testTag = "reciter_select_button",
+                icon = Icons.Default.Person,
+                contentDescription = "اختيار القارئ"
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            HeaderAccessibleButton(
+                onClick = onToggleContinuousPlay,
+                onClickLabel = "زر التشغيل المتواصل",
+                onSingleTap = { onSingleTapAnnounce("التشغيل المتواصل") },
+                testTag = "continuous_play_toggle",
+                icon = Icons.Default.Repeat,
+                contentDescription = "التشغيل المتواصل",
+                isActive = isContinuousPlayEnabled
+            )
             Spacer(modifier = Modifier.width(6.dp))
 
-            BlindAccessibleIconButton(
-                onClick = onOpenHelp,
-                onClickLabel = "تعليمات الأوامر الصوتية",
-                onSingleTap = { onSingleTapAnnounce("دليل المساعدة") },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(DarkImmersiveCard, CircleShape)
-                    .border(1.dp, DarkImmersiveBorder, CircleShape)
-                    .testTag("help_guide_button")
-            ) {
-                Icon(Icons.Default.HelpOutline, contentDescription = "دليل المساعدة", tint = AccessibleGold)
-            }
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            BlindAccessibleIconButton(
+            HeaderAccessibleButton(
                 onClick = onToggleScreenOff,
                 onClickLabel = "وضع إيقاف الشاشة لتوفير البطارية",
                 onSingleTap = { onSingleTapAnnounce("وضع إيقاف الشاشة") },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(if (isScreenOffMode) AccessibleGold else DarkImmersiveCard, CircleShape)
-                    .border(1.dp, if (isScreenOffMode) AccessibleGold else DarkImmersiveBorder, CircleShape)
-                    .testTag("screen_off_toggle")
-            ) {
-                Icon(
-                    Icons.Default.PowerSettingsNew,
-                    contentDescription = "وضع إيقاف الشاشة",
-                    tint = if (isScreenOffMode) DarkImmersiveBg else AccessibleGold
-                )
-            }
+                testTag = "screen_off_toggle",
+                icon = Icons.Default.PowerSettingsNew,
+                contentDescription = "وضع إيقاف الشاشة",
+                isActive = isScreenOffMode
+            )
         }
+    }
+}
+
+@Composable
+private fun HeaderAccessibleButton(
+    onClick: () -> Unit,
+    onClickLabel: String,
+    onSingleTap: () -> Unit,
+    testTag: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    isActive: Boolean = false
+) {
+    BlindAccessibleIconButton(
+        onClick = onClick,
+        onClickLabel = onClickLabel,
+        onSingleTap = onSingleTap,
+        modifier = Modifier
+            .size(48.dp)
+            .background(if (isActive) AccessibleGold else DarkImmersiveCard, CircleShape)
+            .border(1.dp, if (isActive) AccessibleGold else DarkImmersiveBorder, CircleShape)
+            .testTag(testTag)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (isActive) DarkImmersiveBg else AccessibleGold
+        )
     }
 }
 
@@ -623,49 +616,32 @@ fun ControlPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Repeat Tarkiz Button
-        BlindAccessibleIconButton(
+        val repeatText = if (tarkizRepeatMode == 1) "بدون تكرار" else "تكرار $tarkizRepeatMode مرات"
+        ControlAccessibleButton(
             onClick = onToggleRepeat,
-            onClickLabel = "وضع تكرار الحفظ والتركيز. الحالي: ${if (tarkizRepeatMode == 1) "بدون تكرار" else "تكرار $tarkizRepeatMode مرات"}",
+            onClickLabel = "وضع تكرار الحفظ والتركيز. الحالي: $repeatText",
             onSingleTap = { onSingleTapAnnounce("وضع التكرار") },
-            modifier = Modifier
-                .size(54.dp)
-                .testTag("repeat_tarkiz_button")
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Repeat,
-                    contentDescription = "وضع التكرار",
-                    tint = if (tarkizRepeatMode > 1) AccessibleGreenAccent else TextPrimaryWhite,
-                    modifier = Modifier.size(30.dp)
-                )
-                if (tarkizRepeatMode > 1 && tarkizRepeatMode != 99) {
-                    Text(
-                        text = "$tarkizRepeatMode",
-                        color = AccessibleGreenAccent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                }
-            }
-        }
+            testTag = "repeat_tarkiz_button",
+            icon = Icons.Default.Repeat,
+            contentDescription = "وضع التكرار",
+            isActive = tarkizRepeatMode > 1,
+            badgeText = if (tarkizRepeatMode > 1 && tarkizRepeatMode != 99) "$tarkizRepeatMode" else null,
+            buttonSize = 54.dp,
+            iconSize = 30.dp
+        )
 
         // Previous Ayah Button
-        BlindAccessibleIconButton(
+        ControlAccessibleButton(
             onClick = onPrev,
             onClickLabel = "الانتقال للآية السابقة",
             onSingleTap = { onSingleTapAnnounce("الانتقال للآية السابقة") },
-            modifier = Modifier
-                .size(56.dp)
-                .testTag("prev_ayah_button")
-        ) {
-            Icon(
-                imageVector = Icons.Default.SkipPrevious,
-                contentDescription = "الآية السابقة",
-                tint = AccessibleGold,
-                modifier = Modifier.size(38.dp)
-            )
-        }
+            testTag = "prev_ayah_button",
+            icon = Icons.Default.SkipPrevious,
+            contentDescription = "الآية السابقة",
+            isActive = true,
+            buttonSize = 56.dp,
+            iconSize = 38.dp
+        )
 
         // Main Play/Pause Big Center Button
         BlindAccessibleButton(
@@ -688,37 +664,70 @@ fun ControlPanel(
         }
 
         // Next Ayah Button
-        BlindAccessibleIconButton(
+        ControlAccessibleButton(
             onClick = onNext,
             onClickLabel = "الانتقال للآية التالية",
             onSingleTap = { onSingleTapAnnounce("الانتقال للآية التالية") },
-            modifier = Modifier
-                .size(56.dp)
-                .testTag("next_ayah_button")
-        ) {
-            Icon(
-                imageVector = Icons.Default.SkipNext,
-                contentDescription = "الآية التالية",
-                tint = AccessibleGold,
-                modifier = Modifier.size(38.dp)
-            )
-        }
+            testTag = "next_ayah_button",
+            icon = Icons.Default.SkipNext,
+            contentDescription = "الآية التالية",
+            isActive = true,
+            buttonSize = 56.dp,
+            iconSize = 38.dp
+        )
 
         // Bookmark Toggle Button
-        BlindAccessibleIconButton(
+        ControlAccessibleButton(
             onClick = onToggleBookmark,
             onClickLabel = if (isBookmarked) "إزالة الآية من المفضلة" else "حفظ الآية في المفضلة والإشارات المرجعية",
             onSingleTap = { onSingleTapAnnounce("تغيير حالة المفضلة") },
-            modifier = Modifier
-                .size(54.dp)
-                .testTag("bookmark_toggle_button")
-        ) {
+            testTag = "bookmark_toggle_button",
+            icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+            contentDescription = if (isBookmarked) "إزالة من المفضلة" else "إضافة للمفضلة",
+            isActive = isBookmarked,
+            buttonSize = 54.dp,
+            iconSize = 32.dp
+        )
+    }
+}
+
+@Composable
+private fun ControlAccessibleButton(
+    onClick: () -> Unit,
+    onClickLabel: String,
+    onSingleTap: () -> Unit,
+    testTag: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    isActive: Boolean = false,
+    badgeText: String? = null,
+    buttonSize: androidx.compose.ui.unit.Dp,
+    iconSize: androidx.compose.ui.unit.Dp
+) {
+    BlindAccessibleIconButton(
+        onClick = onClick,
+        onClickLabel = onClickLabel,
+        onSingleTap = onSingleTap,
+        modifier = Modifier
+            .size(buttonSize)
+            .testTag(testTag)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
             Icon(
-                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                contentDescription = if (isBookmarked) "إزالة من المفضلة" else "إضافة للمفضلة",
-                tint = if (isBookmarked) AccessibleGold else TextPrimaryWhite,
-                modifier = Modifier.size(32.dp)
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (isActive) AccessibleGold else TextPrimaryWhite,
+                modifier = Modifier.size(iconSize)
             )
+            if (badgeText != null) {
+                Text(
+                    text = badgeText,
+                    color = AccessibleGreenAccent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
         }
     }
 }
@@ -769,10 +778,10 @@ fun ScreenOffSaverOverlay(
 @Composable
 fun AyahCard(
     ayah: com.example.data.model.Ayah,
-    label: String,
     isCurrent: Boolean,
     isPlaying: Boolean = false,
     onClick: () -> Unit,
+    onDoubleTap: () -> Unit = {},
     onSingleTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -782,15 +791,19 @@ fun AyahCard(
     
     Card(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .semantics { 
-                contentDescription = "$label: رقم ${ayah.numberInSurah}، ${ayah.textArabic}"
+                contentDescription = "الآية رقم ${ayah.numberInSurah}، ${ayah.textArabic}"
             }
-            .blindAccessibleClickable(
-                onClickLabel = "تشغيل الآية",
-                onClick = onClick,
-                onSingleTap = onSingleTap
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = { onDoubleTap() },
+                    onTap = { 
+                        onClick()
+                        onSingleTap()
+                    }
+                )
+            },
         colors = CardDefaults.cardColors(containerColor = bgColor),
         shape = RoundedCornerShape(20.dp),
         border = androidx.compose.foundation.BorderStroke(if (isCurrent) 2.dp else 1.dp, borderColor),
@@ -803,29 +816,44 @@ fun AyahCard(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "$label - الآية ${ayah.numberInSurah}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isCurrent) AccessibleGold else TextMutedZinc,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.weight(1f))
             
             Text(
                 text = ayah.textArabic,
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineLarge,
                 color = if (isCurrent) TextPrimaryWhite else TextMutedZinc,
                 textAlign = TextAlign.Center,
-                lineHeight = 36.sp,
-                maxLines = 3,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                lineHeight = 44.sp
             )
             
             if (isCurrent && isPlaying) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 AudioEqualizerBars(isPlaying = true)
             }
+            
+            Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun AyahNumberCard(number: Int) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
+        border = androidx.compose.foundation.BorderStroke(1.dp, DarkImmersiveBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "الآية $number",
+                style = MaterialTheme.typography.titleLarge,
+                color = AccessibleGold,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

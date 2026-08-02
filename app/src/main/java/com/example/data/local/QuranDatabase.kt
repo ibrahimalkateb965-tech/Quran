@@ -19,7 +19,7 @@ abstract class QuranDatabase : RoomDatabase() {
                     context.applicationContext,
                     QuranDatabase::class.java,
                     "quran_a11y_database"
-                ).fallbackToDestructiveMigration().build()
+                ).fallbackToDestructiveMigration(true).build()
                 INSTANCE = instance
                 instance
             }

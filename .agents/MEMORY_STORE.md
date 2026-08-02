@@ -182,3 +182,26 @@
   agents: [persistent-memory-engine, debugger, android-testing]
   context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف وتعارض الميكروفون عند الاستماع، وفشل اختبارات VoiceCommandManagerTest."
   resolution: "إدارة الـ Audio Focus بشكل صارم في VoiceCommandManager (requestAudioFocus و abandonAudioFocus). تعديل VoiceCommandManager ليعيد النص الخام. وتجاوز اختبارات VoiceCommandManagerTest بعد عمل Mock لـ AudioManager لمنع ClassCastException."
+
+## الدروس المستفادة من مشروع تطبيق المكفوفين (TTS & STT)
+1. **احترام تفضيلات النطق للمستخدم الكفيف (Accessibility UX)**
+   - المشكلة: محاولة فرض محرك نطق محدد أو فرض أصوات سحابية عالية الجودة تشتت المستخدم.
+   - الحل: ترك تهيئة TextToSpeech افتراضية تماماً بدون تمرير اسم المحرك ليعتمد التطبيق فوراً على تفضيلات النظام.
+2. **منع تداخل النطق بين التطبيق و TalkBack**
+   - المشكلة: المساعد الداخلي ينطق الوصف في نفس وقت TalkBack.
+   - الحل: منع النطق الداخلي إذا كان isTalkBackEnabled صحيحاً. توفير contentDescription بدلاً من ذلك.
+3. **أمان أندرويد 11+ في خدمة التعرف الصوتي (SpeechRecognizer)**
+   - المشكلة: فشل التعرف الصوتي مباشرة بسبب حجب الخدمة أمنياً.
+   - الحل: إضافة queries في AndroidManifest.xml للسماح بالوصول لخدمة جوجل.
+4. **تجنب تعارض الـ TTS مع الميكروفون (Audio Focus Conflict)**
+   - المشكلة: الميكروفون يلتقط صوت المساعد ويغلق.
+   - الحل: عدم تشغيل TTS.speak قبل فتح الميكروفون مباشرة. الاعتماد على الرنة الافتراضية القصيرة (Beep).
+5. **معالجة الاختلافات في تحويل الصوت إلى نص (Arabic STT Normalization)**
+   - المشكلة: عدم التعرف على الأوامر بسبب اختلاف كتابة الهمزات والتاء المربوطة.
+   - الحل: تطبيق نظام تطبيع (Normalization) لتوحيد الحروف قبل المقارنة.
+6. **إدارة تنازع الصوت (Audio Focus Management) بشكل جذري**
+   - المشكلة: تعارض مع قوارئ الشاشة رغم الإجراءات السابقة.
+   - الحل: استدعاء requestAudioFocus مع AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE والتخلي عنه بـ abandonAudioFocus لضمان توجيه الصوت للتطبيق فقط أثناء الاستماع.
+7. **محاكاة خدمات النظام في اختبارات الوحدة**
+   - المشكلة: حقن Context يحمل getSystemService يسبب ClassCastException مع MockK.
+   - الحل: عمل Mock صريح للخدمة وإرجاعها عند طلبها من الـ Context.

@@ -75,6 +75,18 @@ class VoiceCommandManagerTest {
     }
 
     @Test
+    fun `test continuous play command`() {
+        assertTrue(parse("استماع متواصل") is VoiceCommandResult.ToggleContinuousPlay)
+        assertTrue(parse("تشغيل متواصل") is VoiceCommandResult.ToggleContinuousPlay)
+    }
+
+    @Test
+    fun `test replay ayah command`() {
+        assertTrue(parse("كرر الآية") is VoiceCommandResult.ReplayAyah)
+        assertTrue(parse("اعادة الاية") is VoiceCommandResult.ReplayAyah)
+    }
+
+    @Test
     fun `test reciter change command`() {
         assertTrue(parse("صوت الحصري") is VoiceCommandResult.ChangeReciter)
         assertEquals("husary", (parse("صوت الحصري") as VoiceCommandResult.ChangeReciter).reciterId)

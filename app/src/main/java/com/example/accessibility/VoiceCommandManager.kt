@@ -20,6 +20,8 @@ sealed class VoiceCommandResult {
     object PreviousAyah : VoiceCommandResult()
     object ToggleBookmark : VoiceCommandResult()
     object ToggleRepeatMode : VoiceCommandResult()
+    object ToggleContinuousPlay : VoiceCommandResult()
+    object ReplayAyah : VoiceCommandResult()
     data class ChangeReciter(val reciterId: String) : VoiceCommandResult()
     object ShowSurahIndex : VoiceCommandResult()
     object ShowHelp : VoiceCommandResult()
@@ -178,6 +180,9 @@ class VoiceCommandManager(private val context: Context) {
         if (clean.contains("توقف") || clean.contains("ايقاف") || clean.contains("اسكت") || clean.contains("اقطع")) {
             return VoiceCommandResult.Pause
         }
+        if (clean.contains("استماع متواصل") || clean.contains("تشغيل متواصل") || clean.contains("تلقائي")) {
+            return VoiceCommandResult.ToggleContinuousPlay
+        }
         if ((clean.contains("تشغيل") && !clean.contains("سوره") && !clean.contains("صوره")) || clean.contains("استيناف") || clean.contains("واصل")) {
             return VoiceCommandResult.Resume
         }
@@ -190,8 +195,11 @@ class VoiceCommandManager(private val context: Context) {
         if (clean.contains("مرجعيه") || clean.contains("علامه") || clean.contains("حفظ الايه") || clean.contains("مفضله")) {
             return VoiceCommandResult.ToggleBookmark
         }
-        if (clean.contains("تكرار") || clean.contains("تاكيد") || clean.contains("تركيز") || clean.contains("حفظ")) {
+        if (clean.contains("تكرار") && !clean.contains("كرر الايه") || clean.contains("تاكيد") || clean.contains("تركيز") || clean.contains("حفظ")) {
             return VoiceCommandResult.ToggleRepeatMode
+        }
+        if (clean.contains("كرر الايه") || clean.contains("اعاده الايه") || clean.contains("اعد الايه")) {
+            return VoiceCommandResult.ReplayAyah
         }
         if (clean.contains("قائمه") || clean.contains("قايمه") || clean.contains("فهرس") || 
             (clean.contains("سور") && !clean.contains("سوره")) || 

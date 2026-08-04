@@ -10,11 +10,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.lifecycleScope
+import com.example.security.TrialManager
 import com.example.ui.screens.QuranPlayerScreen
 import com.example.ui.screens.TrialExpiredScreen
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.viewmodel.QuranViewModel
-import java.util.Calendar
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -27,10 +31,10 @@ class MainActivity : ComponentActivity() {
         if (!recordAudioGranted) {
             viewModel.announce("تنبيه: صلاحية الميكروفون مطلوبة لتفعيل الأوامر الصوتية.")
         }
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notificationsGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
-            if (!notificationsGranted && recordAudioGranted) { // Don't announce both at exactly the same time if both denied
+            if (!notificationsGranted && recordAudioGranted) {
                 viewModel.announce("تنبيه: صلاحية الإشعارات مطلوبة لتشغيل الصوت في الخلفية.")
             }
         }
@@ -42,26 +46,27 @@ class MainActivity : ComponentActivity() {
 
         checkAndRequestPermissions()
 
-        val trialExpired = isTrialExpired()
-
         setContent {
             QuranBlindTheme {
-                if (trialExpired) {
-                    TrialExpiredScreen(
-                        onAnnounce = { msg -> viewModel.announce(msg) }
-                    )
-                } else {
-                    QuranPlayerScreen(viewModel = viewModel)
+                val trialExpired by viewModel.isTrialExpired.collectAsState(initial = null)
+                val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
+
+                when (trialExpired) {
+                    null -> {
+                        // Loading state while checking trial
+                    }
+                    true -> {
+                        TrialExpiredScreen(
+                            isTalkBackEnabled = isTalkBackEnabled,
+                            onAnnounce = { msg -> viewModel.announce(msg) }
+                        )
+                    }
+                    false -> {
+                        QuranPlayerScreen(viewModel = viewModel)
+                    }
                 }
             }
         }
-    }
-
-    private fun isTrialExpired(): Boolean {
-        val expiryCalendar = Calendar.getInstance().apply {
-            set(2026, Calendar.AUGUST, 8, 23, 59, 59)
-        }
-        return System.currentTimeMillis() > expiryCalendar.timeInMillis
     }
 
     private fun checkAndRequestPermissions() {

@@ -4,10 +4,17 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
 /**
  * مدير النطق الداخلي للتطبيق.
+ *
+ * يراقب حالة TalkBack لحظياً وينشرها عبر [isTalkBackEnabledFlow].
+ * عند تفعيل TalkBack، يتوقف TTS الداخلي ويجب على المستهلكين توجيه الإعلانات
+ * إلى announceForAccessibility بدلاً منه.
  */
 class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
@@ -17,8 +24,36 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var isInitialized = false
 
+    private val _isTalkBackEnabled = MutableStateFlow(isTalkBackEnabled())
+    val isTalkBackEnabledFlow: StateFlow<Boolean> = _isTalkBackEnabled.asStateFlow()
+
+    private val accessibilityStateChangeListener =
+        AccessibilityManager.AccessibilityStateChangeListener { enabled ->
+            updateTalkBackState(enabled && accessibilityManager?.isTouchExplorationEnabled == true)
+        }
+
+    private val touchExplorationStateChangeListener =
+        AccessibilityManager.TouchExplorationStateChangeListener { enabled ->
+            updateTalkBackState(accessibilityManager?.isEnabled == true && enabled)
+        }
+
     init {
-        if (!isTalkBackEnabled()) {
+        accessibilityManager?.addAccessibilityStateChangeListener(accessibilityStateChangeListener)
+        accessibilityManager?.addTouchExplorationStateChangeListener(touchExplorationStateChangeListener)
+
+        if (!_isTalkBackEnabled.value) {
+            tts = TextToSpeech(appContext, this)
+        }
+    }
+
+    private fun updateTalkBackState(enabled: Boolean) {
+        if (_isTalkBackEnabled.value == enabled) return
+        _isTalkBackEnabled.value = enabled
+
+        if (enabled) {
+            // عند تفعيل TalkBack نوقف TTS الداخلي فوراً.
+            tts?.stop()
+        } else if (tts == null) {
             tts = TextToSpeech(appContext, this)
         }
     }
@@ -26,7 +61,7 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             isInitialized = true
-            
+
             try {
                 val currentVoice = tts?.voice ?: tts?.defaultVoice
                 val isAlreadyArabic = currentVoice?.locale?.language?.startsWith("ar") == true
@@ -37,8 +72,6 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
                         Log.e("SpeechManager", "اللغة العربية غير مدعومة أو ملفاتها مفقودة في محرك الـ TTS الحالي")
                     }
                 } else {
-                    // السر هنا: إذا كان الصوت الافتراضي عربياً، لا تستدعي setLanguage أبداً!
-                    // استدعاء setLanguage يلغي اختيار المستخدم للصوت (مثلاً الذكري) ويرجعه للصوت الأنثوي الافتراضي للمحرك.
                     Log.d("SpeechManager", "صوت النظام الافتراضي عربي بالفعل، تم اعتماده كما هو للحفاظ على نبرة المستخدم.")
                 }
             } catch (e: Exception) {
@@ -50,7 +83,7 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun speak(text: String, queueMode: Int = TextToSpeech.QUEUE_FLUSH) {
-        if (isTalkBackEnabled()) return
+        if (_isTalkBackEnabled.value) return
 
         if (isInitialized) {
             tts?.speak(text, queueMode, null, "QuranA11yTTS")
@@ -71,6 +104,8 @@ class SpeechManager(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun shutdown() {
+        accessibilityManager?.removeAccessibilityStateChangeListener(accessibilityStateChangeListener)
+        accessibilityManager?.removeTouchExplorationStateChangeListener(touchExplorationStateChangeListener)
         tts?.shutdown()
         tts = null
         isInitialized = false

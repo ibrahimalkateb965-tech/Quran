@@ -1,0 +1,209 @@
+<div dir="rtl">
+
+# مخزن الذاكرة المركزي لمشروع Blind App (MEMORY_STORE.md)
+
+> [!IMPORTANT]
+> هذا الملف هو السجل المركزي للذاكرة المستدامة. يُحدّث تلقائياً بواسطة وكيل `persistent-memory-engine` بعد كل خطاف نجاح أو أمر تسجيل يدوي.
+
+---
+
+## سجل الدروس المستفادة (Lessons Learned)
+
+```yaml
+- id: MEM-2026-07-21-001
+  type: lesson
+  timestamp: "2026-07-21T11:00:00+03:00"
+  agents: [agent-optimizer, prompt-engineer]
+  context: "تأسيس نظام Autovem وبناء 37 مهارة جديدة"
+  content: "عند بناء مهارات جديدة، يجب دائماً اتباع هيكل YAML frontmatter موحد (name + description) والتأكد من تسجيل كل مهارة في sub_agents.yaml"
+  tags: [skill-creation, standardization]
+  status: active
+
+- id: MEM-2026-07-21-002
+  type: lesson
+  timestamp: "2026-07-21T11:50:00+03:00"
+  agents: [ai-geo-seo-optimizer]
+  context: "تحسين محركات البحث التوليدية GEO"
+  content: "تحسين المحتوى للظهور في محركات بحث الذ الذكاء الاصطناعي (Perplexity, SearchGPT, Gemini) يتطلب زيادة كثافة الحقائق، الاعتماد على نبرة الخبير، وتقسيم المحتوى لفقرات مستقلة قابلة للاقتباس والاسترجاع عبر RAG."
+  tags: [geo, ai-search, seo]
+  status: active
+
+- id: MEM-2026-07-21-003
+  type: lesson
+  timestamp: "2026-07-21T12:15:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "تحميل الملفات الكبيرة برمجياً عبر PowerShell"
+  content: "عند أتمتة تحميل الملفات الكبيرة (مثل MSI) من GitHub، استخدام Invoke-WebRequest قد يؤدي إلى انقطاع الاتصال (Connection Forcibly Closed). الحل المستقر هو تفعيل TLS 1.2 واستخدام وحدة BITS (Start-BitsTransfer) لضمان التحميل المستقر ودعم الاستئناف."
+  tags: [powershell, automation, bits-transfer, bug-fix]
+  status: active
+
+- id: MEM-2026-07-21-004
+  type: bug-fix
+  timestamp: "2026-07-21T16:50:00+03:00"
+  agents: [devops-deployer, persistent-memory-engine]
+  context: "نشر ملفات ماركداون ولوحة التحكم على GitHub Pages"
+  content: "موقع GitHub Pages يبني المواقع بشكل افتراضي باستخدام Jekyll. هذا يمنع قراءة الملفات التي تحتوي على رموز معينة أو ملفات البنية. لمنع ذلك والحصول على استعراض مباشر وسليم لملفات Markdown الخام، يجب إنشاء ملف فارغ باسم `.nojekyll` في الجذر الرئيسي للمستودع."
+  tags: [github-pages, jekyll, static-site]
+  status: active
+
+- id: MEM-2026-07-21-005
+  type: bug-fix
+  timestamp: "2026-07-21T16:50:00+03:00"
+  agents: [debugger, persistent-memory-engine]
+  context: "معالجة أخطاء الترميز للمخرجات العربية على ويندوز"
+  content: "تشغيل سكربتات بايثون في الخلفية على ويندوز تطبع نصوصاً باللغة العربية أو رموزاً تعبيرية (Emojis) يسبب توقف السكربت بخطأ UnicodeEncodeError (ترميز cp1252). الحل هو فرض ترميز UTF-8 لمخرجات الكونسول بإضافة `sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())` في بداية السكربت، مع إزالة الرموز غير المدعومة من الطباعة الافتراضية."
+  tags: [windows, python, encoding, unicode, bug-fix]
+  status: active
+
+- id: MEM-2026-07-21-006
+  type: bug-fix
+  timestamp: "2026-07-21T16:50:00+03:00"
+  agents: [devops-deployer, persistent-memory-engine]
+  context: "حل تعارض عمليات البوت النشطة في الخلفية"
+  content: "عند تشغيل بوت تليجرام باستخدام getUpdates، فإن أي نسخة قديمة نشطة في الخلفية ستسبب خطأ Conflict (رمز 409). لحلها يجب تحديد معرّف العملية (PID) لـ pythonw.exe أو python.exe وإنهاؤها قسراً. وإذا كانت العملية تعمل بصلاحيات مدير (Elevated) فيجب فتح Terminal كمسؤول (Run as Admin) لتنفيذ أمر `taskkill /F /PID <PID>` بنجاح."
+  tags: [process-management, taskkill, telegram-bot, conflict, windows]
+  status: active
+```
+
+---
+
+## سجل القرارات المعمارية (Architecture Decisions)
+
+```yaml
+- id: ADR-2026-08-01-001
+  type: decision
+  timestamp: "2026-07-21T11:00:00+03:00"
+  agents: [code-architect, agent-optimizer]
+  context: "اختيار استراتيجية النماذج لنظام Autovem"
+  content: "تم اعتماد النظام الثلاثي: flash للمحتوى والتسويق والمالية والقانون، pro للبرمجة والمراجعة والبناء، thinking للمعمارية والتخطيط والذاكرة"
+  tags: [model-strategy, autovem-core]
+  status: active
+
+- id: ADR-2026-07-21-002
+  type: decision
+  timestamp: "2026-07-21T11:00:00+03:00"
+  agents: [prompt-engineer]
+  context: "استقلالية نظام Autovem"
+  content: "حذف جميع الإشارات لأنظمة خارجية من ملفات المهارات والوكلاء. النظام مستقل تماماً ومحايد للنماذج (Model-Agnostic)"
+  tags: [independence, cleanup]
+  status: active
+
+- id: ADR-2026-07-21-003
+  type: decision
+  timestamp: "2026-07-21T12:15:00+03:00"
+  agents: [code-architect, persistent-memory-engine]
+  context: "هيكلية الذاكرة للمشاريع المتعددة (Monorepo Workspace)"
+  content: "لمنع تداخل السياق في بيئات العمل متعددة المشاريع، تم اعتماد هيكلية لامركزية للذاكرة عبر تهيئة مجلد `.agents` محلي داخل كل مشروع فرعي يحتوي على ملفات `MEMORY_STORE.md` و `PROJECT_CONTEXT.md` الخاصة به، مع ربطها جميعاً بأدلة الخطافات والمهارات المركزية."
+  tags: [memory-architecture, monorepo, context-isolation]
+  status: active
+
+- id: ADR-2026-07-21-004
+  type: decision
+  timestamp: "2026-07-21T13:30:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "توافقية النظام مع المشاريع القديمة (Legacy Support)"
+  content: "لتهيئة مشاريع قديمة تمتلك بالفعل مجلدات `.agents` وقواعد `AGENTS.md` منفصلة، نعتمد قاعدة (الإضافة فقط دون استبدال). نضيف ملفي `MEMORY_STORE.md` و `PROJECT_CONTEXT.md` حصرياً، ونبقي قواعد الخطافات القديمة للمشروع سليمة كما هي لضمان عدم تأثر السلوك السابق للمشروع القديم."
+  tags: [legacy-support, backward-compatibility, architecture]
+  status: active
+
+- id: ADR-2026-07-21-005
+  type: decision
+  timestamp: "2026-07-21T16:50:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "نمط الإيقاظ الفردي لبوتات التطوير (One-Shot Polling Pattern)"
+  content: "لتفعيل دورة إطافات لتطبيق الويب، يجب الالتزام الصارم بتخصيص العمود الثالث ليكون (المحفزات - Triggers فقط) لضمان أن زر النسخ في التطبيق ينسخ المحفز فقط لتشغيل الوكيل، بينما يتم عزل (الوصف والتفاصيل) في عمود مستقل (الأخير) ليتم عرضه للمستخدم كمعلومات دون أن يتداخل مع النص المنسوخ."
+  tags: [excel-export, ui-preference, prompt-library, copy-action]
+  status: active
+```
+
+---
+
+## سجل الأخطاء المحلولة والقائمة (Resolved & Pending Bugs)
+
+```yaml
+- id: BUG-2026-08-01-001
+  type: bug-fix
+  timestamp: "2026-08-01T01:25:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف (صوت أنثوي بدلاً من المألوف)"
+  content: "لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
+  tags: [tts, accessibility, pending]
+  status: pending_investigation
+
+- id: BUG-2026-07-21-007
+  type: bug-fix
+  timestamp: "2026-07-21T21:23:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "فشل إنشاء سجل جديد (Failed to create record) في PocketBase مع بيانات استجابة فارغة (data: {})"
+  content: "عند إرسال طلب لإنشاء سجل يحتوي على حقول علاقات (Relations)، يجب التأكد أن قيمة الحقل المُرسلة هي الـ ID الخاص بالعنصر (وهو نص مكون من 15 حرفاً). استخدام الاسم كـ ID يؤدي لرفض السيرفر بـ 400 Bad Request مع رسالة فشل عامة فارغة data. تم تطبيق آلية لاستخراج الـ ID الصحيح، لكن المشكلة لا تزال قائمة (جاري التحقيق لاحقاً في احتمالية أن المشكلة في relation آخر مثل created_by_admin أو مشكلة في الـ Rules)."
+  tags: [pocketbase, bug-fix, relations, api, pending]
+
+- id: MEM-2026-08-01-001
+  type: bug-fix
+  timestamp: "2026-08-01T01:25:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف (صوت أنثوي بدلاً من المألوف)"
+  content: "الدروس المستفادة من هذه المرحلة:\n1. منع الميكروفون من العمل أثناء النطق لتفادي تعارض Audio Focus.\n2. ضرورة إضافة `<queries>` لخدمة `RecognitionService` في أندرويد 11+.\n3. تطبيق تطبيع الحروف العربية للنصوص الملتقطة بالصوت (Normalization).\n\nالمشكلة المتبقية: لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب في جلسة العمل القادمة إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
+  tags: [tts, accessibility, speech-recognizer, pending]
+  status: pending_investigation
+
+- id: BUG-2026-08-01-002
+  type: bug-fix
+  timestamp: "2026-08-01T15:34:00+03:00"
+  agents: [persistent-memory-engine, debugger, android-testing]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف وتعارض الميكروفون عند الاستماع، وفشل اختبارات VoiceCommandManagerTest."
+  resolution: "إدارة الـ Audio Focus بشكل صارم في VoiceCommandManager (requestAudioFocus و abandonAudioFocus). تعديل VoiceCommandManager ليعيد النص الخام. وتجاوز اختبارات VoiceCommandManagerTest بعد عمل Mock لـ AudioManager لمنع ClassCastException."
+
+- id: BUG-2026-08-02-001
+  type: bug-fix
+  timestamp: "2026-08-02T14:22:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "إغلاق التطبيق (Crash) والدخول في حلقة لا نهائية عند تمرير واجهة Pager."
+  content: "كان التطبيق ينهار أو يتخطى الآيات سريعاً بسبب التقاط حالة قديمة (Stale State) داخل بيئة LaunchedEffect في Compose. تم استبدال القراءة بحالة حية `viewModel.uiState.value.currentIndex` واستخدام أمر انتقال مباشر `goToAyah` لتفادي المشكلة."
+  tags: [compose, launched-effect, bug-fix, ui]
+```
+
+---
+
+## فهرس المهارات والقدرات (Skill Capability Index)
+
+| القسم | عدد المهارات | المهارات |
+|:------|:---:|:---------|
+| **النواة والذاكرة** | 1 | persistent-memory-engine |
+| **أدوات التطوير** | 4 | skill-forge-builder, docs-fetcher-context, mcp-tool-builder, webapp-qa-tester |
+| **التصميم والعلامة** | 6 | ui-ux-design-lead, taste-design-critic, motion-transitions-pro, frontend-design-builder, web-artifacts-prototyper, brand-kit-keeper |
+| **التسويق والنمو** | 5 | copywriting-lead, ai-geo-seo-optimizer, cro-conversion-lead, ad-creative-maker, customer-research-voice |
+| **صناعة المحتوى** | 3 | post-content-writer, script-hook-generator, profile-optimizer |
+| **المالية** | 6 | financial-statements-builder, journal-entry-keeper, reconciliation-auditor, variance-analyst, audit-support-prep, close-management-lead |
+| **الأعمال** | 6 | cash-flow-watcher, invoice-chaser, payroll-planner, margin-analyst, tax-prepper, campaign-runner |
+| **القانون** | 6 | contract-reviewer, nda-triage, compliance-officer, legal-risk-assessor, vendor-vetter, signature-wrangler |
+| **الوكلاء الأصليون** | 23 | (راجع sub_agents.yaml للقائمة الكاملة) |
+
+
+## الدروس المستفادة من مشروع تطبيق المكفوفين (TTS & STT)
+1. **احترام تفضيلات النطق للمستخدم الكفيف (Accessibility UX)**
+   - المشكلة: محاولة فرض محرك نطق محدد أو فرض أصوات سحابية عالية الجودة تشتت المستخدم.
+   - الحل: ترك تهيئة TextToSpeech افتراضية تماماً بدون تمرير اسم المحرك ليعتمد التطبيق فوراً على تفضيلات النظام.
+2. **منع تداخل النطق بين التطبيق و TalkBack**
+   - المشكلة: المساعد الداخلي ينطق الوصف في نفس وقت TalkBack.
+   - الحل: منع النطق الداخلي إذا كان isTalkBackEnabled صحيحاً. توفير contentDescription بدلاً من ذلك.
+3. **أمان أندرويد 11+ في خدمة التعرف الصوتي (SpeechRecognizer)**
+   - المشكلة: فشل التعرف الصوتي مباشرة بسبب حجب الخدمة أمنياً.
+   - الحل: إضافة queries في AndroidManifest.xml للسماح بالوصول لخدمة جوجل.
+4. **تجنب تعارض الـ TTS مع الميكروفون (Audio Focus Conflict)**
+   - المشكلة: الميكروفون يلتقط صوت المساعد ويغلق.
+   - الحل: عدم تشغيل TTS.speak قبل فتح الميكروفون مباشرة. الاعتماد على الرنة الافتراضية القصيرة (Beep).
+5. **معالجة الاختلافات في تحويل الصوت إلى نص (Arabic STT Normalization)**
+   - المشكلة: عدم التعرف على الأوامر بسبب اختلاف كتابة الهمزات والتاء المربوطة.
+   - الحل: تطبيق نظام تطبيع (Normalization) لتوحيد الحروف قبل المقارنة.
+6. **إدارة تنازع الصوت (Audio Focus Management) بشكل جذري**
+   - المشكلة: تعارض مع قوارئ الشاشة رغم الإجراءات السابقة.
+   - الحل: استدعاء requestAudioFocus مع AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE والتخلي عنه بـ abandonAudioFocus لضمان توجيه الصوت للتطبيق فقط أثناء الاستماع.
+7. **محاكاة خدمات النظام في اختبارات الوحدة**
+   - المشكلة: حقن Context يحمل getSystemService يسبب ClassCastException مع MockK.
+   - الحل: عمل Mock صريح للخدمة وإرجاعها عند طلبها من الـ Context.
+8. **تعارض التقاط الحالة القديمة في Compose (Stale State Capture in LaunchedEffect)**
+   - المشكلة: الاعتماد على قيمة مقروءة من الـ `uiState` داخل كتلة `snapshotFlow` يؤدي لالتقاط قيمة قديمة (Stale Value)، مما قد يسبب حلقة لا نهائية (Infinite Loop) من التنقل العشوائي أو توقف التطبيق (Crash).
+   - الحل: قراءة القيمة الحية مباشرة من المرجع داخل كتلة الـ `collect` مثل `viewModel.uiState.value.currentIndex` وتجنب استخدام المتغيرات الملتقطة، وكذلك الاعتماد على القفز المباشر `goToAyah(index)` بدلاً من حسابات الزيادة/النقصان النسبية.
+
+</div>

@@ -22,12 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.accessibility.announceForAccessibility
 import com.example.ui.theme.AccessibleGold
 import com.example.ui.theme.DarkImmersiveBg
 import com.example.ui.theme.DarkImmersiveCard
@@ -35,12 +37,18 @@ import com.example.ui.theme.TextPrimaryWhite
 
 @Composable
 fun TrialExpiredScreen(
+    isTalkBackEnabled: Boolean = false,
     onAnnounce: (String) -> Unit = {}
 ) {
     val announceMessage = "تنبيه: انتهت الفترة التجريبية للتطبيق المحددة بـ 7 أيام. يرجى التواصل مع المطور للحصول على النسخة الكاملة."
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        onAnnounce(announceMessage)
+        if (isTalkBackEnabled) {
+            announceForAccessibility(context, announceMessage)
+        } else {
+            onAnnounce(announceMessage)
+        }
     }
 
     Surface(

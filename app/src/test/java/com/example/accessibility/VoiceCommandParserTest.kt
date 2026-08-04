@@ -1,34 +1,29 @@
 package com.example.accessibility
 
-import android.content.Context
+import com.example.data.model.Surah
+import com.example.data.repository.QuranRepository
+import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.lang.reflect.Method
 
-class VoiceCommandManagerTest {
+class VoiceCommandParserTest {
 
-    private lateinit var voiceCommandManager: VoiceCommandManager
-    private lateinit var parseCommandMethod: Method
+    private lateinit var parser: VoiceCommandParser
+    private lateinit var repository: QuranRepository
 
     @Before
     fun setup() {
-        // Mock the context and audio manager
-        val context = mockk<Context>(relaxed = true)
-        val audioManager = mockk<android.media.AudioManager>(relaxed = true)
-        io.mockk.every { context.getSystemService(Context.AUDIO_SERVICE) } returns audioManager
-        voiceCommandManager = VoiceCommandManager(context)
-
-        // Use reflection to access the private parseCommand method for unit testing
-        parseCommandMethod = VoiceCommandManager::class.java.getDeclaredMethod("parseCommand", String::class.java)
-        parseCommandMethod.isAccessible = true
+        repository = mockk(relaxed = true)
+        every { repository.findSurahByName("البقرة") } returns Surah(
+            2, "البقرة", "Al-Baqarah", "سورة البقرة", 286, "مدنية", 2
+        )
+        parser = VoiceCommandParser(repository)
     }
 
-    private fun parse(text: String): VoiceCommandResult {
-        return parseCommandMethod.invoke(voiceCommandManager, text) as VoiceCommandResult
-    }
+    private fun parse(text: String): VoiceCommandResult = parser.parseCommand(text)
 
     @Test
     fun `test pause command variations`() {
@@ -48,7 +43,7 @@ class VoiceCommandManagerTest {
     fun `test navigation commands`() {
         assertTrue(parse("التالي") is VoiceCommandResult.NextAyah)
         assertTrue(parse("الآية التي بعدها") is VoiceCommandResult.NextAyah)
-        
+
         assertTrue(parse("السابق") is VoiceCommandResult.PreviousAyah)
         assertTrue(parse("ارجع للآية") is VoiceCommandResult.PreviousAyah)
     }
@@ -71,7 +66,7 @@ class VoiceCommandManagerTest {
     fun `test play surah command`() {
         val result = parse("تشغيل سورة البقرة")
         assertTrue(result is VoiceCommandResult.PlaySurahByName)
-        assertEquals("البقره", (result as VoiceCommandResult.PlaySurahByName).surahName)
+        assertEquals("البقرة", (result as VoiceCommandResult.PlaySurahByName).surahName)
     }
 
     @Test
@@ -90,7 +85,7 @@ class VoiceCommandManagerTest {
     fun `test reciter change command`() {
         assertTrue(parse("صوت الحصري") is VoiceCommandResult.ChangeReciter)
         assertEquals("husary", (parse("صوت الحصري") as VoiceCommandResult.ChangeReciter).reciterId)
-        
+
         assertTrue(parse("الشيخ العفاسي") is VoiceCommandResult.ChangeReciter)
         assertEquals("afasy", (parse("الشيخ العفاسي") as VoiceCommandResult.ChangeReciter).reciterId)
     }

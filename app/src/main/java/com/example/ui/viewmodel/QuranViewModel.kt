@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import android.content.ComponentName
 import androidx.core.content.ContextCompat
+import com.example.security.TrialManager
 import com.example.service.QuranAudioService
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
@@ -19,33 +21,50 @@ import com.example.data.model.Ayah
 import com.example.data.model.Reciter
 import com.example.data.model.Surah
 import com.example.data.repository.QuranRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class QuranUiState(
+data class PlaybackUiState(
     val surahs: List<Surah> = emptyList(),
     val currentSurah: Surah? = null,
     val currentAyahs: List<Ayah> = emptyList(),
     val currentAyahIndex: Int = 0,
     val isPlaying: Boolean = false,
     val isLoadingAudio: Boolean = false,
+    val currentLoopCount: Int = 1
+)
+
+data class SettingsUiState(
     val selectedReciter: Reciter = Reciter.DEFAULT_RECITERS.first(),
-    val tarkizRepeatMode: Int = 1, // 1 = play once, 3 = loop 3x, 5 = loop 5x, 10 = loop 10x, 99 = infinite
-    val currentLoopCount: Int = 1,
-    val isCurrentAyahBookmarked: Boolean = false,
-    val isListeningVoice: Boolean = false,
-    val voiceFeedbackText: String = "",
-    val isScreenOffMode: Boolean = false,
+    val tarkizRepeatMode: Int = 1,
+    val isContinuousPlayEnabled: Boolean = false
+)
+
+data class BookmarkUiState(
+    val isCurrentAyahBookmarked: Boolean = false
+)
+
+data class VoiceUiState(
+    val isListeningVoice: Boolean = false
+)
+
+data class DialogUiState(
     val showSurahIndex: Boolean = false,
     val showReciterDialog: Boolean = false,
-    val showHelpDialog: Boolean = false,
-    val announcementMessage: String = "",
-    val isContinuousPlayEnabled: Boolean = false
+    val showHelpDialog: Boolean = false
+)
+
+data class ScreenModeUiState(
+    val isScreenOffMode: Boolean = false
 )
 
 class QuranViewModel(application: Application) : AndroidViewModel(application) {
@@ -55,10 +74,39 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     private val voiceManager = VoiceCommandManager(application)
 
     private var mediaController: MediaController? = null
-    private lateinit var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>
+    private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
+    private var playerListener: Player.Listener? = null
+    private var isControllerReleased = false
+    private var pendingAudioUrlToPlay: String? = null
+    private var pendingAyahAnnouncement: String? = null
 
-    private val _uiState = MutableStateFlow(QuranUiState(surahs = repository.getAllSurahs()))
-    val uiState: StateFlow<QuranUiState> = _uiState.asStateFlow()
+    private var isAwaitingNetworkRecovery = false
+    private var networkRetryCount = 0
+    private var networkRetryJob: Job? = null
+
+    private val _playbackUiState = MutableStateFlow(PlaybackUiState(surahs = repository.getAllSurahs()))
+    val playbackUiState: StateFlow<PlaybackUiState> = _playbackUiState.asStateFlow()
+
+    private val _settingsUiState = MutableStateFlow(SettingsUiState())
+    val settingsUiState: StateFlow<SettingsUiState> = _settingsUiState.asStateFlow()
+
+    private val _bookmarkUiState = MutableStateFlow(BookmarkUiState())
+    val bookmarkUiState: StateFlow<BookmarkUiState> = _bookmarkUiState.asStateFlow()
+
+    private val _voiceUiState = MutableStateFlow(VoiceUiState())
+    val voiceUiState: StateFlow<VoiceUiState> = _voiceUiState.asStateFlow()
+
+    private val _dialogUiState = MutableStateFlow(DialogUiState())
+    val dialogUiState: StateFlow<DialogUiState> = _dialogUiState.asStateFlow()
+
+    private val _screenModeUiState = MutableStateFlow(ScreenModeUiState())
+    val screenModeUiState: StateFlow<ScreenModeUiState> = _screenModeUiState.asStateFlow()
+
+    private val _isTrialExpired = MutableStateFlow<Boolean?>(null)
+    val isTrialExpired: StateFlow<Boolean?> = _isTrialExpired.asStateFlow()
+
+    private val _announcementEvent = Channel<String>(Channel.BUFFERED)
+    val announcementEvent = _announcementEvent.receiveAsFlow()
 
     val bookmarks: StateFlow<List<BookmarkEntity>> = repository.allBookmarks.stateIn(
         scope = viewModelScope,
@@ -67,23 +115,41 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
+        viewModelScope.launch {
+            _isTrialExpired.value = TrialManager.getInstance(application).isTrialExpired()
+        }
+
         val sessionToken = SessionToken(application, ComponentName(application, QuranAudioService::class.java))
         controllerFuture = MediaController.Builder(application, sessionToken).buildAsync()
         
-        controllerFuture.addListener({
-            mediaController = controllerFuture.get()
-            mediaController?.addListener(object : Player.Listener {
+        controllerFuture?.addListener({
+            if (isControllerReleased) return@addListener
+            mediaController = controllerFuture?.get()
+
+            playerListener = object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    _uiState.update { it.copy(isPlaying = isPlaying) }
+                    _playbackUiState.update { it.copy(isPlaying = isPlaying) }
+                    if (isPlaying) {
+                        pendingAyahAnnouncement?.let { msg ->
+                            pendingAyahAnnouncement = null
+                            viewModelScope.launch { delay(400); announce(msg) }
+                        }
+                        if (isAwaitingNetworkRecovery) {
+                            isAwaitingNetworkRecovery = false
+                            networkRetryCount = 0
+                            haptic.vibrateNetworkRecovery()
+                            announce("عاد الاتصال بالإنترنت، جاري مواصلة التلاوة")
+                        }
+                    }
                 }
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_BUFFERING -> {
-                            _uiState.update { it.copy(isLoadingAudio = true) }
+                            _playbackUiState.update { it.copy(isLoadingAudio = true) }
                         }
                         Player.STATE_READY -> {
-                            _uiState.update { it.copy(isLoadingAudio = false) }
+                            _playbackUiState.update { it.copy(isLoadingAudio = false) }
                         }
                         Player.STATE_ENDED -> {
                             onAyahPlaybackEnded()
@@ -91,7 +157,24 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                         else -> {}
                     }
                 }
-            })
+
+                override fun onPlayerError(error: PlaybackException) {
+                    pendingAyahAnnouncement = null
+                    if (isNetworkRelatedError(error)) {
+                        handleNetworkPlaybackError()
+                    } else {
+                        announce("حدث خطأ في تشغيل الصوت")
+                    }
+                }
+            }.also { listener ->
+                mediaController?.addListener(listener)
+            }
+            
+            // Play pending audio if any
+            pendingAudioUrlToPlay?.let { url ->
+                pendingAudioUrlToPlay = null
+                playAudioUrl(url)
+            }
         }, ContextCompat.getMainExecutor(application))
 
         // Load default starting Surah (1. Al-Fatihah)
@@ -101,7 +184,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     fun loadSurah(surahId: Int, targetAyahIndex: Int = 0, autoPlay: Boolean = true) {
         val surah = repository.getSurahById(surahId) ?: return
         viewModelScope.launch {
-            _uiState.update {
+            _playbackUiState.update {
                 it.copy(
                     currentSurah = surah,
                     currentAyahIndex = targetAyahIndex,
@@ -109,17 +192,19 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                     currentLoopCount = 1
                 )
             }
-            val ayahs = repository.fetchAyahsForSurah(surahId, _uiState.value.selectedReciter.serverIdentifier)
+            val ayahs = repository.fetchAyahsForSurah(surahId, _settingsUiState.value.selectedReciter.serverIdentifier)
             val initialBookmarked = if (ayahs.isNotEmpty()) {
                 repository.isBookmarked(surahId, ayahs[targetAyahIndex.coerceIn(0, ayahs.lastIndex)].numberInSurah)
             } else false
 
-            _uiState.update {
+            _playbackUiState.update {
                 it.copy(
                     currentAyahs = ayahs,
-                    isLoadingAudio = false,
-                    isCurrentAyahBookmarked = initialBookmarked
+                    isLoadingAudio = false
                 )
+            }
+            _bookmarkUiState.update {
+                it.copy(isCurrentAyahBookmarked = initialBookmarked)
             }
 
             announce("${surah.translationArabic}. عدد آياتها ${surah.ayahCount}.")
@@ -130,54 +215,65 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun playAudioUrl(url: String) {
+        mediaController?.let { controller ->
+            controller.setMediaItem(MediaItem.fromUri(url), 0L)
+            controller.prepare()
+            controller.play()
+        } ?: run {
+            pendingAudioUrlToPlay = url
+        }
+    }
+
     private fun playCurrentAyah() {
-        val ayahs = _uiState.value.currentAyahs
-        val index = _uiState.value.currentAyahIndex
+        val ayahs = _playbackUiState.value.currentAyahs
+        val index = _playbackUiState.value.currentAyahIndex
         if (index !in ayahs.indices) return
 
         val activeAyah = ayahs[index]
+        if (activeAyah.audioUrl.isBlank()) return
+
         viewModelScope.launch {
             val bookmarked = repository.isBookmarked(activeAyah.surahId, activeAyah.numberInSurah)
-            _uiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
+            _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
         }
 
-        if (activeAyah.audioUrl.isNotBlank()) {
-            mediaController?.stop()
-            mediaController?.setMediaItem(MediaItem.fromUri(activeAyah.audioUrl))
-            mediaController?.prepare()
-            mediaController?.play()
+        val controller = mediaController
+        if (controller != null) {
+            controller.setMediaItem(MediaItem.fromUri(activeAyah.audioUrl), 0L)
+            controller.prepare()
+            controller.play()
+        } else {
+            pendingAudioUrlToPlay = activeAyah.audioUrl
         }
     }
 
     private fun onAyahPlaybackEnded() {
-        val state = _uiState.value
-        val repeatMode = state.tarkizRepeatMode
-        val currentLoop = state.currentLoopCount
+        val playbackState = _playbackUiState.value
+        val repeatMode = _settingsUiState.value.tarkizRepeatMode
+        val currentLoop = playbackState.currentLoopCount
 
         // Check if we need to repeat the current Ayah (Tarkiz/Hifz Mode)
         if (repeatMode > 1 && (repeatMode == 99 || currentLoop < repeatMode)) {
-            _uiState.update { it.copy(currentLoopCount = currentLoop + 1) }
+            _playbackUiState.update { it.copy(currentLoopCount = currentLoop + 1) }
             playCurrentAyah()
             return
         }
 
         // Otherwise reset loop count and proceed to next Ayah
-        _uiState.update { it.copy(currentLoopCount = 1) }
+        _playbackUiState.update { it.copy(currentLoopCount = 1) }
 
-        if (state.currentAyahIndex < state.currentAyahs.lastIndex) {
-            if (state.isContinuousPlayEnabled) {
-                val nextIndex = state.currentAyahIndex + 1
-                _uiState.update { it.copy(currentAyahIndex = nextIndex) }
-                haptic.vibrateClick()
-                playCurrentAyah()
+        if (playbackState.currentAyahIndex < playbackState.currentAyahs.lastIndex) {
+            if (_settingsUiState.value.isContinuousPlayEnabled) {
+                goToAyah(playbackState.currentAyahIndex + 1, autoPlay = true)
             }
         } else {
             // End of Surah reached
             haptic.vibrateRepeatOn()
-            val nextSurahId = (state.currentSurah?.id ?: 1) + 1
+            val nextSurahId = (playbackState.currentSurah?.id ?: 1) + 1
             if (nextSurahId <= 114) {
                 announce("انتهت السورة. الانتقال للسورة التالية.")
-                if (state.isContinuousPlayEnabled) {
+                if (_settingsUiState.value.isContinuousPlayEnabled) {
                     loadSurah(nextSurahId, autoPlay = true)
                 } else {
                     loadSurah(nextSurahId, autoPlay = false)
@@ -203,15 +299,15 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun replayCurrentAyah() {
-        val state = _uiState.value
-        _uiState.update { it.copy(currentLoopCount = state.currentLoopCount + 1) }
+        val state = _playbackUiState.value
+        _playbackUiState.update { it.copy(currentLoopCount = state.currentLoopCount + 1) }
         performAction("تكرار الآية", HapticType.DOUBLE_TAP)
         playCurrentAyah()
     }
 
     fun toggleContinuousPlay() {
-        val next = !_uiState.value.isContinuousPlayEnabled
-        _uiState.update { it.copy(isContinuousPlayEnabled = next) }
+        val next = !_settingsUiState.value.isContinuousPlayEnabled
+        _settingsUiState.update { it.copy(isContinuousPlayEnabled = next) }
         if (next) {
             performAction("وضع الاستماع المتواصل مفعّل", HapticType.CLICK)
         } else {
@@ -220,14 +316,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun navigateAyah(offset: Int) {
-        val state = _uiState.value
+        val state = _playbackUiState.value
         val newIndex = state.currentAyahIndex + offset
 
         if (newIndex in state.currentAyahs.indices) {
-            _uiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1) }
-            val ayah = state.currentAyahs[newIndex]
-            performAction("الآية ${ayah.numberInSurah}", HapticType.CLICK)
-            playCurrentAyah()
+            goToAyah(newIndex, autoPlay = true)
         } else if (newIndex >= state.currentAyahs.size) {
             val nextSurahId = (state.currentSurah?.id ?: 1) + 1
             if (nextSurahId <= 114) {
@@ -244,21 +337,28 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     fun playNextAyah() = navigateAyah(1)
     fun playPreviousAyah() = navigateAyah(-1)
 
-    fun goToAyah(index: Int) {
-        val state = _uiState.value
-        if (index in state.currentAyahs.indices && index != state.currentAyahIndex) {
-            _uiState.update { it.copy(currentAyahIndex = index, currentLoopCount = 1) }
-            val ayah = state.currentAyahs[index]
-            performAction("الآية ${ayah.numberInSurah}", HapticType.CLICK)
+    fun goToAyah(index: Int, autoPlay: Boolean = true) {
+        val state = _playbackUiState.value
+        if (index !in state.currentAyahs.indices || index == state.currentAyahIndex) return
+
+        _playbackUiState.update { it.copy(currentAyahIndex = index, currentLoopCount = 1) }
+        val ayah = state.currentAyahs[index]
+        haptic.vibrateClick()
+
+        if (autoPlay) {
+            pendingAyahAnnouncement = "الآية ${ayah.numberInSurah}"
             playCurrentAyah()
+        } else {
+            announce("الآية ${ayah.numberInSurah}")
         }
     }
 
     fun toggleRepeatMode() {
         val modes = listOf(1, 3, 5, 10, 99)
-        val currentIndex = modes.indexOf(_uiState.value.tarkizRepeatMode)
+        val currentIndex = modes.indexOf(_settingsUiState.value.tarkizRepeatMode)
         val newMode = modes[(currentIndex + 1) % modes.size]
-        _uiState.update { it.copy(tarkizRepeatMode = newMode, currentLoopCount = 1) }
+        _settingsUiState.update { it.copy(tarkizRepeatMode = newMode) }
+        _playbackUiState.update { it.copy(currentLoopCount = 1) }
 
         if (newMode > 1) {
             val modeText = if (newMode == 99) "تكرار لا نهائي" else "تكرار $newMode مرات"
@@ -269,11 +369,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleCurrentBookmark() {
-        val state = _uiState.value
-        val surah = state.currentSurah ?: return
-        val ayahs = state.currentAyahs
-        if (state.currentAyahIndex !in ayahs.indices) return
-        val activeAyah = ayahs[state.currentAyahIndex]
+        val playback = _playbackUiState.value
+        val surah = playback.currentSurah ?: return
+        val ayahs = playback.currentAyahs
+        if (playback.currentAyahIndex !in ayahs.indices) return
+        val activeAyah = ayahs[playback.currentAyahIndex]
 
         viewModelScope.launch {
             val isNowBookmarked = repository.toggleBookmark(
@@ -281,7 +381,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                 surahNameAr = surah.nameArabic,
                 ayahNumber = activeAyah.numberInSurah
             )
-            _uiState.update { it.copy(isCurrentAyahBookmarked = isNowBookmarked) }
+            _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = isNowBookmarked) }
             
             if (isNowBookmarked) {
                 performAction("تم إضافة سورة ${surah.nameArabic} الآية ${activeAyah.numberInSurah} للإشارات المرجعية", HapticType.BOOKMARK)
@@ -292,87 +392,126 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectReciter(reciter: Reciter) {
-        _uiState.update { it.copy(selectedReciter = reciter, showReciterDialog = false) }
+        _settingsUiState.update { it.copy(selectedReciter = reciter) }
+        _dialogUiState.update { it.copy(showReciterDialog = false) }
         performAction("تم تغيير القارئ إلى ${reciter.nameArabic}", HapticType.CLICK)
-        val surah = _uiState.value.currentSurah
+        val surah = _playbackUiState.value.currentSurah
         if (surah != null) {
-            loadSurah(surah.id, _uiState.value.currentAyahIndex, autoPlay = _uiState.value.isPlaying)
+            loadSurah(surah.id, _playbackUiState.value.currentAyahIndex, autoPlay = _playbackUiState.value.isPlaying)
         }
     }
 
     fun startVoiceCommand() {
-        haptic.vibrateLongPress()
-        // Removed `announce(...)` to prevent the device speaker from triggering the microphone and immediately ending recognition.
-        // Google's SpeechRecognizer will automatically play a standard beep sound indicating it's ready.
+        haptic.vibrateVoiceListeningStarted()
+
+        // Pause Quran audio while listening to avoid the microphone picking up the recitation.
+        val wasPlaying = mediaController?.isPlaying == true
+        if (wasPlaying) {
+            mediaController?.pause()
+        }
+
         voiceManager.startListening(
             onResult = { result ->
-                handleVoiceCommandResult(result)
+                handleVoiceCommandResult(result, wasPlaying)
             },
             onStatusChange = { isListening ->
-                _uiState.update { it.copy(isListeningVoice = isListening) }
+                _voiceUiState.update { it.copy(isListeningVoice = isListening) }
             }
         )
     }
 
-    private fun handleVoiceCommandResult(result: VoiceCommandResult) {
+    private fun handleVoiceCommandResult(result: VoiceCommandResult, wasPlayingBeforeListening: Boolean) {
         when (result) {
             is VoiceCommandResult.PlaySurahByName -> {
+                haptic.vibrateVoiceCommandSuccess()
                 val surah = repository.findSurahByName(result.surahName)
                 if (surah != null) {
                     announce("جاري تشغيل سورة ${surah.nameArabic}")
                     loadSurah(surah.id, autoPlay = true)
                 } else {
+                    haptic.vibrateVoiceCommandFailure()
                     announce("لم أجد سورة باسم ${result.surahName}")
                 }
             }
             is VoiceCommandResult.GoToAyahNumber -> {
-                val ayahs = _uiState.value.currentAyahs
+                haptic.vibrateVoiceCommandSuccess()
+                val ayahs = _playbackUiState.value.currentAyahs
                 val targetIndex = (result.ayahNumber - 1).coerceIn(0, (ayahs.size - 1).coerceAtLeast(0))
                 if (ayahs.isNotEmpty()) {
-                    _uiState.update { it.copy(currentAyahIndex = targetIndex, currentLoopCount = 1) }
+                    goToAyah(targetIndex, autoPlay = true)
                     announce("الانتقال إلى الآية ${result.ayahNumber}")
-                    playCurrentAyah()
                 }
             }
             VoiceCommandResult.Pause -> {
+                haptic.vibrateVoiceCommandSuccess()
                 if (mediaController?.isPlaying == true) mediaController?.pause()
                 announce("تم الإيقاف")
             }
             VoiceCommandResult.Resume -> {
+                haptic.vibrateVoiceCommandSuccess()
                 mediaController?.play()
                 announce("تم التشغيل")
             }
-            VoiceCommandResult.NextAyah -> playNextAyah()
-            VoiceCommandResult.PreviousAyah -> playPreviousAyah()
-            VoiceCommandResult.ToggleBookmark -> toggleCurrentBookmark()
-            VoiceCommandResult.ToggleRepeatMode -> toggleRepeatMode()
-            VoiceCommandResult.ToggleContinuousPlay -> toggleContinuousPlay()
-            VoiceCommandResult.ReplayAyah -> replayCurrentAyah()
+            VoiceCommandResult.NextAyah -> {
+                haptic.vibrateVoiceCommandSuccess()
+                playNextAyah()
+            }
+            VoiceCommandResult.PreviousAyah -> {
+                haptic.vibrateVoiceCommandSuccess()
+                playPreviousAyah()
+            }
+            VoiceCommandResult.ToggleBookmark -> {
+                haptic.vibrateVoiceCommandSuccess()
+                toggleCurrentBookmark()
+            }
+            VoiceCommandResult.ToggleRepeatMode -> {
+                haptic.vibrateVoiceCommandSuccess()
+                toggleRepeatMode()
+            }
+            VoiceCommandResult.ToggleContinuousPlay -> {
+                haptic.vibrateVoiceCommandSuccess()
+                toggleContinuousPlay()
+            }
+            VoiceCommandResult.ReplayAyah -> {
+                haptic.vibrateVoiceCommandSuccess()
+                replayCurrentAyah()
+            }
             is VoiceCommandResult.ChangeReciter -> {
+                haptic.vibrateVoiceCommandSuccess()
                 val found = Reciter.DEFAULT_RECITERS.find { it.id == result.reciterId }
                 if (found != null) selectReciter(found)
             }
             VoiceCommandResult.ShowSurahIndex -> {
-                _uiState.update { it.copy(showSurahIndex = true) }
+                haptic.vibrateVoiceCommandSuccess()
+                _dialogUiState.update { it.copy(showSurahIndex = true) }
                 announce("تم فتح قائمة السور")
             }
             VoiceCommandResult.ShowHelp -> {
-                _uiState.update { it.copy(showHelpDialog = true) }
+                haptic.vibrateVoiceCommandSuccess()
+                _dialogUiState.update { it.copy(showHelpDialog = true) }
                 announce("تم فتح قائمة التعليمات والأوامر الصوتية")
             }
             is VoiceCommandResult.UnknownCommand -> {
+                haptic.vibrateVoiceCommandFailure()
                 announce("لم أتعرف على الأمر: ${result.originalText}")
             }
             is VoiceCommandResult.Error -> {
+                haptic.vibrateVoiceCommandFailure()
                 announce(result.message)
             }
+        }
+
+        // Resume Quran audio if it was playing before the voice command,
+        // unless the user explicitly asked to pause.
+        if (wasPlayingBeforeListening && result !is VoiceCommandResult.Pause) {
+            mediaController?.play()
         }
     }
 
     fun toggleScreenOffMode() {
         haptic.vibrateLongPress()
-        val next = !_uiState.value.isScreenOffMode
-        _uiState.update { it.copy(isScreenOffMode = next) }
+        val next = !_screenModeUiState.value.isScreenOffMode
+        _screenModeUiState.update { it.copy(isScreenOffMode = next) }
         if (next) {
             announce("تم تفعيل وضع إيقاف الشاشة لتوفير البطارية. الشاشة مغلقة الآن مع استمرار الإيماءات والصوت.")
         } else {
@@ -382,21 +521,23 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleSurahIndex(show: Boolean) {
         haptic.vibrateClick()
-        _uiState.update { it.copy(showSurahIndex = show) }
+        _dialogUiState.update { it.copy(showSurahIndex = show) }
     }
 
     fun toggleReciterDialog(show: Boolean) {
         haptic.vibrateClick()
-        _uiState.update { it.copy(showReciterDialog = show) }
+        _dialogUiState.update { it.copy(showReciterDialog = show) }
     }
 
     fun toggleHelpDialog(show: Boolean) {
         haptic.vibrateClick()
-        _uiState.update { it.copy(showHelpDialog = show) }
+        _dialogUiState.update { it.copy(showHelpDialog = show) }
     }
 
     fun announce(text: String) {
-        _uiState.update { it.copy(announcementMessage = text) }
+        viewModelScope.launch {
+            _announcementEvent.send(text)
+        }
         speechManager.speak(text)
     }
     
@@ -408,6 +549,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             HapticType.REPEAT_ON -> haptic.vibrateRepeatOn()
             HapticType.REPEAT_OFF -> haptic.vibrateRepeatOff()
             HapticType.BOOKMARK -> haptic.vibrateBookmark()
+            HapticType.NETWORK_LOSS -> haptic.vibrateNetworkLoss()
+            HapticType.NETWORK_RECOVERY -> haptic.vibrateNetworkRecovery()
+            HapticType.VOICE_LISTENING_STARTED -> haptic.vibrateVoiceListeningStarted()
+            HapticType.VOICE_COMMAND_SUCCESS -> haptic.vibrateVoiceCommandSuccess()
+            HapticType.VOICE_COMMAND_FAILURE -> haptic.vibrateVoiceCommandFailure()
             HapticType.NONE -> {}
         }
         if (msg.isNotEmpty()) {
@@ -415,16 +561,71 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun isNetworkRelatedError(error: PlaybackException): Boolean {
+        return when (error.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
+            PlaybackException.ERROR_CODE_TIMEOUT -> true
+            else -> false
+        }
+    }
+
+    private fun handleNetworkPlaybackError() {
+        if (!isAwaitingNetworkRecovery) {
+            isAwaitingNetworkRecovery = true
+            networkRetryCount = 0
+            performAction(
+                "انقطع الاتصال بالإنترنت، جاري المحاولة مرة أخرى",
+                HapticType.NETWORK_LOSS
+            )
+        }
+
+        networkRetryJob?.cancel()
+        networkRetryJob = viewModelScope.launch {
+            if (networkRetryCount < MAX_NETWORK_RETRIES) {
+                networkRetryCount++
+                val backoffMs = MIN_RETRY_BACKOFF_MS * (1 shl (networkRetryCount - 1))
+                delay(backoffMs.coerceAtMost(MAX_RETRY_BACKOFF_MS))
+                mediaController?.prepare()
+            } else {
+                isAwaitingNetworkRecovery = false
+                networkRetryCount = 0
+                performAction(
+                    "تعذّر الاتصال بالإنترنت بعد عدة محاولات. يرجى التحقق من الشبكة والمحاولة لاحقاً.",
+                    HapticType.NETWORK_LOSS
+                )
+            }
+        }
+    }
+
+    companion object {
+        private const val MAX_NETWORK_RETRIES = 3
+        private const val MIN_RETRY_BACKOFF_MS = 1_500L
+        private const val MAX_RETRY_BACKOFF_MS = 10_000L
+    }
+
     override fun onCleared() {
-        MediaController.releaseFuture(controllerFuture)
-        mediaController?.release()
+        isControllerReleased = true
+        networkRetryJob?.cancel()
+        playerListener?.let { mediaController?.removeListener(it) }
+        playerListener = null
         
+        controllerFuture?.let { future ->
+            MediaController.releaseFuture(future)
+        }
+        controllerFuture = null
+        mediaController = null
+
         speechManager.shutdown()
-        voiceManager.stopListening()
+        voiceManager.destroy()
         super.onCleared()
     }
 }
 
 enum class HapticType {
-    CLICK, DOUBLE_TAP, LONG_PRESS, REPEAT_ON, REPEAT_OFF, BOOKMARK, NONE
+    CLICK, DOUBLE_TAP, LONG_PRESS, REPEAT_ON, REPEAT_OFF, BOOKMARK,
+    NETWORK_LOSS, NETWORK_RECOVERY,
+    VOICE_LISTENING_STARTED, VOICE_COMMAND_SUCCESS, VOICE_COMMAND_FAILURE,
+    NONE
 }

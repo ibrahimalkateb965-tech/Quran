@@ -180,7 +180,7 @@ fun SurahIndexSheet(
             ) {
                 if (selectedSurahForAyahs != null) {
                     val count = selectedSurahForAyahs!!.ayahCount
-                    items(count) { index ->
+                    items(count, key = { it }) { index ->
                         val ayahNumber = index + 1
                         Card(
                             modifier = Modifier

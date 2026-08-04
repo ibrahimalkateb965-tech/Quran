@@ -71,50 +71,55 @@ class QuranRepository(private val context: Context) {
     ): List<Ayah> = withContext(Dispatchers.IO) {
         val surah = getSurahById(surahId) ?: return@withContext emptyList()
         try {
-            val urlString = "https://api.alquran.cloud/v1/surah/$surahId/$reciterIdentifier"
-            val connection = URL(urlString).openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 8000
-            connection.readTimeout = 8000
+            return@withContext kotlinx.coroutines.withTimeout(15_000) {
+                val urlString = "https://api.alquran.cloud/v1/surah/$surahId/$reciterIdentifier"
+                val connection = URL(urlString).openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
 
-            if (connection.responseCode == 200) {
-                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-                val rootObj = JSONObject(responseText)
-                val dataObj = rootObj.getJSONObject("data")
-                val ayahsArray = dataObj.getJSONArray("ayahs")
+                if (connection.responseCode == 200) {
+                    val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                    val rootObj = JSONObject(responseText)
+                    val dataObj = rootObj.getJSONObject("data")
+                    val ayahsArray = dataObj.getJSONArray("ayahs")
 
-                val ayahs = mutableListOf<Ayah>()
-                for (i in 0 until ayahsArray.length()) {
-                    val item = ayahsArray.getJSONObject(i)
-                    val numberInSurah = item.getInt("numberInSurah")
-                    val globalNumber = item.getInt("number")
-                    val textArabic = item.getString("text")
-                    val audioUrl = item.optString("audio", "")
+                    val ayahs = mutableListOf<Ayah>()
+                    for (i in 0 until ayahsArray.length()) {
+                        val item = ayahsArray.getJSONObject(i)
+                        val numberInSurah = item.getInt("numberInSurah")
+                        val globalNumber = item.getInt("number")
+                        val textArabic = item.getString("text")
+                        val audioUrl = item.optString("audio", "")
 
-                    val finalAudioUrl = if (reciterIdentifier == "ar.husary") {
-                        val formattedSurah = surahId.toString().padStart(3, '0')
-                        val formattedAyah = numberInSurah.toString().padStart(3, '0')
-                        "https://verse.mp3quran.net/data/Husary_64kbps/$formattedSurah$formattedAyah.mp3"
-                    } else if (audioUrl.isNotBlank()) {
-                        audioUrl
-                    } else {
-                        "https://cdn.islamic.network/quran/audio/128/$reciterIdentifier/$globalNumber.mp3"
-                    }
+                        val finalAudioUrl = if (reciterIdentifier == "ar.husary") {
+                            val formattedSurah = surahId.toString().padStart(3, '0')
+                            val formattedAyah = numberInSurah.toString().padStart(3, '0')
+                            "https://verse.mp3quran.net/data/Husary_64kbps/$formattedSurah$formattedAyah.mp3"
+                        } else if (audioUrl.isNotBlank()) {
+                            audioUrl
+                        } else {
+                            "https://cdn.islamic.network/quran/audio/128/$reciterIdentifier/$globalNumber.mp3"
+                        }
 
-                    ayahs.add(
-                        Ayah(
-                            numberInSurah = numberInSurah,
-                            globalNumber = globalNumber,
-                            textArabic = textArabic,
-                            audioUrl = finalAudioUrl,
-                            surahId = surahId,
-                            page = item.optInt("page", 1),
-                            juz = item.optInt("juz", 1)
+                        ayahs.add(
+                            Ayah(
+                                numberInSurah = numberInSurah,
+                                globalNumber = globalNumber,
+                                textArabic = textArabic,
+                                audioUrl = finalAudioUrl,
+                                surahId = surahId,
+                                page = item.optInt("page", 1),
+                                juz = item.optInt("juz", 1)
+                            )
                         )
-                    )
+                    }
+                    return@withTimeout ayahs
                 }
-                return@withContext ayahs
+                return@withTimeout emptyList<Ayah>()
             }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            e.printStackTrace()
         } catch (e: Exception) {
             e.printStackTrace()
         }

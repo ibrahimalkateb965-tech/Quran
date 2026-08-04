@@ -75,4 +75,70 @@ class HapticFeedbackManager(context: Context) {
             vibrator?.vibrate(longArrayOf(0, 40, 40, 40, 40, 60), -1)
         }
     }
+
+    /**
+     * Short-long-short pattern to signal voice listening has started.
+     */
+    fun vibrateVoiceListeningStarted() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val timings = longArrayOf(0, 50, 80, 150, 80, 50)
+            val amplitudes = intArrayOf(0, 200, 0, 255, 0, 200)
+            vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 50, 80, 150, 80, 50), -1)
+        }
+    }
+
+    /**
+     * Single confirming pulse to signal a voice command was understood.
+     */
+    fun vibrateVoiceCommandSuccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(100)
+        }
+    }
+
+    /**
+     * Rapid staccato pulses to signal a voice command failed.
+     */
+    fun vibrateVoiceCommandFailure() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val timings = longArrayOf(0, 40, 40, 40, 40, 40, 40, 40)
+            val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255, 0, 255)
+            vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 40, 40, 40, 40, 40, 40, 40), -1)
+        }
+    }
+
+    /**
+     * Three rapid pulses to signal network loss.
+     */
+    fun vibrateNetworkLoss() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val timings = longArrayOf(0, 60, 60, 60, 60, 60)
+            val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
+            vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 60, 60, 60, 60, 60), -1)
+        }
+    }
+
+    /**
+     * Single confirming pulse to signal network recovery.
+     */
+    fun vibrateNetworkRecovery() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(120)
+        }
+    }
 }

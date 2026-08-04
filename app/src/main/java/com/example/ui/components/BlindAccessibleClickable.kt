@@ -9,14 +9,16 @@ import androidx.compose.ui.semantics.semantics
 
 import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalContext
-import android.view.accessibility.AccessibilityManager
-import android.content.Context
 import androidx.compose.foundation.clickable
+import com.example.accessibility.LocalTalkBackEnabled
 
 /**
  * A custom modifier that requires a physical double-tap to activate when TalkBack is OFF,
  * but still correctly responds to TalkBack's virtual click (which is triggered by the user's
  * double-tap gesture while TalkBack is ON).
+ *
+ * Reads TalkBack state reactively from [LocalTalkBackEnabled] so the UI adapts if TalkBack
+ * is toggled while the app is running.
  */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.blindAccessibleClickable(
@@ -26,8 +28,7 @@ fun Modifier.blindAccessibleClickable(
     onClick: () -> Unit
 ): Modifier = composed {
     val context = LocalContext.current
-    val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-    val isTalkBackEnabled = am.isTouchExplorationEnabled
+    val isTalkBackEnabled = LocalTalkBackEnabled.current
 
     if (isTalkBackEnabled) {
         // إذا كان TalkBack الخاص بالهاتف مفعلاً، نستخدم clickable القياسي.

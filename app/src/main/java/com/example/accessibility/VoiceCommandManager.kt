@@ -5,11 +5,13 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import com.example.data.repository.QuranRepository
 
 sealed class VoiceCommandResult {
     data class PlaySurahByName(val surahName: String) : VoiceCommandResult()
@@ -29,28 +31,43 @@ sealed class VoiceCommandResult {
     data class Error(val message: String) : VoiceCommandResult()
 }
 
-class VoiceCommandManager(private val context: Context) {
+class VoiceCommandManager(context: Context) {
+    private val appContext = context.applicationContext
+    private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val parser = VoiceCommandParser(QuranRepository(appContext))
+    private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var isDestroyed = false
+    private var currentRequestId = 0
     private var audioFocusRequest: AudioFocusRequest? = null
 
     fun startListening(
         onResult: (VoiceCommandResult) -> Unit,
         onStatusChange: (Boolean) -> Unit
     ) {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        if (isDestroyed) return
+
+        if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
             onResult(VoiceCommandResult.Error("التعرف على الصوت غير مدعوم على هذا الجهاز"))
             return
         }
 
-        stopListening()
+        // Prevent concurrent sessions and clean up the previous one.
+        stopListeningInternal()
+
+        currentRequestId++
+        val requestId = currentRequestId
+
         requestAudioFocus()
+        playStartTone()
 
         try {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(appContext).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
+                        if (!isValidSession(requestId)) return
                         isListening = true
                         onStatusChange(true)
                     }
@@ -58,38 +75,33 @@ class VoiceCommandManager(private val context: Context) {
                     override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
+
                     override fun onEndOfSpeech() {
+                        if (!isValidSession(requestId)) return
                         isListening = false
                         onStatusChange(false)
                         abandonAudioFocus()
                     }
 
                     override fun onError(error: Int) {
+                        if (!isValidSession(requestId)) return
                         isListening = false
                         onStatusChange(false)
                         abandonAudioFocus()
-                        val errorMsg = when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH -> "لم أستطع فهم الأمر الصوتي، يرجى المحاولة مرة أخرى"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "لم يتم التحدث بأي أمر صوتی"
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "صلاحية الميكروفون غير ممنوحة"
-                            SpeechRecognizer.ERROR_NETWORK -> "لا يوجد اتصال بالإنترنت للتعرف على الصوت"
-                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "انتهى وقت الاتصال بالإنترنت"
-                            SpeechRecognizer.ERROR_CLIENT -> "خطأ في خدمة جوجل الصوتية، قد يحتاج تطبيق جوجل للتحديث"
-                            SpeechRecognizer.ERROR_SERVER -> "خطأ في خادم جوجل للتعرف الصوتي"
-                            SpeechRecognizer.ERROR_AUDIO -> "مشكلة في تسجيل الصوت من الميكروفون"
-                            else -> "حدث خطأ في التعرف على الصوت (رمز الخطأ: $error)"
-                        }
+                        val errorMsg = resolveErrorMessage(error)
                         onResult(VoiceCommandResult.Error(errorMsg))
                     }
 
                     override fun onResults(results: Bundle?) {
+                        if (!isValidSession(requestId)) return
                         isListening = false
                         onStatusChange(false)
                         abandonAudioFocus()
+
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val spokenText = matches?.firstOrNull()
                         if (!spokenText.isNullOrBlank()) {
-                            val parsed = parseCommand(spokenText)
+                            val parsed = parser.parseCommand(spokenText)
                             onResult(parsed)
                         } else {
                             onResult(VoiceCommandResult.Error("لم أستطع فهم الأمر"))
@@ -113,32 +125,80 @@ class VoiceCommandManager(private val context: Context) {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-SA")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-SA")
             putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "ar-SA")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
 
         try {
             speechRecognizer?.startListening(intent)
         } catch (e: SecurityException) {
-            isListening = false
-            onStatusChange(false)
-            abandonAudioFocus()
-            onResult(VoiceCommandResult.Error("صلاحية الميكروفون غير ممنوحة للتطبيق"))
+            cleanupAfterError(onStatusChange, onResult, "صلاحية الميكروفون غير ممنوحة للتطبيق")
         } catch (e: Exception) {
-            isListening = false
-            onStatusChange(false)
-            abandonAudioFocus()
-            onResult(VoiceCommandResult.Error("تعذر بدء التعرف الصوتي: ${e.message}"))
+            cleanupAfterError(onStatusChange, onResult, "تعذر بدء التعرف الصوتي: ${e.message}")
         }
     }
 
     fun stopListening() {
+        stopListeningInternal()
+        abandonAudioFocus()
+    }
+
+    fun destroy() {
+        if (isDestroyed) return
+        isDestroyed = true
+        stopListeningInternal()
+        abandonAudioFocus()
+        toneGenerator.release()
+    }
+
+    private fun stopListeningInternal() {
         if (isListening) {
-            speechRecognizer?.stopListening()
+            try {
+                speechRecognizer?.stopListening()
+            } catch (_: Exception) {
+            }
             isListening = false
         }
-        speechRecognizer?.destroy()
+        try {
+            speechRecognizer?.destroy()
+        } catch (_: Exception) {
+        }
         speechRecognizer = null
+        currentRequestId++
+    }
+
+    private fun cleanupAfterError(
+        onStatusChange: (Boolean) -> Unit,
+        onResult: (VoiceCommandResult) -> Unit,
+        message: String
+    ) {
+        isListening = false
+        onStatusChange(false)
+        stopListeningInternal()
         abandonAudioFocus()
+        onResult(VoiceCommandResult.Error(message))
+    }
+
+    private fun isValidSession(requestId: Int): Boolean {
+        return !isDestroyed && requestId == currentRequestId
+    }
+
+    private fun playStartTone() {
+        toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+    }
+
+    private fun resolveErrorMessage(error: Int): String {
+        return when (error) {
+            SpeechRecognizer.ERROR_NO_MATCH -> "لم أستطع فهم الأمر الصوتي، يرجى المحاولة مرة أخرى"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "لم يتم التحدث بأي أمر صوتی"
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "صلاحية الميكروفون غير ممنوحة"
+            SpeechRecognizer.ERROR_NETWORK -> "لا يوجد اتصال بالإنترنت للتعرف على الصوت"
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "انتهى وقت الاتصال بالإنترنت"
+            SpeechRecognizer.ERROR_CLIENT -> "خطأ في خدمة جوجل الصوتية، قد يحتاج تطبيق جوجل للتحديث"
+            SpeechRecognizer.ERROR_SERVER -> "خطأ في خادم جوجل للتعرف الصوتي"
+            SpeechRecognizer.ERROR_AUDIO -> "مشكلة في تسجيل الصوت من الميكروفون"
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "خدمة التعرف الصوتي مشغولة، جاري إعادة المحاولة"
+            else -> "حدث خطأ في التعرف على الصوت (رمز الخطأ: $error)"
+        }
     }
 
     private fun requestAudioFocus() {
@@ -160,111 +220,10 @@ class VoiceCommandManager(private val context: Context) {
     private fun abandonAudioFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
         } else {
             @Suppress("DEPRECATION")
             audioManager.abandonAudioFocus(null)
         }
-    }
-
-    private fun parseCommand(rawText: String): VoiceCommandResult {
-        // Normalization to handle speech-to-text variations
-        val clean = rawText.trim()
-            .replace("أ", "ا")
-            .replace("إ", "ا")
-            .replace("آ", "ا")
-            .replace("ة", "ه")
-            .replace("ؤ", "و")
-            .replace("ئ", "ي")
-            .replace("ى", "ي")
-
-        if (clean.contains("توقف") || clean.contains("ايقاف") || clean.contains("اسكت") || clean.contains("اقطع")) {
-            return VoiceCommandResult.Pause
-        }
-        if (clean.contains("استماع متواصل") || clean.contains("تشغيل متواصل") || clean.contains("تلقائي")) {
-            return VoiceCommandResult.ToggleContinuousPlay
-        }
-        if ((clean.contains("تشغيل") && !clean.contains("سوره") && !clean.contains("صوره")) || clean.contains("استيناف") || clean.contains("واصل")) {
-            return VoiceCommandResult.Resume
-        }
-        if (clean.contains("تالي") || clean.contains("بعده") || clean.contains("تقدم") || clean.contains("قدام")) {
-            return VoiceCommandResult.NextAyah
-        }
-        if (clean.contains("سابق") || clean.contains("قبلها") || clean.contains("ارجع") || clean.contains("ورا")) {
-            return VoiceCommandResult.PreviousAyah
-        }
-        if (clean.contains("مرجعيه") || clean.contains("علامه") || clean.contains("حفظ الايه") || clean.contains("مفضله")) {
-            return VoiceCommandResult.ToggleBookmark
-        }
-        if (clean.contains("تكرار") && !clean.contains("كرر الايه") || clean.contains("تاكيد") || clean.contains("تركيز") || clean.contains("حفظ")) {
-            return VoiceCommandResult.ToggleRepeatMode
-        }
-        if (clean.contains("كرر الايه") || clean.contains("اعاده الايه") || clean.contains("اعد الايه")) {
-            return VoiceCommandResult.ReplayAyah
-        }
-        if (clean.contains("قائمه") || clean.contains("قايمه") || clean.contains("فهرس") || 
-            (clean.contains("سور") && !clean.contains("سوره")) || 
-            (clean.contains("صور") && !clean.contains("صوره"))) {
-            return VoiceCommandResult.ShowSurahIndex
-        }
-        if (clean.contains("تعليمات") || clean.contains("مساعده") || clean.contains("الاوامر") || clean.contains("دليل")) {
-            return VoiceCommandResult.ShowHelp
-        }
-        if (clean.contains("الحصري")) {
-            return VoiceCommandResult.ChangeReciter("husary")
-        }
-        if (clean.contains("العفاسي")) {
-            return VoiceCommandResult.ChangeReciter("afasy")
-        }
-        if (clean.contains("المنشاوي")) {
-            return VoiceCommandResult.ChangeReciter("minshawi")
-        }
-        if (clean.contains("عبد الباسط")) {
-            return VoiceCommandResult.ChangeReciter("abdulbasit")
-        }
-
-        // Check Ayah number command like "الآية 5" or "آية 12"
-        if (clean.contains("ايه")) {
-            val digits = clean.filter { it.isDigit() }
-            if (digits.isNotEmpty()) {
-                val num = digits.toIntOrNull()
-                if (num != null && num > 0) {
-                    return VoiceCommandResult.GoToAyahNumber(num)
-                }
-            }
-            // Parse spoken Arabic number words
-            val numFromWords = parseArabicNumberWord(clean)
-            if (numFromWords != null) {
-                return VoiceCommandResult.GoToAyahNumber(numFromWords)
-            }
-        }
-
-        // Surah play command like "تشغيل سورة البقرة" or "سورة الكهف"
-        if (clean.contains("سوره") || clean.contains("صوره") || clean.contains("تشغيل")) {
-            val surahPart = clean.substringAfter("سوره").substringAfter("صوره").substringAfter("تشغيل").trim()
-            if (surahPart.isNotBlank()) {
-                return VoiceCommandResult.PlaySurahByName(surahPart)
-            }
-        }
-
-        return VoiceCommandResult.UnknownCommand(rawText)
-    }
-
-    private fun parseArabicNumberWord(text: String): Int? {
-        val wordMap = mapOf(
-            "واحد" to 1, "الاولي" to 1, "الاول" to 1,
-            "اثنان" to 2, "ثاني" to 2, "الثانيه" to 2,
-            "ثلاثه" to 3, "الثالثه" to 3, "ثلاث" to 3,
-            "اربعه" to 4, "الرابعه" to 4, "اربع" to 4,
-            "خمسه" to 5, "الخامسه" to 5, "خمس" to 5,
-            "سته" to 6, "السادسه" to 6, "ست" to 6,
-            "سبعه" to 7, "السابعه" to 7, "سبع" to 7,
-            "ثمانيه" to 8, "الثامنه" to 8, "ثمان" to 8,
-            "تسعه" to 9, "التاسعه" to 9, "تسع" to 9,
-            "عشره" to 10, "العاشره" to 10, "عشر" to 10
-        )
-        for ((word, value) in wordMap) {
-            if (text.contains(word)) return value
-        }
-        return null
     }
 }

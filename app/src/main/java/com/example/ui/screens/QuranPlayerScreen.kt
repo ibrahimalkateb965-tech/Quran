@@ -12,7 +12,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,20 +56,32 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.example.ui.components.player.AudioEqualizerBars
+import com.example.ui.components.player.AyahCard
+import com.example.ui.components.player.AyahNumberCard
+import com.example.ui.components.player.BigVoiceMicrophoneButton
+import com.example.ui.components.player.ControlPanel
+import com.example.ui.components.player.GestureHintChip
+import com.example.ui.components.player.HeaderBar
+import com.example.ui.components.player.ListeningVoiceBanner
+import com.example.ui.components.player.ScreenOffSaverOverlay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -83,6 +94,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.accessibility.LocalTalkBackEnabled
+import com.example.accessibility.announceForAccessibility
 import com.example.ui.components.ReciterSelectorSheet
 import com.example.ui.components.SurahIndexSheet
 import com.example.ui.components.VoiceCommandGuideSheet
@@ -103,9 +116,28 @@ import com.example.ui.viewmodel.QuranViewModel
 fun QuranPlayerScreen(
     viewModel: QuranViewModel
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val playbackUiState by viewModel.playbackUiState.collectAsState()
+    val settingsUiState by viewModel.settingsUiState.collectAsState()
+    val bookmarkUiState by viewModel.bookmarkUiState.collectAsState()
+    val voiceUiState by viewModel.voiceUiState.collectAsState()
+    val dialogUiState by viewModel.dialogUiState.collectAsState()
+    val screenModeUiState by viewModel.screenModeUiState.collectAsState()
+    val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
+    val context = LocalContext.current
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    // Observe announcement events
+    LaunchedEffect(viewModel.announcementEvent, isTalkBackEnabled) {
+        viewModel.announcementEvent.collect { message ->
+            if (message.isNotBlank() && isTalkBackEnabled) {
+                announceForAccessibility(context, message)
+            }
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalLayoutDirection provides LayoutDirection.Rtl,
+        LocalTalkBackEnabled provides isTalkBackEnabled
+    ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = DarkImmersiveBg
@@ -135,24 +167,7 @@ fun QuranPlayerScreen(
                             }
                         )
                     }
-                    .pointerInput(Unit) {
-                        var totalDrag = 0f
-                        detectHorizontalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onDragEnd = {
-                                if (totalDrag > 60) {
-                                    viewModel.playNextAyah()
-                                } else if (totalDrag < -60) {
-                                    viewModel.playPreviousAyah()
-                                }
-                            },
-                            onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
-                                totalDrag += dragAmount
-                            }
-                        )
-                    }
-            ) {
+                    ) {
                 // Main Accessible Content
                 Column(
                     modifier = Modifier
@@ -165,8 +180,8 @@ fun QuranPlayerScreen(
                         onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
                         onOpenReciters = { viewModel.toggleReciterDialog(true) },
                         onToggleScreenOff = { viewModel.toggleScreenOffMode() },
-                        isScreenOffMode = uiState.isScreenOffMode,
-                        isContinuousPlayEnabled = uiState.isContinuousPlayEnabled,
+                        isScreenOffMode = screenModeUiState.isScreenOffMode,
+                        isContinuousPlayEnabled = settingsUiState.isContinuousPlayEnabled,
                         onToggleContinuousPlay = { viewModel.toggleContinuousPlay() },
                         onSingleTapAnnounce = { viewModel.announce(it) }
                     )
@@ -174,17 +189,17 @@ fun QuranPlayerScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Dynamic TalkBack Live Announcement & Voice Feedback
-                    val activeSurah = uiState.currentSurah
-                    val ayahs = uiState.currentAyahs
-                    val currentAyah = ayahs.getOrNull(uiState.currentAyahIndex)
+                    val activeSurah = playbackUiState.currentSurah
+                    val ayahs = playbackUiState.currentAyahs
+                    val currentAyah = ayahs.getOrNull(playbackUiState.currentAyahIndex)
 
                     val talkBackDescription = buildString {
                         append("تطبيق القرآن الكريم للمكفوفين. ")
                         if (activeSurah != null) {
                             append("سورة ${activeSurah.nameArabic}، الآية ${currentAyah?.numberInSurah ?: 1} من أصل ${activeSurah.ayahCount}. ")
                         }
-                        if (uiState.isPlaying) append("جاري التشغيل. ") else append("متوقف مؤقتاً. ")
-                        if (uiState.tarkizRepeatMode > 1) append("وضع التكرار مفعّل. ")
+                        if (playbackUiState.isPlaying) append("جاري التشغيل. ") else append("متوقف مؤقتاً. ")
+                        if (settingsUiState.tarkizRepeatMode > 1) append("وضع التكرار مفعّل. ")
                         append("انقر مرتين للتشغيل أو الإيقاف. اضغط مطولاً للتحدث بالحدث الصوتي. اسحب يميناً ويساراً للتنقل.")
                     }
 
@@ -199,11 +214,11 @@ fun QuranPlayerScreen(
 
                     // Active Voice Listening Pulse Indicator
                     AnimatedVisibility(
-                        visible = uiState.isListeningVoice,
+                        visible = voiceUiState.isListeningVoice,
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
-                        ListeningVoiceBanner()
+                        ListeningVoiceBanner(isScreenOffMode = screenModeUiState.isScreenOffMode)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -221,27 +236,39 @@ fun QuranPlayerScreen(
 
                     // HorizontalPager for Ayahs
                     val pagerState = rememberPagerState(
-                        initialPage = uiState.currentAyahIndex,
+                        initialPage = playbackUiState.currentAyahIndex,
                         pageCount = { ayahs.size }
                     )
+                    var isProgrammaticScroll by remember { mutableStateOf(false) }
 
                     // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
-                    LaunchedEffect(uiState.currentAyahIndex) {
-                        if (pagerState.currentPage != uiState.currentAyahIndex && uiState.currentAyahIndex in ayahs.indices) {
-                            pagerState.animateScrollToPage(uiState.currentAyahIndex)
+                    LaunchedEffect(playbackUiState.currentAyahIndex) {
+                        val target = playbackUiState.currentAyahIndex
+                        if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
+                            isProgrammaticScroll = true
+                            try {
+                                pagerState.animateScrollToPage(target)
+                            } finally {
+                                isProgrammaticScroll = false
+                            }
                         }
                     }
 
                     // Sync Pager state to ViewModel (when user swipes)
                     LaunchedEffect(pagerState) {
-                        snapshotFlow { pagerState.currentPage }.collect { page ->
-                            // Read fresh state to avoid stale capture
-                            val currentIndex = viewModel.uiState.value.currentAyahIndex
-                            if (page != currentIndex && page in ayahs.indices) {
-                                viewModel.goToAyah(page)
+                        snapshotFlow { pagerState.currentPage }
+                            .distinctUntilChanged()
+                            .collect { page ->
+                                if (isProgrammaticScroll) return@collect
+                                val currentIndex = viewModel.playbackUiState.value.currentAyahIndex
+                                if (page != currentIndex && page in ayahs.indices) {
+                                    viewModel.goToAyah(page, autoPlay = true)
+                                }
                             }
-                        }
                     }
+
+                    val currentAyahIndex by remember(playbackUiState.currentAyahIndex) { derivedStateOf { playbackUiState.currentAyahIndex } }
+                    val isPlaying by remember(playbackUiState.isPlaying) { derivedStateOf { playbackUiState.isPlaying } }
 
                     HorizontalPager(
                         state = pagerState,
@@ -251,6 +278,13 @@ fun QuranPlayerScreen(
                     ) { page ->
                         val ayah = ayahs.getOrNull(page)
                         if (ayah != null) {
+                            val isCurrentPage by remember(page, currentAyahIndex) {
+                                derivedStateOf { page == currentAyahIndex }
+                            }
+                            val isPagePlaying by remember(isCurrentPage, isPlaying) {
+                                derivedStateOf { isCurrentPage && isPlaying }
+                            }
+
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
@@ -258,8 +292,9 @@ fun QuranPlayerScreen(
                             ) {
                                 AyahCard(
                                     ayah = ayah,
-                                    isCurrent = (page == uiState.currentAyahIndex),
-                                    isPlaying = (page == uiState.currentAyahIndex) && uiState.isPlaying,
+                                    isCurrent = isCurrentPage,
+                                    isPlaying = isPagePlaying,
+                                    isScreenOffMode = screenModeUiState.isScreenOffMode,
                                     onClick = { },
                                     onDoubleTap = { viewModel.togglePlayback() },
                                     onSingleTap = { },
@@ -294,9 +329,9 @@ fun QuranPlayerScreen(
 
                     // Primary Playback & Control Panel
                     ControlPanel(
-                        isPlaying = uiState.isPlaying,
-                        isBookmarked = uiState.isCurrentAyahBookmarked,
-                        tarkizRepeatMode = uiState.tarkizRepeatMode,
+                        isPlaying = playbackUiState.isPlaying,
+                        isBookmarked = bookmarkUiState.isCurrentAyahBookmarked,
+                        tarkizRepeatMode = settingsUiState.tarkizRepeatMode,
                         onTogglePlay = { viewModel.togglePlayback() },
                         onNext = { viewModel.playNextAyah() },
                         onPrev = { viewModel.playPreviousAyah() },
@@ -316,7 +351,7 @@ fun QuranPlayerScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "القارئ: ${uiState.selectedReciter.nameArabic}",
+                            text = "القارئ: ${settingsUiState.selectedReciter.nameArabic}",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedZinc
                         )
@@ -329,17 +364,17 @@ fun QuranPlayerScreen(
                 }
 
                 // Full Screen-Off Battery Saver Overlay (for blind users)
-                if (uiState.isScreenOffMode) {
+                if (screenModeUiState.isScreenOffMode) {
                     ScreenOffSaverOverlay(
                         onWakeUp = { viewModel.toggleScreenOffMode() }
                     )
                 }
 
                 // Surah Index Dialog Sheet
-                if (uiState.showSurahIndex) {
+                if (dialogUiState.showSurahIndex) {
                     SurahIndexSheet(
-                        surahs = uiState.surahs,
-                        currentSurahId = uiState.currentSurah?.id,
+                        surahs = playbackUiState.surahs,
+                        currentSurahId = playbackUiState.currentSurah?.id,
                         onSelectSurah = { surahId, ayahIndex ->
                             viewModel.loadSurah(surahId, targetAyahIndex = ayahIndex, autoPlay = true)
                             viewModel.toggleSurahIndex(false)
@@ -350,9 +385,9 @@ fun QuranPlayerScreen(
                 }
 
                 // Reciter Selector Sheet
-                if (uiState.showReciterDialog) {
+                if (dialogUiState.showReciterDialog) {
                     ReciterSelectorSheet(
-                        selectedReciter = uiState.selectedReciter,
+                        selectedReciter = settingsUiState.selectedReciter,
                         onSelectReciter = { reciter ->
                             viewModel.selectReciter(reciter)
                             viewModel.toggleReciterDialog(false)
@@ -363,497 +398,6 @@ fun QuranPlayerScreen(
                 }
 
             }
-        }
-    }
-}
-
-@Composable
-fun AudioEqualizerBars(isPlaying: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "equalizer")
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.Bottom,
-        modifier = Modifier.height(24.dp)
-    ) {
-        val barHeights = listOf(0.4f, 0.8f, 0.5f, 0.9f, 0.6f)
-        val animTargetValues = listOf(0.9f, 0.3f, 0.95f, 0.4f, 0.85f)
-
-        barHeights.forEachIndexed { index, baseScale ->
-            val scale by infiniteTransition.animateFloat(
-                initialValue = if (isPlaying) baseScale else 0.25f,
-                targetValue = if (isPlaying) animTargetValues[index] else 0.25f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 350 + index * 70, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "bar_$index"
-            )
-            Box(
-                modifier = Modifier
-                    .width(5.dp)
-                    .height((24 * scale).dp)
-                    .background(
-                        color = if (index % 2 == 0) AccessibleGold else AccessibleGoldVariant,
-                        shape = RoundedCornerShape(2.dp)
-                    )
-            )
-        }
-    }
-}
-
-@Composable
-fun GestureHintChip(label: String) {
-    Surface(
-        color = DarkImmersiveCard,
-        shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, DarkImmersiveBorder)
-    ) {
-        Text(
-            text = label,
-            color = TextMutedZinc,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
-}
-
-@Composable
-fun HeaderBar(
-    onOpenSurahIndex: () -> Unit,
-    onOpenReciters: () -> Unit,
-    onToggleScreenOff: () -> Unit,
-    isScreenOffMode: Boolean,
-    isContinuousPlayEnabled: Boolean,
-    onToggleContinuousPlay: () -> Unit,
-    onSingleTapAnnounce: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-
-        // Action Buttons Row
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            HeaderAccessibleButton(
-                onClick = onOpenSurahIndex,
-                onClickLabel = "فتح فهرس السور",
-                onSingleTap = { onSingleTapAnnounce("فهرس السور") },
-                testTag = "surah_index_button",
-                icon = Icons.AutoMirrored.Filled.List,
-                contentDescription = "فهرس السور"
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            HeaderAccessibleButton(
-                onClick = onOpenReciters,
-                onClickLabel = "تغيير القارئ المفضل",
-                onSingleTap = { onSingleTapAnnounce("اختيار القارئ") },
-                testTag = "reciter_select_button",
-                icon = Icons.Default.Person,
-                contentDescription = "اختيار القارئ"
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            HeaderAccessibleButton(
-                onClick = onToggleContinuousPlay,
-                onClickLabel = "زر التشغيل المتواصل",
-                onSingleTap = { onSingleTapAnnounce("التشغيل المتواصل") },
-                testTag = "continuous_play_toggle",
-                icon = Icons.Default.Repeat,
-                contentDescription = "التشغيل المتواصل",
-                isActive = isContinuousPlayEnabled
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-
-            HeaderAccessibleButton(
-                onClick = onToggleScreenOff,
-                onClickLabel = "وضع إيقاف الشاشة لتوفير البطارية",
-                onSingleTap = { onSingleTapAnnounce("وضع إيقاف الشاشة") },
-                testTag = "screen_off_toggle",
-                icon = Icons.Default.PowerSettingsNew,
-                contentDescription = "وضع إيقاف الشاشة",
-                isActive = isScreenOffMode
-            )
-        }
-    }
-}
-
-@Composable
-private fun HeaderAccessibleButton(
-    onClick: () -> Unit,
-    onClickLabel: String,
-    onSingleTap: () -> Unit,
-    testTag: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    isActive: Boolean = false
-) {
-    BlindAccessibleIconButton(
-        onClick = onClick,
-        onClickLabel = onClickLabel,
-        onSingleTap = onSingleTap,
-        modifier = Modifier
-            .size(48.dp)
-            .background(if (isActive) AccessibleGold else DarkImmersiveCard, CircleShape)
-            .border(1.dp, if (isActive) AccessibleGold else DarkImmersiveBorder, CircleShape)
-            .testTag(testTag)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = if (isActive) DarkImmersiveBg else AccessibleGold
-        )
-    }
-}
-
-@Composable
-fun ListeningVoiceBanner() {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    Surface(
-        color = AccessibleGold,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .padding(vertical = 4.dp)
-            .semantics {
-                liveRegion = LiveRegionMode.Assertive
-                contentDescription = "جاري الاستماع الآن، تحدث بالأمر الصوتي"
-            }
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Mic, contentDescription = null, tint = DarkImmersiveBg, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "جاري الاستماع لطلبك الصوتي...",
-                style = MaterialTheme.typography.headlineMedium,
-                color = DarkImmersiveBg,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun BigVoiceMicrophoneButton(
-    isListening: Boolean,
-    onClick: () -> Unit,
-    onSingleTapAnnounce: (String) -> Unit
-) {
-    BlindAccessibleButton(
-        onClick = onClick,
-        onClickLabel = "زر الأمر الصوتي الرئيسي. اضغط للتحدث بأسماء السور أو الأوامر",
-        onSingleTap = { onSingleTapAnnounce("استماع للأوامر الصوتية") },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .border(1.dp, if (isListening) AccessibleGreenAccent else AccessibleGold, RoundedCornerShape(20.dp))
-            .testTag("voice_mic_main_button"),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isListening) AccessibleGreenAccent else AccessibleGold
-        ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "استماع للأوامر الصوتية",
-                tint = DarkImmersiveBg,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = if (isListening) "جاري الاستماع..." else "تحدث بالأمر الصوتي (أو اضغط مطولاً)",
-                style = MaterialTheme.typography.headlineMedium,
-                color = DarkImmersiveBg,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun ControlPanel(
-    isPlaying: Boolean,
-    isBookmarked: Boolean,
-    tarkizRepeatMode: Int,
-    onTogglePlay: () -> Unit,
-    onNext: () -> Unit,
-    onPrev: () -> Unit,
-    onToggleBookmark: () -> Unit,
-    onToggleRepeat: () -> Unit,
-    onSingleTapAnnounce: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp)
-            .background(DarkImmersiveCard, RoundedCornerShape(24.dp))
-            .border(1.dp, DarkImmersiveBorder, RoundedCornerShape(24.dp))
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Repeat Tarkiz Button
-        val repeatText = if (tarkizRepeatMode == 1) "بدون تكرار" else "تكرار $tarkizRepeatMode مرات"
-        ControlAccessibleButton(
-            onClick = onToggleRepeat,
-            onClickLabel = "وضع تكرار الحفظ والتركيز. الحالي: $repeatText",
-            onSingleTap = { onSingleTapAnnounce("وضع التكرار") },
-            testTag = "repeat_tarkiz_button",
-            icon = Icons.Default.Repeat,
-            contentDescription = "وضع التكرار",
-            isActive = tarkizRepeatMode > 1,
-            badgeText = if (tarkizRepeatMode > 1 && tarkizRepeatMode != 99) "$tarkizRepeatMode" else null,
-            buttonSize = 54.dp,
-            iconSize = 30.dp
-        )
-
-        // Previous Ayah Button
-        ControlAccessibleButton(
-            onClick = onPrev,
-            onClickLabel = "الانتقال للآية السابقة",
-            onSingleTap = { onSingleTapAnnounce("الانتقال للآية السابقة") },
-            testTag = "prev_ayah_button",
-            icon = Icons.Default.SkipPrevious,
-            contentDescription = "الآية السابقة",
-            isActive = true,
-            buttonSize = 56.dp,
-            iconSize = 38.dp
-        )
-
-        // Main Play/Pause Big Center Button
-        BlindAccessibleButton(
-            onClick = onTogglePlay,
-            onClickLabel = if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة",
-            onSingleTap = { onSingleTapAnnounce(if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة") },
-            modifier = Modifier
-                .size(64.dp)
-                .testTag("play_pause_center_button"),
-            colors = ButtonDefaults.buttonColors(containerColor = AccessibleGold),
-            shape = CircleShape,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-        ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (isPlaying) "إيقاف التلاوة" else "تشغيل التلاوة",
-                tint = DarkImmersiveBg,
-                modifier = Modifier.size(40.dp)
-            )
-        }
-
-        // Next Ayah Button
-        ControlAccessibleButton(
-            onClick = onNext,
-            onClickLabel = "الانتقال للآية التالية",
-            onSingleTap = { onSingleTapAnnounce("الانتقال للآية التالية") },
-            testTag = "next_ayah_button",
-            icon = Icons.Default.SkipNext,
-            contentDescription = "الآية التالية",
-            isActive = true,
-            buttonSize = 56.dp,
-            iconSize = 38.dp
-        )
-
-        // Bookmark Toggle Button
-        ControlAccessibleButton(
-            onClick = onToggleBookmark,
-            onClickLabel = if (isBookmarked) "إزالة الآية من المفضلة" else "حفظ الآية في المفضلة والإشارات المرجعية",
-            onSingleTap = { onSingleTapAnnounce("تغيير حالة المفضلة") },
-            testTag = "bookmark_toggle_button",
-            icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-            contentDescription = if (isBookmarked) "إزالة من المفضلة" else "إضافة للمفضلة",
-            isActive = isBookmarked,
-            buttonSize = 54.dp,
-            iconSize = 32.dp
-        )
-    }
-}
-
-@Composable
-private fun ControlAccessibleButton(
-    onClick: () -> Unit,
-    onClickLabel: String,
-    onSingleTap: () -> Unit,
-    testTag: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    isActive: Boolean = false,
-    badgeText: String? = null,
-    buttonSize: androidx.compose.ui.unit.Dp,
-    iconSize: androidx.compose.ui.unit.Dp
-) {
-    BlindAccessibleIconButton(
-        onClick = onClick,
-        onClickLabel = onClickLabel,
-        onSingleTap = onSingleTap,
-        modifier = Modifier
-            .size(buttonSize)
-            .testTag(testTag)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (isActive) AccessibleGold else TextPrimaryWhite,
-                modifier = Modifier.size(iconSize)
-            )
-            if (badgeText != null) {
-                Text(
-                    text = badgeText,
-                    color = AccessibleGreenAccent,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ScreenOffSaverOverlay(
-    onWakeUp: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .clickable { onWakeUp() }
-            .semantics {
-                contentDescription = "الشاشة مغلقة لتوفير البطارية. انقر مرتين لإلغاء القفل أو واصل التحكم بالإيماءات والصوت."
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(24.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.PowerSettingsNew,
-                contentDescription = null,
-                tint = Color.DarkGray,
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "وضع توفير البطارية للمكفوفين مفعّل",
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.DarkGray,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "المس الشاشة مرتين للخروج من الوضع",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.DarkGray,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-fun AyahCard(
-    ayah: com.example.data.model.Ayah,
-    isCurrent: Boolean,
-    isPlaying: Boolean = false,
-    onClick: () -> Unit,
-    onDoubleTap: () -> Unit = {},
-    onSingleTap: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    val borderColor = if (isCurrent) AccessibleGold else DarkImmersiveBorder
-    val bgColor = if (isCurrent) DarkImmersiveSurface else DarkImmersiveCard
-    val elevation = if (isCurrent) 8.dp else 2.dp
-    
-    Card(
-        modifier = modifier
-            .fillMaxSize()
-            .semantics { 
-                contentDescription = "الآية رقم ${ayah.numberInSurah}، ${ayah.textArabic}"
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { onDoubleTap() },
-                    onTap = { 
-                        onClick()
-                        onSingleTap()
-                    }
-                )
-            },
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(if (isCurrent) 2.dp else 1.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Text(
-                text = ayah.textArabic,
-                style = MaterialTheme.typography.headlineLarge,
-                color = if (isCurrent) TextPrimaryWhite else TextMutedZinc,
-                textAlign = TextAlign.Center,
-                lineHeight = 44.sp
-            )
-            
-            if (isCurrent && isPlaying) {
-                Spacer(modifier = Modifier.height(12.dp))
-                AudioEqualizerBars(isPlaying = true)
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-fun AyahNumberCard(number: Int) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
-        border = androidx.compose.foundation.BorderStroke(1.dp, DarkImmersiveBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "الآية $number",
-                style = MaterialTheme.typography.titleLarge,
-                color = AccessibleGold,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

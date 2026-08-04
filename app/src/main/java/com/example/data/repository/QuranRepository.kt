@@ -40,6 +40,24 @@ class QuranRepository(private val context: Context) {
         return bookmarkDao.isBookmarked(surahId, ayahNumber)
     }
 
+    private val prefs = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+
+    fun saveLastPosition(surahId: Int, ayahIndex: Int) {
+        prefs.edit()
+            .putInt("last_surah_id", surahId)
+            .putInt("last_ayah_index", ayahIndex)
+            .apply()
+    }
+
+    fun getLastPosition(): Pair<Int, Int>? {
+        val surahId = prefs.getInt("last_surah_id", -1)
+        val ayahIndex = prefs.getInt("last_ayah_index", -1)
+        if (surahId != -1 && ayahIndex != -1) {
+            return Pair(surahId, ayahIndex)
+        }
+        return null
+    }
+
     fun getAllSurahs(): List<Surah> {
         return SURAH_LIST
     }

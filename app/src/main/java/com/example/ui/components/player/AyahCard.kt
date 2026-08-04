@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -52,7 +53,7 @@ fun AyahCard(
         modifier = modifier
             .fillMaxSize()
             .semantics { 
-                contentDescription = "الآية رقم ${ayah.numberInSurah}، ${ayah.textArabic}"
+                contentDescription = ayah.textArabic
             }
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -96,12 +97,16 @@ fun AyahCard(
 }
 
 @Composable
-fun AyahNumberCard(number: Int) {
+fun AyahNumberCard(
+    number: Int,
+    onClick: () -> Unit = {}
+) {
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
         border = BorderStroke(1.dp, DarkImmersiveBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.clickable { onClick() }
     ) {
         Box(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),

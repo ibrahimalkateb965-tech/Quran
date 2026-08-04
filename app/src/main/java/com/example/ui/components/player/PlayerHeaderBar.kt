@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Repeat
@@ -30,6 +31,7 @@ import com.example.ui.theme.DarkImmersiveCard
 @Composable
 fun HeaderBar(
     onOpenSurahIndex: () -> Unit,
+    onOpenBookmarks: () -> Unit,
     onOpenReciters: () -> Unit,
     onToggleScreenOff: () -> Unit,
     isScreenOffMode: Boolean,
@@ -54,6 +56,15 @@ fun HeaderBar(
                 testTag = "surah_index_button",
                 icon = Icons.AutoMirrored.Filled.List,
                 contentDescription = "فهرس السور"
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            HeaderAccessibleButton(
+                onClick = onOpenBookmarks,
+                onClickLabel = "الإشارات المرجعية",
+                onSingleTap = { onSingleTapAnnounce("الإشارات المرجعية") },
+                testTag = "bookmarks_button",
+                icon = Icons.Default.Bookmark,
+                contentDescription = "الإشارات المرجعية"
             )
             Spacer(modifier = Modifier.width(6.dp))
             HeaderAccessibleButton(

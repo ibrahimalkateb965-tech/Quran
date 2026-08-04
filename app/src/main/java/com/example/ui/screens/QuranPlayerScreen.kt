@@ -98,6 +98,7 @@ import com.example.accessibility.LocalTalkBackEnabled
 import com.example.accessibility.announceForAccessibility
 import com.example.ui.components.ReciterSelectorSheet
 import com.example.ui.components.SurahIndexSheet
+import com.example.ui.components.BookmarksSheet
 import com.example.ui.components.VoiceCommandGuideSheet
 import com.example.ui.components.blindAccessibleClickable
 import androidx.compose.ui.graphics.Brush
@@ -123,6 +124,7 @@ fun QuranPlayerScreen(
     val dialogUiState by viewModel.dialogUiState.collectAsState()
     val screenModeUiState by viewModel.screenModeUiState.collectAsState()
     val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
+    val bookmarks by viewModel.bookmarks.collectAsState()
     val context = LocalContext.current
 
     // Observe announcement events
@@ -178,6 +180,7 @@ fun QuranPlayerScreen(
                     // Header Bar with Status Badges and Quick Controls
                     HeaderBar(
                         onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
+                        onOpenBookmarks = { viewModel.toggleBookmarksSheet(true) },
                         onOpenReciters = { viewModel.toggleReciterDialog(true) },
                         onToggleScreenOff = { viewModel.toggleScreenOffMode() },
                         isScreenOffMode = screenModeUiState.isScreenOffMode,
@@ -239,29 +242,22 @@ fun QuranPlayerScreen(
                         initialPage = playbackUiState.currentAyahIndex,
                         pageCount = { ayahs.size }
                     )
-                    var isProgrammaticScroll by remember { mutableStateOf(false) }
-
                     // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
                     LaunchedEffect(playbackUiState.currentAyahIndex) {
                         val target = playbackUiState.currentAyahIndex
                         if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
-                            isProgrammaticScroll = true
-                            try {
-                                pagerState.animateScrollToPage(target)
-                            } finally {
-                                isProgrammaticScroll = false
-                            }
+                            pagerState.animateScrollToPage(target)
                         }
                     }
 
                     // Sync Pager state to ViewModel (when user swipes)
                     LaunchedEffect(pagerState) {
-                        snapshotFlow { pagerState.currentPage }
+                        snapshotFlow { pagerState.settledPage }
                             .distinctUntilChanged()
                             .collect { page ->
-                                if (isProgrammaticScroll) return@collect
-                                val currentIndex = viewModel.playbackUiState.value.currentAyahIndex
-                                if (page != currentIndex && page in ayahs.indices) {
+                                val currentState = viewModel.playbackUiState.value
+                                val currentIndex = currentState.currentAyahIndex
+                                if (page != currentIndex && page in currentState.currentAyahs.indices) {
                                     viewModel.goToAyah(page, autoPlay = true)
                                 }
                             }
@@ -303,7 +299,10 @@ fun QuranPlayerScreen(
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                AyahNumberCard(number = ayah.numberInSurah)
+                                AyahNumberCard(
+                                    number = ayah.numberInSurah,
+                                    onClick = { viewModel.announce("الآية ${ayah.numberInSurah}") }
+                                )
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
@@ -380,6 +379,19 @@ fun QuranPlayerScreen(
                             viewModel.toggleSurahIndex(false)
                         },
                         onDismiss = { viewModel.toggleSurahIndex(false) },
+                        onAnnounce = { viewModel.announce(it) }
+                    )
+                }
+
+                // Bookmarks Sheet
+                if (dialogUiState.showBookmarksSheet) {
+                    BookmarksSheet(
+                        bookmarks = bookmarks,
+                        onSelectBookmark = { surahId, ayahIndex ->
+                            viewModel.loadSurah(surahId, targetAyahIndex = ayahIndex, autoPlay = true)
+                            viewModel.toggleBookmarksSheet(false)
+                        },
+                        onDismiss = { viewModel.toggleBookmarksSheet(false) },
                         onAnnounce = { viewModel.announce(it) }
                     )
                 }

@@ -60,7 +60,8 @@ data class VoiceUiState(
 data class DialogUiState(
     val showSurahIndex: Boolean = false,
     val showReciterDialog: Boolean = false,
-    val showHelpDialog: Boolean = false
+    val showHelpDialog: Boolean = false,
+    val showBookmarksSheet: Boolean = false
 )
 
 data class ScreenModeUiState(
@@ -177,8 +178,13 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             }
         }, ContextCompat.getMainExecutor(application))
 
-        // Load default starting Surah (1. Al-Fatihah)
-        loadSurah(1, autoPlay = false)
+        val lastPos = repository.getLastPosition()
+        if (lastPos != null) {
+            loadSurah(lastPos.first, lastPos.second, autoPlay = false)
+        } else {
+            // Load default starting Surah (1. Al-Fatihah)
+            loadSurah(1, autoPlay = false)
+        }
     }
 
     fun loadSurah(surahId: Int, targetAyahIndex: Int = 0, autoPlay: Boolean = true) {
@@ -192,6 +198,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                     currentLoopCount = 1
                 )
             }
+            repository.saveLastPosition(surahId, targetAyahIndex)
             val ayahs = repository.fetchAyahsForSurah(surahId, _settingsUiState.value.selectedReciter.serverIdentifier)
             val initialBookmarked = if (ayahs.isNotEmpty()) {
                 repository.isBookmarked(surahId, ayahs[targetAyahIndex.coerceIn(0, ayahs.lastIndex)].numberInSurah)
@@ -343,13 +350,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
         _playbackUiState.update { it.copy(currentAyahIndex = index, currentLoopCount = 1) }
         val ayah = state.currentAyahs[index]
+        repository.saveLastPosition(ayah.surahId, index)
         haptic.vibrateClick()
 
         if (autoPlay) {
-            pendingAyahAnnouncement = "الآية ${ayah.numberInSurah}"
             playCurrentAyah()
-        } else {
-            announce("الآية ${ayah.numberInSurah}")
         }
     }
 
@@ -522,6 +527,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSurahIndex(show: Boolean) {
         haptic.vibrateClick()
         _dialogUiState.update { it.copy(showSurahIndex = show) }
+    }
+
+    fun toggleBookmarksSheet(show: Boolean) {
+        haptic.vibrateClick()
+        _dialogUiState.update { it.copy(showBookmarksSheet = show) }
     }
 
     fun toggleReciterDialog(show: Boolean) {

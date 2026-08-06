@@ -27,7 +27,7 @@ object SntpClient {
      */
     suspend fun requestTime(
         host: String = DEFAULT_NTP_HOST,
-        timeoutMillis: Int = 8_000
+        timeoutMillis: Int = 3_000
     ): Long? = withContext(Dispatchers.IO) {
         var socket: DatagramSocket? = null
         try {

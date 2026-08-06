@@ -163,9 +163,6 @@ fun QuranPlayerScreen(
                         detectTapGestures(
                             onDoubleTap = {
                                 viewModel.togglePlayback()
-                            },
-                            onLongPress = {
-                                viewModel.startVoiceCommand()
                             }
                         )
                     }
@@ -180,10 +177,7 @@ fun QuranPlayerScreen(
                     // Header Bar with Status Badges and Quick Controls
                     HeaderBar(
                         onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
-                        onOpenBookmarks = { viewModel.toggleBookmarksSheet(true) },
                         onOpenReciters = { viewModel.toggleReciterDialog(true) },
-                        onToggleScreenOff = { viewModel.toggleScreenOffMode() },
-                        isScreenOffMode = screenModeUiState.isScreenOffMode,
                         isContinuousPlayEnabled = settingsUiState.isContinuousPlayEnabled,
                         onToggleContinuousPlay = { viewModel.toggleContinuousPlay() },
                         onSingleTapAnnounce = { viewModel.announce(it) }
@@ -203,7 +197,7 @@ fun QuranPlayerScreen(
                         }
                         if (playbackUiState.isPlaying) append("جاري التشغيل. ") else append("متوقف مؤقتاً. ")
                         if (settingsUiState.tarkizRepeatMode > 1) append("وضع التكرار مفعّل. ")
-                        append("انقر مرتين للتشغيل أو الإيقاف. اضغط مطولاً للتحدث بالحدث الصوتي. اسحب يميناً ويساراً للتنقل.")
+                        append("انقر مرتين للتشغيل أو الإيقاف. اسحب يميناً ويساراً للتنقل.")
                     }
 
                     Box(
@@ -318,28 +312,12 @@ fun QuranPlayerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         GestureHintChip(label = "نقرتين: تشغيل/إيقاف")
-                        GestureHintChip(label = "ضغط مطول: أوامر صوتية")
                         GestureHintChip(label = "سحب أفقي: آية آية")
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Spacer(modifier = Modifier.height(10.dp))
 
-                    // Primary Playback & Control Panel
-                    ControlPanel(
-                        isPlaying = playbackUiState.isPlaying,
-                        isBookmarked = bookmarkUiState.isCurrentAyahBookmarked,
-                        tarkizRepeatMode = settingsUiState.tarkizRepeatMode,
-                        onTogglePlay = { viewModel.togglePlayback() },
-                        onNext = { viewModel.playNextAyah() },
-                        onPrev = { viewModel.playPreviousAyah() },
-                        onToggleBookmark = { viewModel.toggleCurrentBookmark() },
-                        onToggleRepeat = { viewModel.toggleRepeatMode() },
-                        onSingleTapAnnounce = { viewModel.announce(it) }
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Bottom Reciter & Mode Bar Readout
                     Row(

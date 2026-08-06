@@ -16,10 +16,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import com.example.ui.components.BlindAccessibleButton
-import com.example.ui.components.BlindAccessibleIconButton
 import com.example.ui.components.blindAccessibleClickable
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -49,50 +47,16 @@ fun VoiceCommandGuideSheet(
         "التالي / السابق" to "للتنقل بين الآيات آية آية",
         "تكرار / حفظ / تركيز" to "لتفعيل تكرار الآية (1، 3، 5، 10 مرات) للحفظ",
         "إشارة مرجعية" to "لحفظ الآية الحالية في المفضلة",
-        "أسماء القراء" to "مثال: الحصري، المنشاوي، العفاسي، عبد الباسط",
+        "أسماء القراء" to "مثال: الحصري، المنشاوي، عبد الرشيد صوفي، عبد الباسط",
         "قائمة السور" to "لفتح فهرس المائة وأربعة عشر سورة"
     )
 
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("voice_command_guide_sheet"),
-        color = DarkImmersiveBg
+    AccessibleBottomSheet(
+        title = "دليل الأوامر الصوتية",
+        contentDescriptionText = "دليل الأوامر الصوتية باللغة العربية",
+        onDismiss = onDismiss,
+        onAnnounce = onAnnounce
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "دليل الأوامر الصوتية",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = AccessibleGold,
-                    modifier = Modifier.semantics { contentDescription = "دليل الأوامر الصوتية باللغة العربية" }
-                )
-
-                BlindAccessibleIconButton(
-                    onClick = onDismiss,
-                    onClickLabel = "إغلاق دليل الأوامر الصوتية",
-                    onSingleTap = { onAnnounce("إغلاق دليل المساعدة") },
-                    modifier = Modifier
-                        .height(48.dp)
-                        .width(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        tint = AccessibleGold
-                    )
-                }
-            }
 
             BlindAccessibleButton(
                 onClick = onSpeakGuide,
@@ -149,4 +113,3 @@ fun VoiceCommandGuideSheet(
             }
         }
     }
-}

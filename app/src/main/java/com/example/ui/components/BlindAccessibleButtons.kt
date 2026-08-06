@@ -28,13 +28,12 @@ fun BlindAccessibleIconButton(
     onClick: () -> Unit,
     onClickLabel: String,
     onSingleTap: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.size(48.dp),
     enabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = modifier
-            .size(48.dp)
             .clip(CircleShape)
             .blindAccessibleClickable(
                 onClickLabel = onClickLabel,

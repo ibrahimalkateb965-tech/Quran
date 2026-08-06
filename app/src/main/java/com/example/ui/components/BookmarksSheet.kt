@@ -14,13 +14,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -45,113 +41,75 @@ fun BookmarksSheet(
     onDismiss: () -> Unit,
     onAnnounce: (String) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = DarkImmersiveBg
+    AccessibleBottomSheet(
+        title = "الإشارات المرجعية",
+        contentDescriptionText = "الإشارات المرجعية. لديك ${bookmarks.size} إشارة.",
+        onDismiss = onDismiss,
+        onAnnounce = onAnnounce
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        if (bookmarks.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "الإشارات المرجعية",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = AccessibleGold,
-                    modifier = Modifier.semantics {
-                        contentDescription = "الإشارات المرجعية. لديك ${bookmarks.size} إشارة."
-                    }
+                    text = "لا توجد إشارات مرجعية محفوظة.",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimaryWhite
                 )
-
-                BlindAccessibleIconButton(
-                    onClick = onDismiss,
-                    onClickLabel = "إغلاق النافذة",
-                    onSingleTap = { onAnnounce("إغلاق نافذة الإشارات المرجعية") },
-                    modifier = Modifier
-                        .height(48.dp)
-                        .width(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "إغلاق نافذة الإشارات المرجعية",
-                        tint = AccessibleGold
-                    )
-                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (bookmarks.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "لا توجد إشارات مرجعية محفوظة.",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimaryWhite
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(bookmarks, key = { "${it.surahId}_${it.ayahNumber}" }) { bookmark ->
-                        Card(
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(bookmarks, key = { "${it.surahId}_${it.ayahNumber}" }) { bookmark ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .blindAccessibleClickable(
+                                onClickLabel = "الانتقال إلى سورة ${bookmark.surahNameAr} الآية ${bookmark.ayahNumber}",
+                                onClick = { onSelectBookmark(bookmark.surahId, bookmark.ayahNumber - 1) },
+                                onSingleTap = { onAnnounce("سورة ${bookmark.surahNameAr}، الآية ${bookmark.ayahNumber}") }
+                            )
+                            .semantics {
+                                contentDescription = "سورة ${bookmark.surahNameAr}، الآية ${bookmark.ayahNumber}. انقر مرتين للانتقال إليها."
+                            },
+                        colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(72.dp)
-                                .blindAccessibleClickable(
-                                    onClickLabel = "الانتقال إلى سورة ${bookmark.surahNameAr} الآية ${bookmark.ayahNumber}",
-                                    onClick = { onSelectBookmark(bookmark.surahId, bookmark.ayahNumber - 1) },
-                                    onSingleTap = { onAnnounce("سورة ${bookmark.surahNameAr}، الآية ${bookmark.ayahNumber}") }
-                                )
-                                .semantics {
-                                    contentDescription = "سورة ${bookmark.surahNameAr}، الآية ${bookmark.ayahNumber}. انقر مرتين للانتقال إليها."
-                                },
-                            colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
-                            shape = RoundedCornerShape(12.dp)
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .height(44.dp)
+                                    .width(44.dp)
+                                    .background(DarkImmersiveSurface, shape = RoundedCornerShape(22.dp)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .height(44.dp)
-                                        .width(44.dp)
-                                        .background(DarkImmersiveSurface, shape = RoundedCornerShape(22.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${bookmark.surahId}",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = AccessibleGold
-                                    )
-                                }
+                                Text(
+                                    text = "${bookmark.surahId}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = AccessibleGold
+                                )
+                            }
 
-                                Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
-                                Column {
-                                    Text(
-                                        text = "سورة ${bookmark.surahNameAr}",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        color = TextPrimaryWhite,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "الآية ${bookmark.ayahNumber}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.LightGray
-                                    )
-                                }
+                            Column {
+                                Text(
+                                    text = "سورة ${bookmark.surahNameAr}",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = TextPrimaryWhite,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "الآية ${bookmark.ayahNumber}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.LightGray
+                                )
                             }
                         }
                     }

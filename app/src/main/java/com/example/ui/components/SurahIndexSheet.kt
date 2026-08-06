@@ -1,13 +1,11 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,24 +13,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import com.example.ui.components.BlindAccessibleIconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -66,6 +63,9 @@ fun SurahIndexSheet(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedSurahForAyahs by remember { mutableStateOf<Surah?>(null) }
+    val surahListState = rememberLazyListState()
+    val ayahListState = rememberLazyListState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val filteredSurahs = remember(searchQuery, surahs) {
         if (searchQuery.isBlank()) surahs
@@ -77,75 +77,31 @@ fun SurahIndexSheet(
         }
     }
 
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("surah_index_sheet"),
-        color = DarkImmersiveBg
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (selectedSurahForAyahs != null) {
-                    BlindAccessibleIconButton(
-                        onClick = { selectedSurahForAyahs = null },
-                        onClickLabel = "العودة لقائمة السور",
-                        onSingleTap = { onAnnounce("العودة لقائمة السور") },
-                        modifier = Modifier
-                            .height(48.dp)
-                            .width(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "رجوع لقائمة السور",
-                            tint = AccessibleGold
-                        )
-                    }
-                    Text(
-                        text = "اختر الآية (${selectedSurahForAyahs!!.nameArabic})",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = AccessibleGold,
-                        modifier = Modifier.semantics {
-                            contentDescription = "قائمة آيات سورة ${selectedSurahForAyahs!!.nameArabic}"
-                        }
-                    )
-                } else {
-                    Text(
-                        text = "فهرس السور (114 سورة)",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = AccessibleGold,
-                        modifier = Modifier.semantics {
-                            contentDescription = "فهرس السور. يحتوي على مائة وأربعة عشر سورة"
-                        }
-                    )
-                }
-
+    AccessibleBottomSheet(
+        title = if (selectedSurahForAyahs != null) "اختر الآية (${selectedSurahForAyahs!!.nameArabic})" else "فهرس السور (114 سورة)",
+        contentDescriptionText = if (selectedSurahForAyahs != null) "قائمة آيات سورة ${selectedSurahForAyahs!!.nameArabic}" else "فهرس السور. يحتوي على مائة وأربعة عشر سورة",
+        onDismiss = onDismiss,
+        onAnnounce = onAnnounce,
+        navigationIcon = if (selectedSurahForAyahs != null) {
+            {
                 BlindAccessibleIconButton(
-                    onClick = onDismiss,
-                    onClickLabel = "إغلاق النافذة",
-                    onSingleTap = { onAnnounce("إغلاق نافذة السور") },
+                    onClick = { selectedSurahForAyahs = null },
+                    onClickLabel = "العودة لقائمة السور",
+                    onSingleTap = { onAnnounce("العودة لقائمة السور") },
                     modifier = Modifier
                         .height(48.dp)
                         .width(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "إغلاق نافذة السور",
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "رجوع لقائمة السور",
                         tint = AccessibleGold
                     )
                 }
             }
-
-            if (selectedSurahForAyahs == null) {
+        } else null,
+        headerContent = if (selectedSurahForAyahs == null) {
+            {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -171,14 +127,20 @@ fun SurahIndexSheet(
                     )
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        } else null
+    ) {
+            LaunchedEffect(selectedSurahForAyahs) {
                 if (selectedSurahForAyahs != null) {
+                    ayahListState.scrollToItem(0)
+                }
+            }
+
+            if (selectedSurahForAyahs != null) {
+                LazyColumn(
+                    state = ayahListState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     val count = selectedSurahForAyahs!!.ayahCount
                     items(count, key = { it }) { index ->
                         val ayahNumber = index + 1
@@ -212,7 +174,13 @@ fun SurahIndexSheet(
                             }
                         }
                     }
-                } else {
+                }
+            } else {
+                LazyColumn(
+                    state = surahListState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     items(filteredSurahs, key = { it.id }) { surah ->
                         val isSelected = surah.id == currentSurahId
                         Card(
@@ -221,7 +189,10 @@ fun SurahIndexSheet(
                                 .height(72.dp)
                                 .blindAccessibleClickable(
                                     onClickLabel = "عرض آيات سورة ${surah.nameArabic}",
-                                    onClick = { selectedSurahForAyahs = surah },
+                                    onClick = { 
+                                        keyboardController?.hide()
+                                        selectedSurahForAyahs = surah 
+                                    },
                                     onSingleTap = { onAnnounce("سورة ${surah.nameArabic}، عدد آياتها ${surah.ayahCount}") }
                                 )
                                 .semantics {
@@ -288,7 +259,5 @@ fun SurahIndexSheet(
                     }
                 }
             }
-        }
     }
 }
-

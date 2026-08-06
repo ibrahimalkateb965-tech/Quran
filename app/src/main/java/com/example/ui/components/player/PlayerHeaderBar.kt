@@ -31,10 +31,7 @@ import com.example.ui.theme.DarkImmersiveCard
 @Composable
 fun HeaderBar(
     onOpenSurahIndex: () -> Unit,
-    onOpenBookmarks: () -> Unit,
     onOpenReciters: () -> Unit,
-    onToggleScreenOff: () -> Unit,
-    isScreenOffMode: Boolean,
     isContinuousPlayEnabled: Boolean,
     onToggleContinuousPlay: () -> Unit,
     onSingleTapAnnounce: (String) -> Unit
@@ -59,15 +56,6 @@ fun HeaderBar(
             )
             Spacer(modifier = Modifier.width(6.dp))
             HeaderAccessibleButton(
-                onClick = onOpenBookmarks,
-                onClickLabel = "الإشارات المرجعية",
-                onSingleTap = { onSingleTapAnnounce("الإشارات المرجعية") },
-                testTag = "bookmarks_button",
-                icon = Icons.Default.Bookmark,
-                contentDescription = "الإشارات المرجعية"
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            HeaderAccessibleButton(
                 onClick = onOpenReciters,
                 onClickLabel = "تغيير القارئ المفضل",
                 onSingleTap = { onSingleTapAnnounce("اختيار القارئ") },
@@ -84,17 +72,6 @@ fun HeaderBar(
                 icon = Icons.Default.Repeat,
                 contentDescription = "التشغيل المتواصل",
                 isActive = isContinuousPlayEnabled
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-
-            HeaderAccessibleButton(
-                onClick = onToggleScreenOff,
-                onClickLabel = "وضع إيقاف الشاشة لتوفير البطارية",
-                onSingleTap = { onSingleTapAnnounce("وضع إيقاف الشاشة") },
-                testTag = "screen_off_toggle",
-                icon = Icons.Default.PowerSettingsNew,
-                contentDescription = "وضع إيقاف الشاشة",
-                isActive = isScreenOffMode
             )
         }
     }
@@ -115,7 +92,7 @@ fun HeaderAccessibleButton(
         onClickLabel = onClickLabel,
         onSingleTap = onSingleTap,
         modifier = Modifier
-            .size(48.dp)
+            .size(62.dp)
             .background(if (isActive) AccessibleGold else DarkImmersiveCard, CircleShape)
             .border(1.dp, if (isActive) AccessibleGold else DarkImmersiveBorder, CircleShape)
             .testTag(testTag)
@@ -123,7 +100,8 @@ fun HeaderAccessibleButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (isActive) DarkImmersiveBg else AccessibleGold
+            tint = if (isActive) DarkImmersiveBg else AccessibleGold,
+            modifier = Modifier.size(31.dp)
         )
     }
 }

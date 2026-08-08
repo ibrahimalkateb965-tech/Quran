@@ -45,10 +45,8 @@ class TrialManager private constructor(context: Context) {
 
         val nowWallTime = resolveTrustedWallTime(installWallTime, installElapsed)
         if (nowWallTime == null) {
-            // لا يمكن تحديد الوقت الموثوق — نفترض السماح بالاستخدام تجنباً لمنع المستخدم عن الخطأ.
-            // ملاحظة: هذا قرار تجربة مستخدم؛ لمنع التلاعب يمكن إرجاع true هنا.
-            Log.w(TAG, "تعذّر تحديد الوقت الموثوق؛ يتم السماح بالاستخدام مؤقتاً")
-            return@withContext false
+            Log.e(TAG, "تنبيه أمني خطير: تعذّر تحديد الوقت الموثوق أو تم رصد تلاعب صريح. سيتم إغلاق التطبيق (Fail-Closed).")
+            return@withContext true
         }
 
         updateLastKnownWallTime(nowWallTime)
@@ -68,7 +66,7 @@ class TrialManager private constructor(context: Context) {
             return@withContext 7
         }
 
-        val nowWallTime = resolveTrustedWallTime(installWallTime, installElapsed) ?: return@withContext 7
+        val nowWallTime = resolveTrustedWallTime(installWallTime, installElapsed) ?: return@withContext 0
         val remaining = TRIAL_DURATION_MILLIS - (nowWallTime - installWallTime)
         val days = (remaining / (24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(0)
         days

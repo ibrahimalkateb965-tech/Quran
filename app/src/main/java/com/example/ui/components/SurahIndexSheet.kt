@@ -146,12 +146,15 @@ fun SurahIndexSheet(
                     }
                 }
             } else {
+                val displaySurahs = remember(surahs, currentSurahId) {
+                    surahs.sortedBy { if (it.id == currentSurahId) 0 else 1 }
+                }
                 LazyColumn(
                     state = surahListState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(surahs, key = { it.id }) { surah ->
+                    items(displaySurahs, key = { it.id }) { surah ->
                         val isSelected = surah.id == currentSurahId
                         Card(
                             modifier = Modifier

@@ -6,8 +6,5 @@
         </trust-anchors>
     </base-config>
     
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">verse.mp3quran.net</domain>
-        <domain includeSubdomains="true">cdn.islamic.network</domain>
-    </domain-config>
+
 </network-security-config>

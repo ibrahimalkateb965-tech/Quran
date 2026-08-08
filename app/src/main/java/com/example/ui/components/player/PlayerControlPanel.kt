@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -151,6 +152,13 @@ fun ControlPanel(
     onToggleRepeat: () -> Unit,
     onSingleTapAnnounce: (String) -> Unit
 ) {
+    val currentOnTogglePlay by rememberUpdatedState(onTogglePlay)
+    val currentOnNext by rememberUpdatedState(onNext)
+    val currentOnPrev by rememberUpdatedState(onPrev)
+    val currentOnToggleBookmark by rememberUpdatedState(onToggleBookmark)
+    val currentOnToggleRepeat by rememberUpdatedState(onToggleRepeat)
+    val currentOnSingleTapAnnounce by rememberUpdatedState(onSingleTapAnnounce)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -164,9 +172,9 @@ fun ControlPanel(
         // Repeat Tarkiz Button
         val repeatText = if (tarkizRepeatMode == 1) "بدون تكرار" else "تكرار $tarkizRepeatMode مرات"
         ControlAccessibleButton(
-            onClick = onToggleRepeat,
+            onClick = currentOnToggleRepeat,
             onClickLabel = "وضع تكرار الحفظ والتركيز. الحالي: $repeatText",
-            onSingleTap = { onSingleTapAnnounce("وضع التكرار") },
+            onSingleTap = { currentOnSingleTapAnnounce("وضع التكرار") },
             testTag = "repeat_tarkiz_button",
             icon = Icons.Default.Repeat,
             contentDescription = "وضع التكرار",
@@ -178,9 +186,9 @@ fun ControlPanel(
 
         // Previous Ayah Button
         ControlAccessibleButton(
-            onClick = onPrev,
+            onClick = currentOnPrev,
             onClickLabel = "الانتقال للآية السابقة",
-            onSingleTap = { onSingleTapAnnounce("الانتقال للآية السابقة") },
+            onSingleTap = { currentOnSingleTapAnnounce("الانتقال للآية السابقة") },
             testTag = "prev_ayah_button",
             icon = Icons.Default.SkipPrevious,
             contentDescription = "الآية السابقة",
@@ -191,9 +199,9 @@ fun ControlPanel(
 
         // Main Play/Pause Big Center Button
         BlindAccessibleButton(
-            onClick = onTogglePlay,
+            onClick = currentOnTogglePlay,
             onClickLabel = if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة",
-            onSingleTap = { onSingleTapAnnounce(if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة") },
+            onSingleTap = { currentOnSingleTapAnnounce(if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة") },
             modifier = Modifier
                 .size(64.dp)
                 .testTag("play_pause_center_button"),
@@ -211,9 +219,9 @@ fun ControlPanel(
 
         // Next Ayah Button
         ControlAccessibleButton(
-            onClick = onNext,
+            onClick = currentOnNext,
             onClickLabel = "الانتقال للآية التالية",
-            onSingleTap = { onSingleTapAnnounce("الانتقال للآية التالية") },
+            onSingleTap = { currentOnSingleTapAnnounce("الانتقال للآية التالية") },
             testTag = "next_ayah_button",
             icon = Icons.Default.SkipNext,
             contentDescription = "الآية التالية",
@@ -224,9 +232,9 @@ fun ControlPanel(
 
         // Bookmark Toggle Button
         ControlAccessibleButton(
-            onClick = onToggleBookmark,
+            onClick = currentOnToggleBookmark,
             onClickLabel = if (isBookmarked) "إزالة الآية من المفضلة" else "حفظ الآية في المفضلة والإشارات المرجعية",
-            onSingleTap = { onSingleTapAnnounce("تغيير حالة المفضلة") },
+            onSingleTap = { currentOnSingleTapAnnounce("تغيير حالة المفضلة") },
             testTag = "bookmark_toggle_button",
             icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
             contentDescription = if (isBookmarked) "إزالة من المفضلة" else "إضافة للمفضلة",

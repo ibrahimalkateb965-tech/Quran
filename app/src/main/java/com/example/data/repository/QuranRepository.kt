@@ -1,21 +1,26 @@
 package com.example.data.repository
 
 import android.content.Context
+import com.example.data.local.AyahDao
+import com.example.data.local.AyahEntity
 import com.example.data.local.BookmarkDao
 import com.example.data.local.BookmarkEntity
 import com.example.data.local.QuranDatabase
 import com.example.data.model.Ayah
-import com.example.data.model.Reciter
 import com.example.data.model.Surah
+import com.example.data.network.QuranApiService
+import com.example.di.NetworkModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 class QuranRepository(private val context: Context) {
-    private val bookmarkDao: BookmarkDao = QuranDatabase.getDatabase(context).bookmarkDao()
+    private val database = QuranDatabase.getDatabase(context)
+    private val bookmarkDao: BookmarkDao = database.bookmarkDao()
+    private val ayahDao: AyahDao = database.ayahDao()
+    private val apiService: QuranApiService = NetworkModule.quranApiService
 
     val allBookmarks: Flow<List<BookmarkEntity>> = bookmarkDao.getAllBookmarks()
 
@@ -65,71 +70,64 @@ class QuranRepository(private val context: Context) {
             .trim()
     }
 
-    suspend fun fetchAyahsForSurah(
+    fun getAyahs(
         surahId: Int,
         reciterIdentifier: String = "ar.alafasy"
-    ): List<Ayah> = withContext(Dispatchers.IO) {
-        val surah = getSurahById(surahId) ?: return@withContext emptyList()
-        try {
-            return@withContext kotlinx.coroutines.withTimeout(15_000) {
-                val urlString = "https://api.alquran.cloud/v1/surah/$surahId/$reciterIdentifier"
-                val connection = URL(urlString).openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 4000
-                connection.readTimeout = 4000
-
-                if (connection.responseCode == 200) {
-                    val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-                    val rootObj = JSONObject(responseText)
-                    val dataObj = rootObj.getJSONObject("data")
-                    val ayahsArray = dataObj.getJSONArray("ayahs")
-
-                    val ayahs = mutableListOf<Ayah>()
-                    for (i in 0 until ayahsArray.length()) {
-                        val item = ayahsArray.getJSONObject(i)
-                        val numberInSurah = item.getInt("numberInSurah")
-                        val globalNumber = item.getInt("number")
-                        val textArabic = item.getString("text")
-                        val audioUrl = item.optString("audio", "")
-
-                        val finalAudioUrl = if (reciterIdentifier == "ar.husary") {
-                            val formattedSurah = surahId.toString().padStart(3, '0')
-                            val formattedAyah = numberInSurah.toString().padStart(3, '0')
-                            "https://verse.mp3quran.net/data/Husary_64kbps/$formattedSurah$formattedAyah.mp3"
-                        } else if (audioUrl.isNotBlank()) {
-                            audioUrl
-                        } else {
-                            "https://cdn.islamic.network/quran/audio/128/$reciterIdentifier/$globalNumber.mp3"
-                        }
-
-                        ayahs.add(
-                            Ayah(
-                                numberInSurah = numberInSurah,
-                                globalNumber = globalNumber,
-                                textArabic = textArabic,
-                                audioUrl = finalAudioUrl,
-                                surahId = surahId,
-                                page = item.optInt("page", 1),
-                                juz = item.optInt("juz", 1)
-                            )
-                        )
-                    }
-                    return@withTimeout ayahs
-                }
-                return@withTimeout emptyList<Ayah>()
-            }
-        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            e.printStackTrace()
-        } catch (e: Exception) {
-            e.printStackTrace()
+    ): Flow<List<Ayah>> = flow {
+        val surah = getSurahById(surahId)
+        if (surah == null) {
+            emit(emptyList())
+            return@flow
         }
 
-        // Fallback: Offline generated audio URLs & placeholder text for essential continuous operation
-        generateFallbackAyahs(surah, reciterIdentifier)
-    }
+        // 1. Fetch from Local Database
+        val localAyahs = ayahDao.getAyahsForSurah(surahId, reciterIdentifier)
+        if (localAyahs.isNotEmpty()) {
+            emit(localAyahs.map { it.toDomainModel() })
+        } else {
+            // 2. Fetch from Network
+            try {
+                val response = apiService.getSurahAyahs(surahId, reciterIdentifier)
+                if (response.isSuccessful && response.body() != null) {
+                    val remoteAyahs = response.body()!!.data.ayahs
+                    val entities = remoteAyahs.map {
+                        
+                        val finalAudioUrl = if (!it.audioUrl.isNullOrBlank()) {
+                            it.audioUrl
+                        } else {
+                            resolveAudioEndpoint(reciterIdentifier, surahId, it.numberInSurah, it.globalNumber)
+                        }
+                        
+                        AyahEntity(
+                            globalNumber = it.globalNumber,
+                            numberInSurah = it.numberInSurah,
+                            textArabic = it.text,
+                            textTranslation = "",
+                            audioUrl = finalAudioUrl,
+                            surahId = surahId,
+                            page = it.page,
+                            juz = it.juz,
+                            reciterIdentifier = reciterIdentifier
+                        )
+                    }
+                    // Save to DB
+                    ayahDao.insertAyahs(entities)
+                    
+                    // Emit newly saved data
+                    emit(entities.map { it.toDomainModel() })
+                } else {
+                    // Emit fallback if network fails and local is empty
+                    emit(generateFallbackAyahs(surah, reciterIdentifier))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Emit fallback on exception
+                emit(generateFallbackAyahs(surah, reciterIdentifier))
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     private fun generateFallbackAyahs(surah: Surah, reciterIdentifier: String): List<Ayah> {
-        // Calculate global start ayah index roughly or use standard audio stream CDN pattern
         var currentGlobalNumber = 1
         for (s in com.example.data.model.SurahData.SURAH_LIST) {
             if (s.id == surah.id) break
@@ -153,13 +151,7 @@ class QuranRepository(private val context: Context) {
                 else -> "آية رقم $i من ${surah.nameArabic}"
             }
 
-            val finalAudioUrl = if (reciterIdentifier == "ar.husary") {
-                val formattedSurah = surah.id.toString().padStart(3, '0')
-                val formattedAyah = i.toString().padStart(3, '0')
-                "https://verse.mp3quran.net/data/Husary_64kbps/$formattedSurah$formattedAyah.mp3"
-            } else {
-                "https://cdn.islamic.network/quran/audio/128/$reciterIdentifier/$globalNum.mp3"
-            }
+            val finalAudioUrl = resolveAudioEndpoint(reciterIdentifier, surah.id, i, globalNum)
 
             list.add(
                 Ayah(
@@ -174,4 +166,19 @@ class QuranRepository(private val context: Context) {
         return list
     }
 
+    private fun resolveAudioEndpoint(
+        reciterIdentifier: String,
+        surahId: Int,
+        ayahInSurah: Int,
+        globalNum: Int
+    ): String {
+        // Fallback strategy if API does not return an audioUrl
+        return if (reciterIdentifier == "ar.husary") {
+            val formattedSurah = surahId.toString().padStart(3, '0')
+            val formattedAyah = ayahInSurah.toString().padStart(3, '0')
+            "https://verse.mp3quran.net/data/Husary_64kbps/$formattedSurah$formattedAyah.mp3"
+        } else {
+            "https://cdn.islamic.network/quran/audio/128/$reciterIdentifier/$globalNum.mp3"
+        }
+    }
 }

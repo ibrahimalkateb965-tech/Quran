@@ -18,7 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.layout.size
 import com.example.ui.components.BlindAccessibleIconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,29 +59,19 @@ import com.example.ui.components.blindAccessibleClickable
 fun SurahIndexSheet(
     surahs: List<Surah>,
     currentSurahId: Int?,
+    currentAyahIndex: Int,
     onSelectSurah: (Int, Int) -> Unit, // surahId, ayahIndex
     onDismiss: () -> Unit,
     onAnnounce: (String) -> Unit
 ) {
-    var searchQuery by remember { mutableStateOf("") }
     var selectedSurahForAyahs by remember { mutableStateOf<Surah?>(null) }
     val surahListState = rememberLazyListState()
     val ayahListState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val filteredSurahs = remember(searchQuery, surahs) {
-        if (searchQuery.isBlank()) surahs
-        else {
-            val q = searchQuery.trim()
-            surahs.filter {
-                it.nameArabic.contains(q) || it.id.toString() == q || it.nameEnglish.lowercase().contains(q.lowercase())
-            }
-        }
-    }
-
     AccessibleBottomSheet(
-        title = if (selectedSurahForAyahs != null) "اختر الآية (${selectedSurahForAyahs!!.nameArabic})" else "فهرس السور (114 سورة)",
-        contentDescriptionText = if (selectedSurahForAyahs != null) "قائمة آيات سورة ${selectedSurahForAyahs!!.nameArabic}" else "فهرس السور. يحتوي على مائة وأربعة عشر سورة",
+        title = if (selectedSurahForAyahs != null) "سورة ${selectedSurahForAyahs!!.nameArabic} ( اختيار الآية )" else "اختيار السورة (114 سورة)",
+        contentDescriptionText = if (selectedSurahForAyahs != null) "قائمة آيات سورة ${selectedSurahForAyahs!!.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
         navigationIcon = if (selectedSurahForAyahs != null) {
@@ -100,38 +92,16 @@ fun SurahIndexSheet(
                 }
             }
         } else null,
-        headerContent = if (selectedSurahForAyahs == null) {
-            {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .testTag("surah_search_input")
-                        .semantics { contentDescription = "مربع بحث عن سورة بالاسم أو الرقم" },
-                    placeholder = {
-                        Text("ابحث باسم السورة أو رقمها (مثال: الكهف أو 18)", color = Color.Gray, fontSize = 16.sp)
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = AccessibleGold)
-                    },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AccessibleGold,
-                        unfocusedBorderColor = DarkImmersiveBorder,
-                        focusedTextColor = TextPrimaryWhite,
-                        unfocusedTextColor = TextPrimaryWhite,
-                        focusedContainerColor = DarkImmersiveCard,
-                        unfocusedContainerColor = DarkImmersiveCard
-                    )
-                )
-            }
-        } else null
+        headerContent = null,
+        showCloseButton = false
     ) {
             LaunchedEffect(selectedSurahForAyahs) {
                 if (selectedSurahForAyahs != null) {
-                    ayahListState.scrollToItem(0)
+                    if (selectedSurahForAyahs!!.id == currentSurahId && currentAyahIndex > 0) {
+                        ayahListState.scrollToItem(currentAyahIndex)
+                    } else {
+                        ayahListState.scrollToItem(0)
+                    }
                 }
             }
 
@@ -181,7 +151,7 @@ fun SurahIndexSheet(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(filteredSurahs, key = { it.id }) { surah ->
+                    items(surahs, key = { it.id }) { surah ->
                         val isSelected = surah.id == currentSurahId
                         Card(
                             modifier = Modifier

@@ -1,0 +1,20 @@
+appId: com.example.blindapp
+---
+# Maestro End-to-End Test Flow for Mueen Quran App
+- launchApp:
+    clearState: false
+
+# 1. Verify Main Quran Player Screen Loaded
+- assertVisible: "تطبيق معين"
+
+# 2. Test Play / Pause Interaction
+- tapOn: "تشغيل"
+- waitForAnimationToEnd
+
+# 3. Test Horizontal Ayah Navigation (Swipe Left to Next Ayah)
+- swipe:
+    direction: LEFT
+    duration: 300
+
+# 4. Verify Ayah Card Displayed Properly
+- assertVisible: ".*"

@@ -145,8 +145,23 @@ class TrialManager private constructor(context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.e(TAG, "فشل إنشاء EncryptedSharedPreferences؛ يتم الاستعاضة بالتفضيلات العادية", e)
-            context.getSharedPreferences(PREFS_FILE_NAME_FALLBACK, Context.MODE_PRIVATE)
+            Log.e(TAG, "فشل إنشاء EncryptedSharedPreferences؛ مسح التفضيلات الفاسدة وإعادة المحاولة", e)
+            try {
+                context.getSharedPreferences(PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    context,
+                    PREFS_FILE_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+            } catch (e2: Exception) {
+                Log.e(TAG, "فشل التهيئة الآمنة بالكامل. النظام سيمنع الدخول (Fail-Closed).", e2)
+                throw IllegalStateException("Critical Security Error: Cannot initialize secure storage.", e2)
+            }
         }
     }
 

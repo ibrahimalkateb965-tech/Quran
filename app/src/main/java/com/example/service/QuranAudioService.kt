@@ -76,7 +76,6 @@ class QuranAudioService : MediaSessionService() {
             release()
             mediaSession = null
         }
-        releaseCache()
         super.onDestroy()
     }
 
@@ -98,9 +97,5 @@ class QuranAudioService : MediaSessionService() {
             }
         }
 
-        fun releaseCache() {
-            cacheInstance?.release()
-            cacheInstance = null
-        }
     }
 }

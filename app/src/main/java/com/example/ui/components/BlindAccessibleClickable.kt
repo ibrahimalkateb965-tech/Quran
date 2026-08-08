@@ -23,20 +23,23 @@ import com.example.accessibility.LocalTalkBackEnabled
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.blindAccessibleClickable(
     onClickLabel: String = "اختيار",
+    onLongClickLabel: String? = null,
     role: Role? = null,
     onSingleTap: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ): Modifier = composed {
     val context = LocalContext.current
     val isTalkBackEnabled = LocalTalkBackEnabled.current
 
     if (isTalkBackEnabled) {
-        // إذا كان TalkBack الخاص بالهاتف مفعلاً، نستخدم clickable القياسي.
-        // نظام TalkBack سيحول الضغطة المزدوجة التخيلية إلى onClick مباشرة بشكل سليم.
-        this.clickable(
+        // إذا كان TalkBack الخاص بالهاتف مفعلاً، نستخدم combinedClickable لدعم onClick و onLongClick
+        this.combinedClickable(
             onClickLabel = onClickLabel,
+            onLongClickLabel = onLongClickLabel,
             role = role,
-            onClick = onClick
+            onClick = onClick,
+            onLongClick = onLongClick
         )
     } else {
         // إذا كان TalkBack معطلاً، نستخدم المنطق المخصص لتطبيقنا (المساعد الداخلي).
@@ -44,7 +47,8 @@ fun Modifier.blindAccessibleClickable(
         this.combinedClickable(
             role = role,
             onClick = onSingleTap,
-            onDoubleClick = onClick
+            onDoubleClick = onClick,
+            onLongClick = onLongClick
         )
     }
 }

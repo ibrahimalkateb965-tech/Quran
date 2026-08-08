@@ -17,9 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.AccessibleGold
@@ -34,10 +40,24 @@ fun AccessibleBottomSheet(
     dismissLabel: String = "إغلاق النافذة",
     navigationIcon: (@Composable () -> Unit)? = null,
     headerContent: (@Composable () -> Unit)? = null,
+    showCloseButton: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    val currentOnAnnounce by rememberUpdatedState(onAnnounce)
+
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics {
+                paneTitle = title
+                customActions = listOf(
+                    CustomAccessibilityAction(label = dismissLabel) {
+                        currentOnDismiss()
+                        true
+                    }
+                )
+            },
         color = DarkImmersiveBg
     ) {
         Column(
@@ -63,23 +83,26 @@ fun AccessibleBottomSheet(
                         color = AccessibleGold,
                         modifier = Modifier.semantics {
                             contentDescription = contentDescriptionText
+                            heading()
                         }
                     )
                 }
 
-                BlindAccessibleIconButton(
-                    onClick = onDismiss,
-                    onClickLabel = dismissLabel,
-                    onSingleTap = { onAnnounce(dismissLabel) },
-                    modifier = Modifier
-                        .height(48.dp)
-                        .width(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = dismissLabel,
-                        tint = AccessibleGold
-                    )
+                if (showCloseButton) {
+                    BlindAccessibleIconButton(
+                        onClick = currentOnDismiss,
+                        onClickLabel = dismissLabel,
+                        onSingleTap = { currentOnAnnounce(dismissLabel) },
+                        modifier = Modifier
+                            .height(48.dp)
+                            .width(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = dismissLabel,
+                            tint = AccessibleGold
+                        )
+                    }
                 }
             }
             

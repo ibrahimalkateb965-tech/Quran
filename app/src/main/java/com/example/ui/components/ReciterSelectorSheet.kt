@@ -46,7 +46,8 @@ fun ReciterSelectorSheet(
         title = "اختيار القارئ",
         contentDescriptionText = "قائمة اختيار القارئ المفضل",
         onDismiss = onDismiss,
-        onAnnounce = onAnnounce
+        onAnnounce = onAnnounce,
+        showCloseButton = false
     ) {
         LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(14.dp)

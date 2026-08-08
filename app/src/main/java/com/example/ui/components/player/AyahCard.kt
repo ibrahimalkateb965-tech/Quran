@@ -34,17 +34,28 @@ import com.example.ui.theme.DarkImmersiveSurface
 import com.example.ui.theme.TextMutedZinc
 import com.example.ui.theme.TextPrimaryWhite
 
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import com.example.ui.components.blindAccessibleClickable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.ExperimentalFoundationApi
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AyahCard(
     ayah: Ayah,
-    isCurrent: Boolean,
-    isPlaying: Boolean = false,
-    isScreenOffMode: Boolean = false,
+    isCurrentProvider: () -> Boolean,
+    isPlayingProvider: () -> Boolean = { false },
+    isScreenOffModeProvider: () -> Boolean = { false },
     onClick: () -> Unit,
     onDoubleTap: () -> Unit = {},
     onSingleTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isCurrent = isCurrentProvider()
+    val isPlaying = isPlayingProvider()
+    val isScreenOffMode = isScreenOffModeProvider()
+    
     val borderColor = if (isCurrent) AccessibleGold else DarkImmersiveBorder
     val bgColor = if (isCurrent) DarkImmersiveSurface else DarkImmersiveCard
     val elevation = if (isCurrent) 8.dp else 2.dp
@@ -52,18 +63,22 @@ fun AyahCard(
     Card(
         modifier = modifier
             .fillMaxSize()
-            .semantics { 
-                contentDescription = ayah.textArabic
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { onDoubleTap() },
-                    onTap = { 
-                        onClick()
-                        onSingleTap()
+            .clearAndSetSemantics { 
+                contentDescription = "الآية ${ayah.numberInSurah}"
+                customActions = listOf(
+                    CustomAccessibilityAction("إعادة التلاوة") {
+                        onDoubleTap()
+                        true
                     }
                 )
-            },
+            }
+            .blindAccessibleClickable(
+                onClickLabel = "تشغيل أو إيقاف",
+                onLongClickLabel = "إعادة التلاوة",
+                onClick = onClick,
+                onSingleTap = onSingleTap,
+                onLongClick = onDoubleTap
+            ),
         colors = CardDefaults.cardColors(containerColor = bgColor),
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(if (isCurrent) 2.dp else 1.dp, borderColor),

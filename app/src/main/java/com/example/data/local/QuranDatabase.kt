@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [BookmarkEntity::class], version = 1, exportSchema = false)
+@Database(entities = [BookmarkEntity::class, AyahEntity::class], version = 2, exportSchema = false)
 abstract class QuranDatabase : RoomDatabase() {
     abstract fun bookmarkDao(): BookmarkDao
+    abstract fun ayahDao(): AyahDao
 
     companion object {
         @Volatile

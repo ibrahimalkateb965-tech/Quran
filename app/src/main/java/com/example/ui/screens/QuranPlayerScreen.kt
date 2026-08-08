@@ -75,6 +75,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,14 +118,14 @@ import com.example.ui.viewmodel.QuranViewModel
 fun QuranPlayerScreen(
     viewModel: QuranViewModel
 ) {
-    val playbackUiState by viewModel.playbackUiState.collectAsState()
-    val settingsUiState by viewModel.settingsUiState.collectAsState()
-    val bookmarkUiState by viewModel.bookmarkUiState.collectAsState()
-    val voiceUiState by viewModel.voiceUiState.collectAsState()
-    val dialogUiState by viewModel.dialogUiState.collectAsState()
-    val screenModeUiState by viewModel.screenModeUiState.collectAsState()
-    val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
-    val bookmarks by viewModel.bookmarks.collectAsState()
+    val playbackUiState by viewModel.playbackUiState.collectAsStateWithLifecycle()
+    val settingsUiState by viewModel.settingsUiState.collectAsStateWithLifecycle()
+    val bookmarkUiState by viewModel.bookmarkUiState.collectAsStateWithLifecycle()
+    val voiceUiState by viewModel.voiceUiState.collectAsStateWithLifecycle()
+    val dialogUiState by viewModel.dialogUiState.collectAsStateWithLifecycle()
+    val screenModeUiState by viewModel.screenModeUiState.collectAsStateWithLifecycle()
+    val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
+    val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Observe announcement events
@@ -162,7 +163,7 @@ fun QuranPlayerScreen(
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onDoubleTap = {
-                                viewModel.togglePlayback()
+                                viewModel.replayCurrentAyah()
                             }
                         )
                     }
@@ -176,10 +177,10 @@ fun QuranPlayerScreen(
                 ) {
                     // Header Bar with Status Badges and Quick Controls
                     HeaderBar(
-                        onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
-                        onOpenReciters = { viewModel.toggleReciterDialog(true) },
                         isContinuousPlayEnabled = settingsUiState.isContinuousPlayEnabled,
                         onToggleContinuousPlay = { viewModel.toggleContinuousPlay() },
+                        onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
+                        onOpenReciters = { viewModel.toggleReciterDialog(true) },
                         onSingleTapAnnounce = { viewModel.announce(it) }
                     )
 
@@ -222,82 +223,82 @@ fun QuranPlayerScreen(
 
                     // Surah Info Header
                     Text(
-                        text = "سورة ${activeSurah?.nameArabic ?: ""} • ${activeSurah?.revelationType ?: ""} • ${activeSurah?.ayahCount ?: ""} آية",
+                        text = "سورة ${activeSurah?.nameArabic ?: ""} ( اختيار الآية )",
                         style = MaterialTheme.typography.titleMedium,
                         color = AccessibleGold,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
-                            .semantics { contentDescription = "سورة ${activeSurah?.nameArabic}، عدد الآيات ${activeSurah?.ayahCount}" }
+                            .semantics { contentDescription = "سورة ${activeSurah?.nameArabic} ( اختيار الآية )" }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // HorizontalPager for Ayahs
-                    val pagerState = rememberPagerState(
-                        initialPage = playbackUiState.currentAyahIndex,
-                        pageCount = { ayahs.size }
-                    )
-                    // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
-                    LaunchedEffect(playbackUiState.currentAyahIndex) {
-                        val target = playbackUiState.currentAyahIndex
-                        if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
-                            pagerState.animateScrollToPage(target)
+                    if (ayahs.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = AccessibleGold)
                         }
-                    }
+                    } else {
+                        // HorizontalPager for Ayahs
+                        val pagerState = rememberPagerState(
+                            initialPage = playbackUiState.currentAyahIndex,
+                            pageCount = { ayahs.size }
+                        )
+                        // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
+                        LaunchedEffect(playbackUiState.currentAyahIndex) {
+                            val target = playbackUiState.currentAyahIndex
+                            if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
+                                pagerState.animateScrollToPage(target)
+                            }
+                        }
 
-                    // Sync Pager state to ViewModel (when user swipes)
-                    LaunchedEffect(pagerState) {
-                        snapshotFlow { pagerState.settledPage }
-                            .distinctUntilChanged()
-                            .collect { page ->
-                                val currentState = viewModel.playbackUiState.value
-                                val currentIndex = currentState.currentAyahIndex
-                                if (page != currentIndex && page in currentState.currentAyahs.indices) {
-                                    viewModel.goToAyah(page, autoPlay = true)
+                        // Sync Pager state to ViewModel (when user swipes)
+                        LaunchedEffect(pagerState) {
+                            snapshotFlow { pagerState.settledPage }
+                                .distinctUntilChanged()
+                                .collect { page ->
+                                    val currentState = viewModel.playbackUiState.value
+                                    val currentIndex = currentState.currentAyahIndex
+                                    if (page != currentIndex && page in currentState.currentAyahs.indices) {
+                                        viewModel.goToAyah(page, autoPlay = true)
+                                    }
                                 }
-                            }
-                    }
+                        }
 
-                    val currentAyahIndex by remember(playbackUiState.currentAyahIndex) { derivedStateOf { playbackUiState.currentAyahIndex } }
-                    val isPlaying by remember(playbackUiState.isPlaying) { derivedStateOf { playbackUiState.isPlaying } }
-
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) { page ->
-                        val ayah = ayahs.getOrNull(page)
-                        if (ayah != null) {
-                            val isCurrentPage by remember(page, currentAyahIndex) {
-                                derivedStateOf { page == currentAyahIndex }
-                            }
-                            val isPagePlaying by remember(isCurrentPage, isPlaying) {
-                                derivedStateOf { isCurrentPage && isPlaying }
-                            }
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                AyahCard(
-                                    ayah = ayah,
-                                    isCurrent = isCurrentPage,
-                                    isPlaying = isPagePlaying,
-                                    isScreenOffMode = screenModeUiState.isScreenOffMode,
-                                    onClick = { },
-                                    onDoubleTap = { viewModel.togglePlayback() },
-                                    onSingleTap = { },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                AyahNumberCard(
-                                    number = ayah.numberInSurah,
-                                    onClick = { viewModel.announce("الآية ${ayah.numberInSurah}") }
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) { page ->
+                            val ayah = ayahs.getOrNull(page)
+                            if (ayah != null) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    AyahCard(
+                                        ayah = ayah,
+                                        isCurrentProvider = { page == viewModel.playbackUiState.value.currentAyahIndex },
+                                        isPlayingProvider = { page == viewModel.playbackUiState.value.currentAyahIndex && viewModel.playbackUiState.value.isPlaying },
+                                        isScreenOffModeProvider = { screenModeUiState.isScreenOffMode },
+                                        onClick = { viewModel.togglePlayback() },
+                                        onDoubleTap = { viewModel.replayCurrentAyah() },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    AyahNumberCard(
+                                        number = ayah.numberInSurah,
+                                        onClick = { viewModel.announce("الآية ${ayah.numberInSurah}") }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
                             }
                         }
                     }
@@ -352,6 +353,7 @@ fun QuranPlayerScreen(
                     SurahIndexSheet(
                         surahs = playbackUiState.surahs,
                         currentSurahId = playbackUiState.currentSurah?.id,
+                        currentAyahIndex = playbackUiState.currentAyahIndex,
                         onSelectSurah = { surahId, ayahIndex ->
                             viewModel.loadSurah(surahId, targetAyahIndex = ayahIndex, autoPlay = true)
                             viewModel.toggleSurahIndex(false)

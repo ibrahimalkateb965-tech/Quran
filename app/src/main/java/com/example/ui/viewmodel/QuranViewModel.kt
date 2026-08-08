@@ -58,9 +58,12 @@ data class VoiceUiState(
     val isListeningVoice: Boolean = false
 )
 
+enum class StartupStep { RECITERS, SURAHS, COMPLETED }
+
 data class DialogUiState(
-    val showSurahIndex: Boolean = true,
-    val showReciterDialog: Boolean = false,
+    val startupStep: StartupStep = StartupStep.RECITERS,
+    val showSurahIndex: Boolean = false,
+    val showReciterDialog: Boolean = true,
     val showHelpDialog: Boolean = false,
     val showBookmarksSheet: Boolean = false
 )
@@ -74,6 +77,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     val haptic = HapticFeedbackManager(application)
     val speechManager = SpeechManager(application)
     private val voiceManager = VoiceCommandManager(application)
+    private val sessionPrefs = com.example.data.local.SessionPreferences.getInstance(application)
 
     private var mediaController: MediaController? = null
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
@@ -179,18 +183,46 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             }
         }, ContextCompat.getMainExecutor(application))
 
-        // Always start a new session at Surah 1; previous-session position is never restored.
-        loadSurah(1, autoPlay = false)
-
-        if (speechManager.isTalkBackEnabled()) {
-            announce(
-                "قارئ الشاشة الخاص بالهاتف يعمل الآن. " +
-                "لتجربة أفضل مع المساعد الصوتي الخاص بالتطبيق، يُفضّل إيقاف قارئ الشاشة " +
-                "بالضغط المطول على زري رفع وخفض الصوت معاً، " +
-                "أو من إعدادات الهاتف، إمكانية الوصول، ثم TalkBack."
-            )
+        val savedSession = sessionPrefs.getSession()
+        if (savedSession != null) {
+            val reciter = Reciter.DEFAULT_RECITERS.find { it.serverIdentifier == savedSession.reciterId || it.id == savedSession.reciterId } ?: Reciter.DEFAULT_RECITERS.first()
+            _settingsUiState.update { it.copy(selectedReciter = reciter) }
+            _dialogUiState.update { 
+                it.copy(
+                    startupStep = StartupStep.COMPLETED,
+                    showReciterDialog = false,
+                    showSurahIndex = false
+                ) 
+            }
+            loadSurah(savedSession.surahId, savedSession.ayahIndex, autoPlay = false)
+            
+            if (speechManager.isTalkBackEnabled()) {
+                announce("استئناف التلاوة.")
+            } else {
+                announce("مرحباً بعودتك، تم استئناف التلاوة من آخر توقف.")
+            }
         } else {
-            announce("تم فتح فهرس السور")
+            // First launch fallback: Al-Fatihah, Ayah 1
+            val defaultReciter = Reciter.DEFAULT_RECITERS.first()
+            _settingsUiState.update { it.copy(selectedReciter = defaultReciter) }
+            _dialogUiState.update { 
+                it.copy(
+                    startupStep = StartupStep.COMPLETED,
+                    showReciterDialog = false,
+                    showSurahIndex = false
+                ) 
+            }
+            loadSurah(surahId = 1, targetAyahIndex = 0, autoPlay = false)
+
+            if (speechManager.isTalkBackEnabled()) {
+                announce(
+                    "مرحباً بك. تم اختيار سورة الفاتحة كبداية. " +
+                    "قارئ الشاشة يعمل الآن. لتجربة أفضل مع المساعد الصوتي الخاص بالتطبيق، " +
+                    "يُفضّل إيقاف قارئ الشاشة بالضغط المطول على زري رفع وخفض الصوت معاً."
+                )
+            } else {
+                announce("مرحباً بك. تم اختيار سورة الفاتحة والقارئ الافتراضي كبداية.")
+            }
         }
     }
 
@@ -206,25 +238,33 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                     continuousPlayStartIndex = targetAyahIndex
                 )
             }
-            val ayahs = repository.fetchAyahsForSurah(surahId, _settingsUiState.value.selectedReciter.serverIdentifier)
-            val initialBookmarked = if (ayahs.isNotEmpty()) {
-                repository.isBookmarked(surahId, ayahs[targetAyahIndex.coerceIn(0, ayahs.lastIndex)].numberInSurah)
-            } else false
-
-            _playbackUiState.update {
-                it.copy(
-                    currentAyahs = ayahs,
-                    isLoadingAudio = false
-                )
-            }
-            _bookmarkUiState.update {
-                it.copy(isCurrentAyahBookmarked = initialBookmarked)
-            }
-
+            
             announce("${surah.translationArabic}. عدد آياتها ${surah.ayahCount}.")
+            
+            sessionPrefs.saveSession(
+                reciterId = _settingsUiState.value.selectedReciter.serverIdentifier,
+                surahId = surahId,
+                ayahIndex = targetAyahIndex
+            )
 
-            if (autoPlay && ayahs.isNotEmpty()) {
-                playCurrentAyah()
+            repository.getAyahs(surahId, _settingsUiState.value.selectedReciter.serverIdentifier).collect { ayahs ->
+                val initialBookmarked = if (ayahs.isNotEmpty()) {
+                    repository.isBookmarked(surahId, ayahs[targetAyahIndex.coerceIn(0, ayahs.lastIndex)].numberInSurah)
+                } else false
+
+                _playbackUiState.update {
+                    it.copy(
+                        currentAyahs = ayahs,
+                        isLoadingAudio = false
+                    )
+                }
+                _bookmarkUiState.update {
+                    it.copy(isCurrentAyahBookmarked = initialBookmarked)
+                }
+
+                if (autoPlay && ayahs.isNotEmpty()) {
+                    playCurrentAyah()
+                }
             }
         }
     }
@@ -274,25 +314,20 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        // Check for end of Surah
+        val isLastAyahInSurah = playbackState.currentAyahIndex >= playbackState.currentAyahs.lastIndex
+        if (isLastAyahInSurah) {
+            _playbackUiState.update { it.copy(isPlaying = false, currentLoopCount = 1) }
+            announce("انتهت سورة ${playbackState.currentSurah?.nameArabic}")
+            return
+        }
+
         // Otherwise reset loop count and proceed to next Ayah
         _playbackUiState.update { it.copy(currentLoopCount = 1) }
 
         if (_settingsUiState.value.isContinuousPlayEnabled) {
-            val blockStart = playbackState.continuousPlayStartIndex ?: playbackState.currentAyahIndex
-            val blockEnd = minOf(blockStart + 9, playbackState.currentAyahs.lastIndex)
-
-            if (playbackState.currentAyahIndex >= blockEnd) {
-                // Block finished → loop back to block start
-                if (blockStart == playbackState.currentAyahIndex) {
-                    playCurrentAyah() // Edge: 1-ayah block
-                } else {
-                    goToAyah(blockStart, autoPlay = true, isManual = false)
-                }
-            } else {
-                goToAyah(playbackState.currentAyahIndex + 1, autoPlay = true, isManual = false)
-            }
+            goToAyah(playbackState.currentAyahIndex + 1, autoPlay = true, isManual = false)
         }
-        // If continuous play is OFF, the player simply stops after the current Ayah completes its repetitions.
     }
 
     fun togglePlayback() {
@@ -312,7 +347,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     fun replayCurrentAyah() {
         val state = _playbackUiState.value
         _playbackUiState.update { it.copy(currentLoopCount = state.currentLoopCount + 1) }
-        performAction("تكرار الآية", HapticType.DOUBLE_TAP)
+        performAction("", HapticType.DOUBLE_TAP)
         playCurrentAyah()
     }
 
@@ -361,6 +396,13 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         val ayah = state.currentAyahs[index]
+        
+        sessionPrefs.saveSession(
+            reciterId = _settingsUiState.value.selectedReciter.serverIdentifier,
+            surahId = state.currentSurah?.id ?: 1,
+            ayahIndex = index
+        )
+        
         haptic.vibrateClick()
 
         if (autoPlay) {
@@ -408,11 +450,33 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectReciter(reciter: Reciter) {
         _settingsUiState.update { it.copy(selectedReciter = reciter) }
-        _dialogUiState.update { it.copy(showReciterDialog = false) }
-        performAction("تم تغيير القارئ إلى ${reciter.nameArabic}", HapticType.CLICK)
-        val surah = _playbackUiState.value.currentSurah
-        if (surah != null) {
-            loadSurah(surah.id, _playbackUiState.value.currentAyahIndex, autoPlay = _playbackUiState.value.isPlaying)
+        
+        val currentSurahId = _playbackUiState.value.currentSurah?.id
+        if (currentSurahId != null) {
+            sessionPrefs.saveSession(
+                reciterId = reciter.serverIdentifier,
+                surahId = currentSurahId,
+                ayahIndex = _playbackUiState.value.currentAyahIndex
+            )
+        }
+        
+        val currentStep = _dialogUiState.value.startupStep
+        if (currentStep == StartupStep.RECITERS) {
+            _dialogUiState.update { 
+                it.copy(
+                    startupStep = StartupStep.SURAHS,
+                    showReciterDialog = false,
+                    showSurahIndex = true
+                ) 
+            }
+            performAction("تم اختيار القارئ ${reciter.nameArabic}. الرجاء اختيار السورة", HapticType.CLICK)
+        } else {
+            _dialogUiState.update { it.copy(showReciterDialog = false) }
+            performAction("تم تغيير القارئ إلى ${reciter.nameArabic}", HapticType.CLICK)
+            val surah = _playbackUiState.value.currentSurah
+            if (surah != null) {
+                loadSurah(surah.id, _playbackUiState.value.currentAyahIndex, autoPlay = _playbackUiState.value.isPlaying)
+            }
         }
     }
 

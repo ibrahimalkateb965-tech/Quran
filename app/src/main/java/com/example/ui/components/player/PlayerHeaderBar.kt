@@ -39,8 +39,7 @@ fun HeaderBar(
     isContinuousPlayEnabled: Boolean,
     onToggleContinuousPlay: () -> Unit,
     onOpenSurahIndex: () -> Unit,
-    onOpenReciters: () -> Unit,
-    onSingleTapAnnounce: (String) -> Unit
+    onOpenReciters: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -57,14 +56,8 @@ fun HeaderBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             HeaderAccessibleButton(
-                onClick = {
-                    onToggleContinuousPlay()
-                    onSingleTapAnnounce(if (!isContinuousPlayEnabled) "التشغيل المتواصل مفعل" else "التشغيل المتواصل معطل")
-                },
-                onClickLabel = "تفعيل أو تعطيل التشغيل المتواصل",
-                onSingleTap = { 
-                    onSingleTapAnnounce(if (isContinuousPlayEnabled) "الاستماع المتواصل مفعل" else "الاستماع المتواصل معطل") 
-                },
+                onClick = onToggleContinuousPlay,
+                onClickLabel = if (isContinuousPlayEnabled) "إيقاف الاستماع المتواصل" else "تفعيل الاستماع المتواصل",
                 testTag = "continuous_play_button",
                 icon = Icons.Default.Repeat,
                 contentDescription = "الاستماع المتواصل. حالياً " + (if (isContinuousPlayEnabled) "مفعل" else "معطل"),
@@ -73,8 +66,7 @@ fun HeaderBar(
             Spacer(modifier = Modifier.weight(1f))
             HeaderAccessibleButton(
                 onClick = onOpenSurahIndex,
-                onClickLabel = "فتح قائمة اختيار السورة",
-                onSingleTap = { onSingleTapAnnounce("اختيار السورة") },
+                onClickLabel = "فتح قائمة السور",
                 testTag = "surah_index_button",
                 icon = Icons.AutoMirrored.Filled.List,
                 contentDescription = "اختيار السورة"
@@ -82,8 +74,7 @@ fun HeaderBar(
             Spacer(modifier = Modifier.weight(1f))
             HeaderAccessibleButton(
                 onClick = onOpenReciters,
-                onClickLabel = "تغيير القارئ المفضل",
-                onSingleTap = { onSingleTapAnnounce("اختيار القارئ") },
+                onClickLabel = "تغيير القارئ",
                 testTag = "reciter_select_button",
                 icon = Icons.Default.Person,
                 contentDescription = "اختيار القارئ"
@@ -96,7 +87,6 @@ fun HeaderBar(
 fun HeaderAccessibleButton(
     onClick: () -> Unit,
     onClickLabel: String,
-    onSingleTap: () -> Unit,
     testTag: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -105,7 +95,6 @@ fun HeaderAccessibleButton(
     BlindAccessibleIconButton(
         onClick = onClick,
         onClickLabel = onClickLabel,
-        onSingleTap = onSingleTap,
         modifier = Modifier
             .size(62.dp)
             .background(if (isActive) AccessibleGold else DarkImmersiveCard, CircleShape)

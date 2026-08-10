@@ -57,11 +57,10 @@ fun ReciterSelectorSheet(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(80.dp)
+                            .height(72.dp)
                             .blindAccessibleClickable(
-                                onClickLabel = "اختيار القارئ",
-                                onClick = { onSelectReciter(reciter) },
-                                onSingleTap = { onAnnounce("القارئ ${reciter.nameArabic}") }
+                                onClickLabel = "اختيار القارئ ${reciter.nameArabic}",
+                                onClick = { onSelectReciter(reciter) }
                             )
                             .semantics {
                                 contentDescription = "${reciter.nameArabic}. ${if (isSelected) "مختار حالياً" else "انقر مرتين لاختياره"}"

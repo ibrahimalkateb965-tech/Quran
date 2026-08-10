@@ -49,7 +49,6 @@ fun AyahCard(
     isScreenOffModeProvider: () -> Boolean = { false },
     onClick: () -> Unit,
     onDoubleTap: () -> Unit = {},
-    onSingleTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isCurrent = isCurrentProvider()
@@ -70,7 +69,6 @@ fun AyahCard(
                 onClickLabel = "", // إفراغ النص لمنع نطق TalkBack الافتراضي بالإنجليزية
                 onLongClickLabel = "",
                 onClick = onClick,
-                onSingleTap = onSingleTap,
                 onLongClick = onDoubleTap
             ),
         colors = CardDefaults.cardColors(containerColor = bgColor),

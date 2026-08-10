@@ -446,4 +446,439 @@ private fun focusSecuringModifier(page: Int): Modifier {
 - [ ] T1–T4 خضراء.
 - [ ] بنود التحقق اليدوي 1–8 موقّعة على جهاز حقيقي مع TalkBack.
 
+---
+
+# خطة رقم 68: تطبيق معمارية Dual-Mode بصرامة — تكييف التلميحات وسد فجوات التكافؤ
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**الحالة:** خطة جاهزة للتنفيذ — لم يُعدَّل أي كود.
+**المنفِّذ:** وكيل التطوير.
+**المرجع الملزم:** `.agents/DUAL_MODE_ARCHITECTURE.md` (القاعدة الذهبية + طبقات التكيف الخمس + قاعدة التكافؤ + مصفوفة الاختبار ×2).
+**الاعتمادية:** خطة 67 منفَّذة ومؤكَّدة (تم التحقق: لا وجود لـ `SilentAccessiblePager`، و`userScrollEnabled = true` و`ayahFocusPending` موجودان في `QuranPlayerScreen.kt`).
+
+**Goal:** جعل كل نص تلميحي وكل عنصر مرئي في التطبيق متوافقاً مع قاعدة التكافؤ (لكل مرئي معادل مسموع) مع تصحيح نصوص الإيماءات التي تصف سلوك المبصر وتظهر خطأً لمستخدم TalkBack.
+
+**Architecture:** تفريع سلوك فقط (Behavior Branching) عبر دوال نقية قابلة لاختبار الوحدة (`playerGestureHints`, `buildPlayerStatusDescription`) تُستهلك في مواضع الاستدعاء بناءً على `isTalkBackEnabled` الموجود أصلاً في نطاق الشاشة. لا تفريع Layouts، لا مكونات جديدة للعرض، لا تغيير في شجرة المكونات.
+
+**Tech Stack:** Jetpack Compose (BOM 2025.01.00)، JUnit4 لاختبارات الوحدة.
+
+## Global Constraints
+
+- ممنوع تفريع التصميم (`if (isTalkBackEnabled) { LayoutA } else { LayoutB }`) — يُسمح فقط بتفريع النصوص/السلوك (دليل المعمارية، قاعدة 1).
+- الصمت التام لمحتوى الآيات يبقى كما هو (خطة 67، القرار D2): `contentDescription = ","` لا يُمسّ.
+- لا تعديل على `QuranViewModel` ولا `AyahCard.kt` (باستثناء لا شيء — `AyahCard` خارج النطاق كلياً).
+- كل النصوص الجديدة بالعربية الفصحى المبسطة، وتصف إيماءات TalkBack **الحقيقية** (السحب بإصبعين للتنقل بين الآيات — السحب بإصبع واحد محجوز للتنقل الخطي بين العناصر).
+- النطاق: `QuranPlayerScreen.kt` + ملف جديد `PlayerHints.kt` + `AudioEqualizerBars.kt` (سطر واحد) + ملفات اختبار جديدة.
+
+---
+
+## نتائج المسح التدقيقي (الطلب رقم 2 — موثَّق ومعتمد من المهندس المعماري)
+
+تم فحص كامل شجرة `ui/` مقابل طبقات التكيف الخمس. النتائج:
+
+| المكوّن | الطبقة المعنية | الحكم | الإجراء |
+|---|---|---|---|
+| `GestureHintChip` ×2 (QuranPlayerScreen ~سطر 360-361) | 3 (تغذية راجعة) | ❌ **فجوة**: "سحب أفقي" وصف خاطئ تحت TalkBack، والنصوص تُقرأ بصوت عالٍ وتشتّت | المهمة 1 + 2 |
+| وصف الحالة الحي (`talkBackDescription`, ~سطر 204) | 3 | ❌ **فجوة**: "اسحب يميناً ويساراً للتنقل" غير صحيحة لمستخدم TalkBack | المهمة 3 |
+| `AudioEqualizerBars` | 3 | ⚠️ زخرفي بحت؛ مخفي حالياً **بالصدفة** عبر `clearAndSetSemantics` الخاص بـ `AyahCard` — غير محميّ من إعادة الاستخدام المستقبلية | المهمة 4 (تحصين) |
+| `ScreenOffSaverOverlay` | 5 | ✅ متوافق: وصف منطوق صحيح + `BackHandler` + اندماج Semantics | لا إجراء |
+| `TrialExpiredScreen` | 2/3 | ✅ متوافق: التفريع في قناة الإعلان فقط (سلوك مسموح)، التصميم موحّد | لا إجراء |
+| `HeaderBar` / `HeaderAccessibleButton` | 2/3 | ✅ متوافق: `contentDescription` عربي + نطق عند النقرة الواحدة | لا إجراء |
+| `ListeningVoiceBanner` | 3 | ✅ متوافق: `liveRegion Assertive` + وصف منطوق | لا إجراء |
+| `AyahNumberCard` + نص اسم السورة + شريط "القارئ/الوضع" | 3 | ✅ متوافق: نصوص قابلة للقراءة آلياً من TalkBack | لا إجراء |
+| `ControlPanel` / `BigVoiceMicrophoneButton` | — | ℹ️ معرَّفة لكن **بلا مواضع استدعاء** حالياً (كود غير مستخدم)؛ إن أُعيد إدخالها فهي متوافقة كما هي | لا إجراء (توثيق فقط) |
+| `GlobalBlindGestureModifier` / `blindAccessibleClickable` | 2 | ✅ متوافق: تفريع سلوك نموذجي عبر `LocalTalkBackEnabled` | لا إجراء |
+
+**خلاصة المسح:** فجوتان حقيقيتان (تلميحات + وصف الحالة) وتحصين واحد (Equalizer). كل ما عداها متوافق.
+
+---
+
+### Task 1: دالة نصوص التلميحات النقية + اختبار وحدات فاشل
+
+**Files:**
+- Create: `app/src/main/java/com/example/ui/components/player/PlayerHints.kt`
+- Test: `app/src/test/java/com/example/ui/components/player/PlayerHintsTest.kt`
+
+**Interfaces:**
+- Produces: `data class PlayerGestureHints(val playPauseHint: String, val navigationHint: String)` و `fun playerGestureHints(isTalkBackEnabled: Boolean): PlayerGestureHints` — تستهلكها المهمة 2 في `QuranPlayerScreen.kt`.
+
+- [ ] **Step 1: Write the failing test**
+
+```kotlin
+package com.example.ui.components.player
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class PlayerHintsTest {
+
+    @Test
+    fun `talkback on - navigation hint describes two-finger swipe`() {
+        val hints = playerGestureHints(isTalkBackEnabled = true)
+        assertEquals("سحب بإصبعين: آية آية", hints.navigationHint)
+        assertEquals("نقرتان: تشغيل/إيقاف", hints.playPauseHint)
+    }
+
+    @Test
+    fun `talkback off - sighted hints unchanged`() {
+        val hints = playerGestureHints(isTalkBackEnabled = false)
+        assertEquals("سحب أفقي: آية آية", hints.navigationHint)
+        assertEquals("نقرتين: تشغيل/إيقاف", hints.playPauseHint)
+    }
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.example.ui.components.player.PlayerHintsTest"`
+Expected: FAIL — `unresolved reference: playerGestureHints`
+
+- [ ] **Step 3: Write minimal implementation**
+
+```kotlin
+package com.example.ui.components.player
+
+/**
+ * نصوص تلميحات الإيماءات لشاشة المشغل — مكيّفة حسب وضع TalkBack.
+ * تفريع سلوك (نصوص) وليس تفريع تصميم — وفق .agents/DUAL_MODE_ARCHITECTURE.md
+ */
+data class PlayerGestureHints(
+    val playPauseHint: String,
+    val navigationHint: String
+)
+
+fun playerGestureHints(isTalkBackEnabled: Boolean): PlayerGestureHints =
+    if (isTalkBackEnabled) {
+        PlayerGestureHints(
+            playPauseHint = "نقرتان: تشغيل/إيقاف",
+            navigationHint = "سحب بإصبعين: آية آية"
+        )
+    } else {
+        PlayerGestureHints(
+            playPauseHint = "نقرتين: تشغيل/إيقاف",
+            navigationHint = "سحب أفقي: آية آية"
+        )
+    }
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.example.ui.components.player.PlayerHintsTest"`
+Expected: PASS (2 tests)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/src/main/java/com/example/ui/components/player/PlayerHints.kt app/src/test/java/com/example/ui/components/player/PlayerHintsTest.kt
+git commit -m "feat(a11y): add dual-mode gesture hint texts resolver"
+```
+
+---
+
+### Task 2: تطبيق التلميحات المكيّفة في موضع الاستدعاء
+
+**Files:**
+- Modify: `app/src/main/java/com/example/ui/screens/QuranPlayerScreen.kt` (~سطر 360-361)
+
+**Interfaces:**
+- Consumes: `playerGestureHints(isTalkBackEnabled)` من المهمة 1؛ `isTalkBackEnabled` موجود أصلاً في نطاق `QuranPlayerScreen` (~سطر 141) — لا حاجة لقراءة `LocalTalkBackEnabled` من جديد.
+
+- [ ] **Step 1: Apply the call-site change**
+
+قبل الـ `Row` الحاوي للتلميحات مباشرة (أو ضمنه)، استبدل:
+
+```kotlin
+GestureHintChip(label = "نقرتين: تشغيل/إيقاف")
+GestureHintChip(label = "سحب أفقي: آية آية")
+```
+
+بـ:
+
+```kotlin
+val gestureHints = playerGestureHints(isTalkBackEnabled)
+GestureHintChip(label = gestureHints.playPauseHint)
+GestureHintChip(label = gestureHints.navigationHint)
+```
+
+وأضف الاستيراد: `import com.example.ui.components.player.playerGestureHints`
+
+**ملاحظة إلزامية:** الرقائق تبقى **ظاهرة في الوضعين** (قاعدة المنفعة المتبادلة) — التكييف في النص فقط. ممنوع إخفاء الـ `Row` بشرط.
+
+- [ ] **Step 2: Verify compilation**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD SUCCESSFUL
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/src/main/java/com/example/ui/screens/QuranPlayerScreen.kt
+git commit -m "feat(a11y): adapt player gesture hint chips for TalkBack users"
+```
+
+---
+
+### Task 3: وصف الحالة الحي المكيّف (تصحيح تعليمات السحب المنطوقة)
+
+**Files:**
+- Modify: `app/src/main/java/com/example/ui/components/player/PlayerHints.kt`
+- Modify: `app/src/main/java/com/example/ui/screens/QuranPlayerScreen.kt` (~سطر 204)
+- Test: `app/src/test/java/com/example/ui/components/player/PlayerHintsTest.kt` (إضافة اختبارات)
+
+**Interfaces:**
+- Produces: `fun buildPlayerStatusDescription(surahName: String?, ayahNumber: Int, ayahCount: Int?, isPlaying: Boolean, isRepeatModeActive: Boolean, isTalkBackEnabled: Boolean): String` — تستهلكها `QuranPlayerScreen`.
+
+- [ ] **Step 1: Add failing tests**
+
+```kotlin
+@Test
+fun `status description - talkback on uses two-finger instruction`() {
+    val desc = buildPlayerStatusDescription(
+        surahName = "الفاتحة", ayahNumber = 3, ayahCount = 7,
+        isPlaying = true, isRepeatModeActive = false, isTalkBackEnabled = true
+    )
+    assert(desc.contains("اسحب بإصبعين يميناً أو يساراً للتنقل بين الآيات"))
+    assert(desc.contains("سورة الفاتحة، الآية 3 من أصل 7"))
+    assert(desc.contains("جاري التشغيل"))
+}
+
+@Test
+fun `status description - talkback off keeps original instruction`() {
+    val desc = buildPlayerStatusDescription(
+        surahName = null, ayahNumber = 1, ayahCount = null,
+        isPlaying = false, isRepeatModeActive = true, isTalkBackEnabled = false
+    )
+    assert(desc.contains("اسحب يميناً ويساراً للتنقل"))
+    assert(!desc.contains("بإصبعين"))
+    assert(!desc.contains("سورة"))
+    assert(desc.contains("متوقف مؤقتاً"))
+    assert(desc.contains("وضع التكرار مفعّل"))
+}
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.example.ui.components.player.PlayerHintsTest"`
+Expected: FAIL — `unresolved reference: buildPlayerStatusDescription`
+
+- [ ] **Step 3: Implement in `PlayerHints.kt`**
+
+```kotlin
+fun buildPlayerStatusDescription(
+    surahName: String?,
+    ayahNumber: Int,
+    ayahCount: Int?,
+    isPlaying: Boolean,
+    isRepeatModeActive: Boolean,
+    isTalkBackEnabled: Boolean
+): String = buildString {
+    append("تطبيق القرآن الكريم للمكفوفين. ")
+    if (surahName != null && ayahCount != null) {
+        append("سورة $surahName، الآية $ayahNumber من أصل $ayahCount. ")
+    }
+    append(if (isPlaying) "جاري التشغيل. " else "متوقف مؤقتاً. ")
+    if (isRepeatModeActive) append("وضع التكرار مفعّل. ")
+    if (isTalkBackEnabled) {
+        append("انقر مرتين للتشغيل أو الإيقاف. اسحب بإصبعين يميناً أو يساراً للتنقل بين الآيات.")
+    } else {
+        append("انقر مرتين للتشغيل أو الإيقاف. اسحب يميناً ويساراً للتنقل.")
+    }
+}
+```
+
+- [ ] **Step 4: Replace the inline buildString in `QuranPlayerScreen.kt`**
+
+استبدل كتلة `val talkBackDescription = buildString { ... }` (~سطر 204-213) بـ:
+
+```kotlin
+val talkBackDescription = buildPlayerStatusDescription(
+    surahName = activeSurah?.nameArabic,
+    ayahNumber = currentAyah?.numberInSurah ?: 1,
+    ayahCount = activeSurah?.ayahCount,
+    isPlaying = isPlaying,
+    isRepeatModeActive = settingsUiState.tarkizRepeatMode > 1,
+    isTalkBackEnabled = isTalkBackEnabled
+)
+```
+
+وأضف الاستيراد: `import com.example.ui.components.player.buildPlayerStatusDescription`
+
+**تحقق سلوكي إلزامي:** الناتج في وضع `TalkBack OFF` يجب أن يطابق النص القديم حرفياً (حرفاً بحرف) — أي اختلاف يعني خطأ في الاستخراج.
+
+- [ ] **Step 5: Run tests + compile**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.example.ui.components.player.PlayerHintsTest"` ثم `./gradlew :app:compileDebugKotlin`
+Expected: 4 tests PASS + BUILD SUCCESSFUL
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/src/main/java/com/example/ui/components/player/PlayerHints.kt app/src/main/java/com/example/ui/screens/QuranPlayerScreen.kt app/src/test/java/com/example/ui/components/player/PlayerHintsTest.kt
+git commit -m "feat(a11y): correct spoken swipe instructions for TalkBack in status description"
+```
+
+---
+
+### Task 4: تحصين `AudioEqualizerBars` (إخفاء صريح من شجرة الوصول)
+
+**Files:**
+- Modify: `app/src/main/java/com/example/ui/components/player/AudioEqualizerBars.kt:31`
+
+**Interfaces:**
+- لا واجهات جديدة. تغيير modifier داخلي فقط.
+
+- [ ] **Step 1: Apply the one-line hardening**
+
+العنصر زخرفي بحت (حركة أشرطة)، ومعادله المسموع ("جاري التشغيل") موجود عبر وصف الحالة والإعلانات الصوتية — لذا وفق قاعدة التكافؤ يُخفى صراحةً بدل الاعتماد على إخفاء عرضي من الأب:
+
+```kotlin
+Row(
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+    verticalAlignment = Alignment.Bottom,
+    modifier = Modifier
+        .height(24.dp)
+        .clearAndSetSemantics { } // زخرفي بحت — لا قيمة معلوماتية لقارئ الشاشة
+)
+```
+
+مع الاستيراد: `import androidx.compose.ui.semantics.clearAndSetSemantics`
+
+- [ ] **Step 2: Verify compilation**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD SUCCESSFUL
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/src/main/java/com/example/ui/components/player/AudioEqualizerBars.kt
+git commit -m "fix(a11y): explicitly hide decorative equalizer bars from accessibility tree"
+```
+
+---
+
+### Task 5: مصفوفة التحقق اليدوية ×2 (إلزامية — قاعدة 3 في الدليل)
+
+- [ ] **Step 1: TalkBack ON**
+  - الرقاقتان تُقرآن: "نقرتان: تشغيل/إيقاف" و"سحب بإصبعين: آية آية".
+  - وصف الحالة يقول "اسحب بإصبعين يميناً أو يساراً للتنقل بين الآيات".
+  - السحب الفعلي بإصبعين يقلب الآية (تطابق النص مع السلوك).
+  - أشرطة الـ Equalizer لا تظهر كعقدة قابلة للتركيز أثناء التنقل الخطي.
+
+- [ ] **Step 2: TalkBack OFF**
+  - الرقاقتان تظهران بالنصوص الأصلية: "نقرتين: تشغيل/إيقاف" و"سحب أفقي: آية آية".
+  - المساعد الداخلي ينطق وصف الحالة بالصيغة القديمة ("اسحب يميناً ويساراً").
+  - السحب اللمسي الأفقي بإصبع واحد يقلب الآية.
+  - لا تغيّر بصري إطلاقاً في الواجهة (نفس الرقائق، نفس المواضع).
+
+- [ ] **Step 3: Full test suite + commit**
+
+Run: `./gradlew :app:testDebugUnitTest` و `./gradlew :app:compileDebugKotlin`
+Expected: الكل أخضر، ثم لا شيء للـ commit إن كانت المهام السابقة قد سُجّلت.
+
+---
+
+## تعريف الإنجاز (Definition of Done)
+
+- [ ] نص "سحب أفقي" لا يظهر أبداً لمستخدم TalkBack — ونص "بإصبعين" لا يظهر أبداً للمبصر.
+- [ ] وصف الحالة المنطوق يطابق الإيماءات الحقيقية في كلا الوضعين.
+- [ ] صفر تفريع Layouts جديد (الرقائق ظاهرة للجميع — النص فقط يتكيّف).
+- [ ] `AudioEqualizerBars` مخفي صراحةً من شجرة الوصول.
+- [ ] 4 اختبارات وحدات خضراء + بناء نظيف.
+- [ ] مصفوفة ×2 اليدوية موقّعة على جهاز حقيقي.
+- [ ] جدول المسح التدقيقي أعلاه يبقى مرجعاً — أي مكوّن مرئي جديد مستقبلاً يُضاف إليه قبل الدمج.
+
+---
+
+# ملاحظات المراجعة المعمارية — خطة 69 (ملزمة لوكيل التطوير)
+
+**الحالة:** مراجعة معتمدة بشروط — يُمنع بدء تنفيذ خطة 69 قبل استيفاء البنود المعدّلة أدناه.
+**المرجع:** خطة 69 (دعم وضع المبصرين القياسي وإصلاح الرجوع) كما سلّمها صاحب المنتج.
+**نطاق المراجعة:** `AccessibleBottomSheet.kt`، `SurahIndexSheet.kt`، `BlindAccessibleClickable.kt`، `BlindAccessibleButtons.kt`، `GlobalBlindGestureModifier.kt`، `MainActivity.kt`، `TalkBackCompositionLocal.kt`.
+
+## 1. أحكام المراجعة على الأسئلة المعمارية
+
+| البند | الحكم |
+|---|---|
+| فصل `BackHandler` + تمرير `onBackPress` من الابن للأب (State Hoisting) | ✅ **معتمد** — بشرط الصيغة المعدّلة في §2 |
+| التفريع `if (isTalkBackEnabled)` داخل `blindAccessibleClickable` لتفريغ النقرة المفردة | ✅ **آمن على شجرة الوصول** — معتمد |
+| تعطيل `interceptBlindDoubleTap` العالمي | ⚠️ **ليس اختيارياً — إلزامي الحذف الكامل** (§3 / W2) |
+| إلغاء القارئ الداخلي لغير مستخدمي TalkBack | ⚠️ **موقوف على حسم قرار W1** (§3) قبل التنفيذ |
+| خطة التحقق اليدوي | ⚠️ **ناقصة** — تُستكمل ببنود §4 (W5) |
+
+### مبررات الحكم (للفهم — لا إعادة تحقيق)
+
+- **لماذا الفصل معتمد:** هيمنة `BackHandler` في Compose تتبع ترتيب تسجيل الـ callbacks (LIFO) — ترتيب هش يعتمد على ترتيب التركيب وقد ينقلب مع أي إعادة تركيب شرطية. مالك واحد للرجوع في الغلاف (`AccessibleBottomSheet`) مع منطق مرفوع من الابن يلغي فئة الاختطاف كلياً. المعامل الاختياري `onBackPress: (() -> Unit)? = null` متوافق رجعياً — تم التحقق أن `BookmarksSheet` و`ReciterSelectorSheet` و`VoiceCommandGuideSheet` لا تحتوي BackHandlers داخلية (الوحيدات في المشروع: `AccessibleBottomSheet` و`SurahIndexSheet` و`ScreenOffSaverOverlay`).
+- **لماذا التفريع آمن:** يحدث في طبقة مؤشرات الإدخال فقط؛ الفرعان ينتجان نفس عقدة Semantics (إجراء `onClick` + `Role` + دمج الأبناء) → لا تغيّر في شجرة الوصول، ومتوافق مع القاعدة الذهبية (تفريع سلوك لا تصميم). التبديل الحي أثناء التشغيل آمن عبر إعادة التركيب، وخدمات الوصول الأخرى (Voice Access / Switch Access) تبقى قادرة على التفعيل في الفرعين.
+
+## 2. التعديل الإلزامي على بند إصلاح الرجوع (خطة 69 §3)
+
+الـ lambda المقترح في خطة 69 يحذف بصمت وظيفتين موجودتين في المعالج الحالي (`SurahIndexSheet.kt:102-110`) — هذا انحدار ممنوع:
+
+1. `keyboardController?.hide()` — إخفاء لوحة المفاتيح عند الرجوع (يوجد بحث في الفهرس).
+2. `onAnnounce("تم العودة لقائمة السور")` — المعادل المسموع للعودة البصرية (قاعدة التكافؤ في `.agents/DUAL_MODE_ARCHITECTURE.md`).
+
+**الصيغة الإلزامية البديلة:**
+
+```kotlin
+onBackPress = {
+    keyboardController?.hide()
+    if (selectedSurahForAyahs != null) {
+        selectedSurahForAyahs = null
+        onAnnounce("تم العودة لقائمة السور") // معادل مسموع — إلزامي
+    } else {
+        onDismiss()
+    }
+}
+```
+
+**قيد إضافي:** الحفاظ على ترتيب التركيب الحالي في `QuranPlayerScreen.kt` (الـ `ScreenOffSaverOverlay` قبل النوافذ) حتى لا يختطف الـ Overlay زر الرجوع من نافذة مفتوحة فوقه.
+
+## 3. التحذيرات الملزمة (مرتبة حسب الخطورة)
+
+### 🔴 W1 — قرار منتجي يجب حسمه قبل التنفيذ: TalkBack OFF ≠ مبصر
+
+القارئ الداخلي (نقرة = نطق، نقرتان = تنفيذ، النقرة المزدوجة العالمية لإعادة الآية) بُني **للكفيف الذي لا يشغّل TalkBack**، لا للمبصر. إلغاؤه بالكامل يجعل التطبيق غير قابل للاستخدام لتلك الفئة.
+
+**الخياران المسموحان (يوثَّق أحدهما في الخطة قبل التنفيذ):**
+- **(أ)** تأكيد منتجي صريح موثّق: "جميع المستخدمين الكفوف يعتمدون TalkBack حصراً" → يُسمح بالإلغاء الكامل.
+- **(ب)** التحول لكشف **ثلاثي الأوضاع**: `TalkBack (تلقائي) / مساعد داخلي / مبصر` عبر مفتاح إعدادات أو منتقي وضع عند أول تشغيل، مع بقاء المساعد الداخلي خياراً.
+
+### 🔴 W2 — `interceptBlindDoubleTap`: الحذف الكامل إلزامي وليس اختيارياً
+
+آلية الخلل الشبحي إن تُرك فعّالاً مع النقرة القياسية الجديدة:
+1. المبصر ينقر "تشغيل" → يعمل فوراً.
+2. ينقر مجدداً خلال `doubleTapTimeoutMillis` → المعترض العالمي (`MainActivity.kt:100`) يلتقطها كنقرة مزدوجة، **يستهلكها**، ويستدعي `pendingActionManager.execute()`.
+3. وضع المبصر الجديد لا يسجّل إجراءات معلّقة → يُنفَّذ الـ fallback `replayCurrentAyah()` (`QuranPlayerScreen.kt:156`) → **إعادة تشغيل الآية شبحياً مع كل نقر سريع متتالي**.
+
+**النطاق الإلزامي للحذف (يُضاف لخطة 69 صراحة):**
+- موضع الاستدعاء في `MainActivity.kt` (~سطر 100) وما يتعلق به من `pendingActionManager.execute()`.
+- `Modifier.interceptBlindDoubleTap` كاملاً في `GlobalBlindGestureModifier.kt`.
+- `GlobalBlindGestureState.lastDoubleTapTime` وحاجز الـ 500ms داخل فرع else في `blindAccessibleClickable`.
+- الاستيرادات اليتيمة الناتجة.
+
+### 🟡 W3 — موت منظومة `PendingBlindActionManager`
+
+بعد W2 يصبح `LocalPendingBlindAction` / `PendingBlindActionManager` (`TalkBackCompositionLocal.kt:17`) و`setFallback`/`clear` بلا منتجين — كود ميت. يُوثَّق في الخطة: **حذف المنظومة كاملة** إن حُسم W1 بالخيار (أ)، أو إبقاؤها إن حُسم بالخيار (ب). تركها معلقة ممنوع.
+
+### 🟡 W4 — قرارات صغيرة تُحسم داخل الخطة لا أثناء التنفيذ
+
+- **الضغط المطوّل على `AyahCard` للمبصر** (`onLongClick = replayCurrentAyah` حالياً): يبقى أم يُحذف؟ يُحدَّد صراحة.
+- **معامل `onSingleTap`** في `blindAccessibleClickable`/`AyahCard` يصبح بلا مستهلك في وضع المبصر: يُوثَّق كـ TalkBack-only أو يُنظَّف — قرار صريح.
+- **`TrialExpiredScreen`** (سطر 47-51): هل يبقى النطق عبر TTS الداخلي في وضع المبصر أم يُقتصر على TalkBack؟
+- **تباين النص الجديد** "الوضع: مبصرين" بـ `TextMutedZinc` على `DarkImmersiveBg`: يُتحقق من نسبة تباين ≥ 4.5:1 (WCAG) — المبصر ضعيف البصر مستفيد أيضاً.
+
+### 🟡 W5 — استكمال خطة التحقق (تُضاف لخطة 69)
+
+1. **اختبار آلي للرجوع:** Compose Test يركّب `SurahIndexSheet` ويؤكد أن الرجوع من قائمة الآيات يعود لقائمة السور، ومن قائمة السور يغلق النافذة — دون جهاز.
+2. **تبديل TalkBack أثناء التشغيل** والشاشة مفتوحة → تحوّل حي للسلوك دون انهيار.
+3. **نقر سريع متتالٍ** (3-4 نقرات) للمبصر على التشغيل → صفر إعادة تشغيل شبحية (انحدار W2).
+4. **الرجوع ولوحة المفاتيح مفتوحة** في بحث الفهرس → تُخفى اللوحة ولا يُغلق التطبيق.
+5. **بعد الرجوع من الآيات للسور مع TalkBack:** التركيز يعود لموضع معقول داخل النافذة، ويُسمع إعلان "تم العودة لقائمة السور".
+
+## 4. شرط البدء
+
+لا يبدأ وكيل التطوير تنفيذ خطة 69 إلا بعد: (1) توثيق حسم W1 من صاحب المنتج، (2) اعتماد الصيغة المعدّلة في §2، (3) إدراج نطاق W2 الكامل ضمن مهام التنفيذ.
+
 

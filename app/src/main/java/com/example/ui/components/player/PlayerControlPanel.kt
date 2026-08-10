@@ -102,13 +102,11 @@ fun ListeningVoiceBanner(isScreenOffMode: Boolean = false) {
 @Composable
 fun BigVoiceMicrophoneButton(
     isListening: Boolean,
-    onClick: () -> Unit,
-    onSingleTapAnnounce: (String) -> Unit
+    onClick: () -> Unit
 ) {
     BlindAccessibleButton(
         onClick = onClick,
         onClickLabel = "زر الأمر الصوتي الرئيسي. اضغط للتحدث بأسماء السور أو الأوامر",
-        onSingleTap = { onSingleTapAnnounce("استماع للأوامر الصوتية") },
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
@@ -149,15 +147,13 @@ fun ControlPanel(
     onNext: () -> Unit,
     onPrev: () -> Unit,
     onToggleBookmark: () -> Unit,
-    onToggleRepeat: () -> Unit,
-    onSingleTapAnnounce: (String) -> Unit
+    onToggleRepeat: () -> Unit
 ) {
     val currentOnTogglePlay by rememberUpdatedState(onTogglePlay)
     val currentOnNext by rememberUpdatedState(onNext)
     val currentOnPrev by rememberUpdatedState(onPrev)
     val currentOnToggleBookmark by rememberUpdatedState(onToggleBookmark)
     val currentOnToggleRepeat by rememberUpdatedState(onToggleRepeat)
-    val currentOnSingleTapAnnounce by rememberUpdatedState(onSingleTapAnnounce)
 
     Row(
         modifier = Modifier
@@ -174,7 +170,6 @@ fun ControlPanel(
         ControlAccessibleButton(
             onClick = currentOnToggleRepeat,
             onClickLabel = "وضع تكرار الحفظ والتركيز. الحالي: $repeatText",
-            onSingleTap = { currentOnSingleTapAnnounce("وضع التكرار") },
             testTag = "repeat_tarkiz_button",
             icon = Icons.Default.Repeat,
             contentDescription = "وضع التكرار",
@@ -188,7 +183,6 @@ fun ControlPanel(
         ControlAccessibleButton(
             onClick = currentOnPrev,
             onClickLabel = "الانتقال للآية السابقة",
-            onSingleTap = { currentOnSingleTapAnnounce("الانتقال للآية السابقة") },
             testTag = "prev_ayah_button",
             icon = Icons.Default.SkipPrevious,
             contentDescription = "الآية السابقة",
@@ -201,7 +195,6 @@ fun ControlPanel(
         BlindAccessibleButton(
             onClick = currentOnTogglePlay,
             onClickLabel = if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة",
-            onSingleTap = { currentOnSingleTapAnnounce(if (isPlaying) "إيقاف التلاوة مؤقتاً" else "تشغيل التلاوة") },
             modifier = Modifier
                 .size(64.dp)
                 .testTag("play_pause_center_button"),
@@ -221,7 +214,6 @@ fun ControlPanel(
         ControlAccessibleButton(
             onClick = currentOnNext,
             onClickLabel = "الانتقال للآية التالية",
-            onSingleTap = { currentOnSingleTapAnnounce("الانتقال للآية التالية") },
             testTag = "next_ayah_button",
             icon = Icons.Default.SkipNext,
             contentDescription = "الآية التالية",
@@ -234,7 +226,6 @@ fun ControlPanel(
         ControlAccessibleButton(
             onClick = currentOnToggleBookmark,
             onClickLabel = if (isBookmarked) "إزالة الآية من المفضلة" else "حفظ الآية في المفضلة والإشارات المرجعية",
-            onSingleTap = { currentOnSingleTapAnnounce("تغيير حالة المفضلة") },
             testTag = "bookmark_toggle_button",
             icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
             contentDescription = if (isBookmarked) "إزالة من المفضلة" else "إضافة للمفضلة",
@@ -249,7 +240,6 @@ fun ControlPanel(
 fun ControlAccessibleButton(
     onClick: () -> Unit,
     onClickLabel: String,
-    onSingleTap: () -> Unit,
     testTag: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -261,7 +251,6 @@ fun ControlAccessibleButton(
     BlindAccessibleIconButton(
         onClick = onClick,
         onClickLabel = onClickLabel,
-        onSingleTap = onSingleTap,
         modifier = Modifier
             .size(buttonSize)
             .testTag(testTag)

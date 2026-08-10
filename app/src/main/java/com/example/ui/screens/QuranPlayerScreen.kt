@@ -133,7 +133,7 @@ fun QuranPlayerScreen(
     val voiceUiState by viewModel.voiceUiState.collectAsStateWithLifecycle()
     val dialogUiState by viewModel.dialogUiState.collectAsStateWithLifecycle()
     val screenModeUiState by viewModel.screenModeUiState.collectAsStateWithLifecycle()
-    val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
+    val isTalkBackEnabled = LocalTalkBackEnabled.current
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -145,15 +145,6 @@ fun QuranPlayerScreen(
             }
         }
     }
-    
-    val pendingActionManager = com.example.accessibility.LocalPendingBlindAction.current
-    LaunchedEffect(Unit) {
-        pendingActionManager.setFallback { viewModel.replayCurrentAyah() }
-    }
-    LaunchedEffect(dialogUiState) {
-        pendingActionManager.clear()
-    }
-
     CompositionLocalProvider(
         LocalLayoutDirection provides LayoutDirection.Rtl,
         LocalTalkBackEnabled provides isTalkBackEnabled
@@ -196,8 +187,7 @@ fun QuranPlayerScreen(
                         isContinuousPlayEnabled = settingsUiState.isContinuousPlayEnabled,
                         onToggleContinuousPlay = { viewModel.toggleContinuousPlay() },
                         onOpenSurahIndex = { viewModel.toggleSurahIndex(true) },
-                        onOpenReciters = { viewModel.toggleReciterDialog(true) },
-                        onSingleTapAnnounce = { viewModel.announce(it) }
+                        onOpenReciters = { viewModel.toggleReciterDialog(true) }
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -221,16 +211,7 @@ fun QuranPlayerScreen(
                             }
                     )
 
-                    // Active Voice Listening Pulse Indicator
-                    AnimatedVisibility(
-                        visible = voiceUiState.isListeningVoice,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        ListeningVoiceBanner(isScreenOffMode = screenModeUiState.isScreenOffMode)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // Voice commands are disabled as per client request
 
                     // Surah Info & Ayah Number Header
                     Row(
@@ -364,9 +345,7 @@ fun QuranPlayerScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-
-
-                    // Bottom Reciter & Mode Bar Readout
+                    Spacer(modifier = Modifier.height(10.dp))                    // Bottom Reciter & Mode Bar Readout
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -380,9 +359,9 @@ fun QuranPlayerScreen(
                             color = TextMutedZinc
                         )
                         Text(
-                            text = "الوضع: مكفوفين • قارئ الشاشة مفعّل",
+                            text = if (isTalkBackEnabled) "الوضع: مكفوفين • قارئ الشاشة مفعّل" else "الوضع: مبصرين • قارئ الشاشة غير مفعّل",
                             style = MaterialTheme.typography.bodySmall,
-                            color = AccessibleGreenAccent
+                            color = if (isTalkBackEnabled) AccessibleGreenAccent else TextMutedZinc
                         )
                     }
                 }

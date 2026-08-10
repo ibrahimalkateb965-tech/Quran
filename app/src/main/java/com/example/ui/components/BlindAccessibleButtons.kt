@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 fun BlindAccessibleIconButton(
     onClick: () -> Unit,
     onClickLabel: String,
-    onSingleTap: () -> Unit,
     modifier: Modifier = Modifier.size(48.dp),
     enabled: Boolean = true,
     content: @Composable () -> Unit
@@ -37,8 +36,7 @@ fun BlindAccessibleIconButton(
             .clip(CircleShape)
             .blindAccessibleClickable(
                 onClickLabel = onClickLabel,
-                onClick = { if (enabled) onClick() },
-                onSingleTap = { if (enabled) onSingleTap() }
+                onClick = { if (enabled) onClick() }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -55,7 +53,6 @@ fun BlindAccessibleIconButton(
 fun BlindAccessibleButton(
     onClick: () -> Unit,
     onClickLabel: String,
-    onSingleTap: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.extraLarge,
@@ -77,8 +74,7 @@ fun BlindAccessibleButton(
             .clip(shape) // standard button shape
             .blindAccessibleClickable(
                 onClickLabel = onClickLabel,
-                onClick = { if (enabled) onClick() },
-                onSingleTap = { if (enabled) onSingleTap() }
+                onClick = { if (enabled) onClick() }
             ),
         contentAlignment = Alignment.Center
     ) {

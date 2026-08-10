@@ -31,9 +31,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.view.ViewConfiguration
-import com.example.accessibility.PendingBlindActionManager
-import com.example.accessibility.LocalPendingBlindAction
-import com.example.ui.components.interceptBlindDoubleTap
 class MainActivity : ComponentActivity() {
 
     private val viewModel: QuranViewModel by viewModels()
@@ -64,19 +61,13 @@ class MainActivity : ComponentActivity() {
             QuranBlindTheme {
                 val trialExpired by viewModel.isTrialExpired.collectAsState(initial = null)
                 val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
-                val scope = rememberCoroutineScope()
-                val pendingActionManager = remember { PendingBlindActionManager(scope) }
                 val context = LocalContext.current
-                val doubleTapSlop = remember(context) {
-                    ViewConfiguration.get(context).scaledDoubleTapSlop.toFloat()
-                }
 
                 val lifecycleOwner = LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
                             Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                                pendingActionManager.clear()
                                 viewModel.pausePlayback()
                             }
                             Lifecycle.Event.ON_START -> {
@@ -91,40 +82,29 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                CompositionLocalProvider(
-                    LocalPendingBlindAction provides pendingActionManager
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .interceptBlindDoubleTap(
-                                isTalkBackEnabled = isTalkBackEnabled,
-                                doubleTapSlop = doubleTapSlop,
-                                onDoubleTap = {
-                                    pendingActionManager.execute()
-                                    pendingActionManager.clear()
-                                },
-                                onDragDetected = {
-                                    pendingActionManager.clear()
-                                }
-                            )
+                    CompositionLocalProvider(
+                        com.example.accessibility.LocalTalkBackEnabled provides isTalkBackEnabled
                     ) {
-                        when (trialExpired) {
-                            null -> {
-                                // Loading state while checking trial
-                            }
-                            true -> {
-                                TrialExpiredScreen(
-                                    isTalkBackEnabled = isTalkBackEnabled,
-                                    onAnnounce = { msg -> viewModel.announce(msg) }
-                                )
-                            }
-                            false -> {
-                                QuranPlayerScreen(viewModel = viewModel)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                        ) {
+                            when (trialExpired) {
+                                null -> {
+                                    // Loading state while checking trial
+                                }
+                                true -> {
+                                    TrialExpiredScreen(
+                                        isTalkBackEnabled = isTalkBackEnabled,
+                                        onAnnounce = { msg -> viewModel.announce(msg) }
+                                    )
+                                }
+                                false -> {
+                                    QuranPlayerScreen(viewModel = viewModel)
+                                }
                             }
                         }
                     }
-                }
             }
         }
     }

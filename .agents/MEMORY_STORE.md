@@ -89,6 +89,22 @@
   content: "مجرد (تسجيل) الذكريات لا يكفي. يقع الوكيل أحياناً في (Shortcut Anti-Pattern) محاولاً اختصار الوقت. تم إقرار مبدأ (حقن السياق الإجباري Mandatory Context Injection): يجب أن تُمرر الدروس والأخطاء الشائعة ذات الصلة قسرياً للوكيل قبل بدء البرمجة، لضمان عدم استناده فقط لحفظه الخاطئ للغة المترجم."
   tags: [architecture, global, agent-behavior, context-injection, anti-pattern]
   status: active
+- id: MEM-2026-08-10-002
+  type: lesson
+  timestamp: "2026-08-10T21:10:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "نجاح السحب الأفقي الصامت بإصبعين باستخدام TalkBack"
+  content: "تم بنجاح استعادة ميزة السحب بإصبعين للتنقل بين الصفحات مع تشغيل TalkBack. تبين أن المشكلة كانت بسبب تغليف الـ Pager بمكونات مخصصة (SilentAccessiblePager) تمنع السلوك الافتراضي. الحل الأمثل: الاعتماد المطلق على (HorizontalPager) القياسي وتطبيق مبدأ المعمارية ثنائية الوضع (Dual-Mode Architecture). ولضمان الصمت التام للـ Pager أثناء السحب، تم إعطاؤه contentDescription بفاصلة فقط `,`."
+  tags: [accessibility, talkback, horizontal-pager, dual-mode, bug-fix, success]
+  status: active
+- id: MEM-2026-08-10-003
+  type: lesson
+  timestamp: "2026-08-10T23:05:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "حماية الميزات المحذوفة مسبقاً بناءً على طلب العميل (Feature Deletion Memory)"
+  content: "ميزة عالمية (Global Rule): يُمنع منعاً باتاً إعادة إضافة أي مكون واجهة مستخدم (UI Component) أو ميزة (Feature) تم حذفها مسبقاً (مثل شريط التشغيل PlayerControlPanel أو الأوامر الصوتية) إلا بطلب صريح ومباشر من المستخدم. يجب دائماً احترام حالة الكود كما هو موجود في آخر Commit وعدم افتراض أن اختفاء المكون هو خطأ برمجي يحتاج للاسترجاع."
+  tags: [architecture, global, agent-behavior, ui-components]
+  status: active
 ```
 
 ---

@@ -42,13 +42,19 @@ fun AccessibleBottomSheet(
     navigationIcon: (@Composable () -> Unit)? = null,
     headerContent: (@Composable () -> Unit)? = null,
     showCloseButton: Boolean = true,
+    onBackPress: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismiss)
     val currentOnAnnounce by rememberUpdatedState(onAnnounce)
+    val currentOnBackPress by rememberUpdatedState(onBackPress)
 
     BackHandler {
-        currentOnDismiss()
+        if (currentOnBackPress != null) {
+            currentOnBackPress?.invoke()
+        } else {
+            currentOnDismiss()
+        }
     }
 
     Surface(
@@ -97,7 +103,6 @@ fun AccessibleBottomSheet(
                     BlindAccessibleIconButton(
                         onClick = currentOnDismiss,
                         onClickLabel = dismissLabel,
-                        onSingleTap = { currentOnAnnounce(dismissLabel) },
                         modifier = Modifier
                             .height(48.dp)
                             .width(48.dp)

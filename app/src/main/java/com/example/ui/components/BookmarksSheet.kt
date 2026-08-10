@@ -67,8 +67,7 @@ fun BookmarksSheet(
                             .height(72.dp)
                             .blindAccessibleClickable(
                                 onClickLabel = "الانتقال إلى سورة ${bookmark.surahNameAr} الآية ${bookmark.ayahNumber}",
-                                onClick = { onSelectBookmark(bookmark.surahId, bookmark.ayahNumber - 1) },
-                                onSingleTap = { onAnnounce("سورة ${bookmark.surahNameAr}، الآية ${bookmark.ayahNumber}") }
+                                onClick = { onSelectBookmark(bookmark.surahId, bookmark.ayahNumber - 1) }
                             )
                             .semantics {
                                 contentDescription = "سورة ${bookmark.surahNameAr}، الآية ${bookmark.ayahNumber}. انقر مرتين للانتقال إليها."

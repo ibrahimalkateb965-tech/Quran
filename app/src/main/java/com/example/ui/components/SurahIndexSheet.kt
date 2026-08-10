@@ -77,7 +77,16 @@ fun SurahIndexSheet(
         onAnnounce = onAnnounce,
         navigationIcon = null,
         headerContent = null,
-        showCloseButton = false
+        showCloseButton = true,
+        onBackPress = {
+            keyboardController?.hide()
+            if (selectedSurahForAyahs != null) {
+                selectedSurahForAyahs = null
+                onAnnounce("تم العودة لقائمة السور")
+            } else {
+                onDismiss()
+            }
+        }
     ) {
             LaunchedEffect(currentSurahId, selectedSurahForAyahs) {
                 if (selectedSurahForAyahs == null && currentSurahId != null) {
@@ -98,16 +107,7 @@ fun SurahIndexSheet(
                 }
             }
 
-            // نظام اعتراض التراجع
-            BackHandler(enabled = true) {
-                keyboardController?.hide()
-                if (selectedSurahForAyahs != null) {
-                    selectedSurahForAyahs = null
-                    onAnnounce("تم العودة لقائمة السور")
-                } else {
-                    onDismiss()
-                }
-            }
+            // تم نقل نظام اعتراض التراجع إلى onBackPress في AccessibleBottomSheet
 
             if (selectedSurahForAyahs != null) {
                 LazyColumn(
@@ -124,8 +124,7 @@ fun SurahIndexSheet(
                                 .height(64.dp)
                                 .blindAccessibleClickable(
                                     onClickLabel = "تشغيل من الآية $ayahNumber",
-                                    onClick = { onSelectSurah(selectedSurahForAyahs!!.id, index) },
-                                    onSingleTap = { onAnnounce("الآية $ayahNumber") }
+                                    onClick = { onSelectSurah(selectedSurahForAyahs!!.id, index) }
                                 )
                                 .semantics {
                                     contentDescription = "الآية $ayahNumber. انقر مرتين للتشغيل من هذه الآية."
@@ -169,8 +168,7 @@ fun SurahIndexSheet(
                                     onClick = { 
                                         keyboardController?.hide()
                                         selectedSurahForAyahs = surah 
-                                    },
-                                    onSingleTap = { onAnnounce("سورة ${surah.nameArabic}، عدد آياتها ${surah.ayahCount}") }
+                                    }
                                 )
                                 .semantics {
                                     contentDescription = "سورة ${surah.nameArabic}. رقمها ${surah.id}. آياتها ${surah.ayahCount}. انقر مرتين لاختيار الآية."

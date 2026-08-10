@@ -391,14 +391,14 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         playCurrentAyah()
     }
 
-    fun toggleContinuousPlay() {
+    fun toggleContinuousPlay(forceSpeak: Boolean = false) {
         val next = !_settingsUiState.value.isContinuousPlayEnabled
         _settingsUiState.update { it.copy(isContinuousPlayEnabled = next) }
         if (next) {
             _playbackUiState.update { it.copy(continuousPlayStartIndex = it.currentAyahIndex) }
-            performAction("وضع الاستماع المتواصل مفعّل", HapticType.CLICK)
+            performAction("وضع الاستماع المتواصل مفعّل", HapticType.CLICK, forceSpeak = forceSpeak)
         } else {
-            performAction("تم إيقاف الاستماع المتواصل", HapticType.CLICK)
+            performAction("تم إيقاف الاستماع المتواصل", HapticType.CLICK, forceSpeak = forceSpeak)
         }
     }
 
@@ -450,7 +450,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleRepeatMode() {
+    fun toggleRepeatMode(forceSpeak: Boolean = false) {
         val modes = listOf(1, 3, 5, 10, 99)
         val currentIndex = modes.indexOf(_settingsUiState.value.tarkizRepeatMode)
         val newMode = modes[(currentIndex + 1) % modes.size]
@@ -459,13 +459,13 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
         if (newMode > 1) {
             val modeText = if (newMode == 99) "تكرار لا نهائي" else "تكرار $newMode مرات"
-            performAction("تم تفعيل وضع التركيز: $modeText", HapticType.REPEAT_ON)
+            performAction("تم تفعيل وضع التركيز: $modeText", HapticType.REPEAT_ON, forceSpeak = forceSpeak)
         } else {
-            performAction("تم إيقاف وضع التكرار", HapticType.REPEAT_OFF)
+            performAction("تم إيقاف وضع التكرار", HapticType.REPEAT_OFF, forceSpeak = forceSpeak)
         }
     }
 
-    fun toggleCurrentBookmark() {
+    fun toggleCurrentBookmark(forceSpeak: Boolean = false) {
         val playback = _playbackUiState.value
         val surah = playback.currentSurah ?: return
         val ayahs = playback.currentAyahs
@@ -481,9 +481,9 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = isNowBookmarked) }
             
             if (isNowBookmarked) {
-                performAction("تم إضافة سورة ${surah.nameArabic} الآية ${activeAyah.numberInSurah} للإشارات المرجعية", HapticType.BOOKMARK)
+                performAction("تم إضافة سورة ${surah.nameArabic} الآية ${activeAyah.numberInSurah} للإشارات المرجعية", HapticType.BOOKMARK, forceSpeak = forceSpeak)
             } else {
-                performAction("تم إزالة الآية من الإشارات المرجعية", HapticType.BOOKMARK)
+                performAction("تم إزالة الآية من الإشارات المرجعية", HapticType.BOOKMARK, forceSpeak = forceSpeak)
             }
         }
     }
@@ -546,11 +546,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                 haptic.vibrateVoiceCommandSuccess()
                 val surah = repository.findSurahByName(result.surahName)
                 if (surah != null) {
-                    announce("جاري تشغيل سورة ${surah.nameArabic}")
+                    announce("جاري تشغيل سورة ${surah.nameArabic}", forceSpeak = true)
                     loadSurah(surah.id, autoPlay = true)
                 } else {
                     haptic.vibrateVoiceCommandFailure()
-                    announce("لم أجد سورة باسم ${result.surahName}")
+                    announce("لم أجد سورة باسم ${result.surahName}", forceSpeak = true)
                 }
             }
             is VoiceCommandResult.GoToAyahNumber -> {
@@ -559,18 +559,18 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                 val targetIndex = (result.ayahNumber - 1).coerceIn(0, (ayahs.size - 1).coerceAtLeast(0))
                 if (ayahs.isNotEmpty()) {
                     goToAyah(targetIndex, autoPlay = true)
-                    announce("الانتقال إلى الآية ${result.ayahNumber}")
+                    announce("الانتقال إلى الآية ${result.ayahNumber}", forceSpeak = true)
                 }
             }
             VoiceCommandResult.Pause -> {
                 haptic.vibrateVoiceCommandSuccess()
                 if (mediaController?.isPlaying == true) mediaController?.pause()
-                announce("تم الإيقاف")
+                announce("تم الإيقاف", forceSpeak = true)
             }
             VoiceCommandResult.Resume -> {
                 haptic.vibrateVoiceCommandSuccess()
                 mediaController?.play()
-                announce("تم التشغيل")
+                announce("تم التشغيل", forceSpeak = true)
             }
             VoiceCommandResult.NextAyah -> {
                 haptic.vibrateVoiceCommandSuccess()
@@ -582,15 +582,15 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             }
             VoiceCommandResult.ToggleBookmark -> {
                 haptic.vibrateVoiceCommandSuccess()
-                toggleCurrentBookmark()
+                toggleCurrentBookmark(forceSpeak = true)
             }
             VoiceCommandResult.ToggleRepeatMode -> {
                 haptic.vibrateVoiceCommandSuccess()
-                toggleRepeatMode()
+                toggleRepeatMode(forceSpeak = true)
             }
             VoiceCommandResult.ToggleContinuousPlay -> {
                 haptic.vibrateVoiceCommandSuccess()
-                toggleContinuousPlay()
+                toggleContinuousPlay(forceSpeak = true)
             }
             VoiceCommandResult.ReplayAyah -> {
                 haptic.vibrateVoiceCommandSuccess()
@@ -604,20 +604,20 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             VoiceCommandResult.ShowSurahIndex -> {
                 haptic.vibrateVoiceCommandSuccess()
                 _dialogUiState.update { it.copy(showSurahIndex = true) }
-                announce("تم فتح قائمة السور")
+                announce("تم فتح قائمة السور", forceSpeak = true)
             }
             VoiceCommandResult.ShowHelp -> {
                 haptic.vibrateVoiceCommandSuccess()
                 _dialogUiState.update { it.copy(showHelpDialog = true) }
-                announce("تم فتح قائمة التعليمات والأوامر الصوتية")
+                announce("تم فتح قائمة التعليمات والأوامر الصوتية", forceSpeak = true)
             }
             is VoiceCommandResult.UnknownCommand -> {
                 haptic.vibrateVoiceCommandFailure()
-                announce("لم أتعرف على الأمر: ${result.originalText}")
+                announce("لم أتعرف على الأمر: ${result.originalText}", forceSpeak = true)
             }
             is VoiceCommandResult.Error -> {
                 haptic.vibrateVoiceCommandFailure()
-                announce(result.message)
+                announce(result.message, forceSpeak = true)
             }
         }
 
@@ -669,14 +669,16 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         _dialogUiState.update { it.copy(showHelpDialog = show) }
     }
 
-    fun announce(text: String) {
+    fun announce(text: String, forceSpeak: Boolean = false) {
         viewModelScope.launch {
             _announcementEvent.send(text)
         }
-        speechManager.speak(text)
+        if (forceSpeak || speechManager.isTalkBackEnabled()) {
+            speechManager.speak(text)
+        }
     }
     
-    private fun performAction(msg: String, hapticType: HapticType = HapticType.CLICK) {
+    private fun performAction(msg: String, hapticType: HapticType = HapticType.CLICK, forceSpeak: Boolean = false) {
         when (hapticType) {
             HapticType.CLICK -> haptic.vibrateClick()
             HapticType.DOUBLE_TAP -> haptic.vibrateDoubleTap()
@@ -692,7 +694,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             HapticType.NONE -> {}
         }
         if (msg.isNotEmpty()) {
-            announce(msg)
+            announce(msg, forceSpeak)
         }
     }
 

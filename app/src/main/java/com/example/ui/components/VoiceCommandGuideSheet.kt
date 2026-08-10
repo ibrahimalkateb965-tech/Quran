@@ -61,7 +61,6 @@ fun VoiceCommandGuideSheet(
             BlindAccessibleButton(
                 onClick = onSpeakGuide,
                 onClickLabel = "زر قراءة دليل الأوامر الصوتية بصوت ناطق",
-                onSingleTap = { onAnnounce("قراءة الدليل صوتياً") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
@@ -87,9 +86,8 @@ fun VoiceCommandGuideSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .blindAccessibleClickable(
-                                onClickLabel = "دليل الأمر: $cmd",
-                                onClick = { /* No action needed */ },
-                                onSingleTap = { onAnnounce("الأمر: $cmd. $example") }
+                                onClickLabel = "قراءة الدليل صوتياً",
+                                onClick = { onAnnounce("هذا التطبيق يدعم الأوامر الصوتية...") }
                             )
                             .semantics { contentDescription = "الأمر: $cmd. $example" },
                         colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DarkImmersiveCard)

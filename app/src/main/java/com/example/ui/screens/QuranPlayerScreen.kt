@@ -95,6 +95,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import com.example.ui.components.player.buildPlayerStatusDescription
+import com.example.ui.components.player.playerGestureHints
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -201,16 +203,14 @@ fun QuranPlayerScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Dynamic TalkBack Live Announcement & Voice Feedback
-                    val talkBackDescription = buildString {
-                        append("تطبيق القرآن الكريم للمكفوفين. ")
-                        val surah = activeSurah
-                        if (surah != null) {
-                            append("سورة ${surah.nameArabic}، الآية ${currentAyah?.numberInSurah ?: 1} من أصل ${surah.ayahCount}. ")
-                        }
-                        if (isPlaying) append("جاري التشغيل. ") else append("متوقف مؤقتاً. ")
-                        if (settingsUiState.tarkizRepeatMode > 1) append("وضع التكرار مفعّل. ")
-                        append("انقر مرتين للتشغيل أو الإيقاف. اسحب يميناً ويساراً للتنقل.")
-                    }
+                    val talkBackDescription = buildPlayerStatusDescription(
+                        surahName = activeSurah?.nameArabic,
+                        ayahNumber = currentAyah?.numberInSurah ?: 1,
+                        ayahCount = activeSurah?.ayahCount,
+                        isPlaying = isPlaying,
+                        isRepeatModeActive = settingsUiState.tarkizRepeatMode > 1,
+                        isTalkBackEnabled = isTalkBackEnabled
+                    )
 
                     Box(
                         modifier = Modifier
@@ -357,8 +357,9 @@ fun QuranPlayerScreen(
                             .padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        GestureHintChip(label = "نقرتين: تشغيل/إيقاف")
-                        GestureHintChip(label = "سحب أفقي: آية آية")
+                        val gestureHints = playerGestureHints(isTalkBackEnabled)
+                        GestureHintChip(label = gestureHints.playPauseHint)
+                        GestureHintChip(label = gestureHints.navigationHint)
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))

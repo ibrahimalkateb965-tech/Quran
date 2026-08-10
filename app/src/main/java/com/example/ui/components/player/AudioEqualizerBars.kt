@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -28,7 +29,9 @@ fun AudioEqualizerBars(isPlaying: Boolean) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.Bottom,
-        modifier = Modifier.height(24.dp)
+        modifier = Modifier
+            .height(24.dp)
+            .clearAndSetSemantics { } // زخرفي بحت — لا قيمة معلوماتية لقارئ الشاشة
     ) {
         val barHeights = listOf(0.4f, 0.8f, 0.5f, 0.9f, 0.6f)
         val animTargetValues = listOf(0.9f, 0.3f, 0.95f, 0.4f, 0.85f)

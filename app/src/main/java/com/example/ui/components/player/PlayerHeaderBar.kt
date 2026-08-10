@@ -50,10 +50,27 @@ fun HeaderBar(
     ) {
         // Top Icons (Circular)
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            HeaderAccessibleButton(
+                onClick = {
+                    onToggleContinuousPlay()
+                    onSingleTapAnnounce(if (!isContinuousPlayEnabled) "التشغيل المتواصل مفعل" else "التشغيل المتواصل معطل")
+                },
+                onClickLabel = "تفعيل أو تعطيل التشغيل المتواصل",
+                onSingleTap = { 
+                    onSingleTapAnnounce(if (isContinuousPlayEnabled) "الاستماع المتواصل مفعل" else "الاستماع المتواصل معطل") 
+                },
+                testTag = "continuous_play_button",
+                icon = Icons.Default.Repeat,
+                contentDescription = "الاستماع المتواصل. حالياً " + (if (isContinuousPlayEnabled) "مفعل" else "معطل"),
+                isActive = isContinuousPlayEnabled
+            )
+            Spacer(modifier = Modifier.weight(1f))
             HeaderAccessibleButton(
                 onClick = onOpenSurahIndex,
                 onClickLabel = "فتح قائمة اختيار السورة",
@@ -62,7 +79,7 @@ fun HeaderBar(
                 icon = Icons.AutoMirrored.Filled.List,
                 contentDescription = "اختيار السورة"
             )
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.weight(1f))
             HeaderAccessibleButton(
                 onClick = onOpenReciters,
                 onClickLabel = "تغيير القارئ المفضل",
@@ -71,50 +88,6 @@ fun HeaderBar(
                 icon = Icons.Default.Person,
                 contentDescription = "اختيار القارئ"
             )
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Continuous Play Strip
-        androidx.compose.material3.Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clickable(
-                    onClickLabel = "تفعيل أو تعطيل التشغيل المتواصل",
-                    onClick = {
-                        onToggleContinuousPlay()
-                        onSingleTapAnnounce(if (!isContinuousPlayEnabled) "التشغيل المتواصل مفعل" else "التشغيل المتواصل معطل")
-                    }
-                )
-                .semantics {
-                    contentDescription = "زر التشغيل المتواصل. حالياً " + (if (isContinuousPlayEnabled) "مفعل" else "معطل") + ". انقر مرتين للتبديل."
-                },
-            colors = androidx.compose.material3.CardDefaults.cardColors(
-                containerColor = if (isContinuousPlayEnabled) AccessibleGold else DarkImmersiveCard
-            ),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                androidx.compose.material3.Text(
-                    text = "الاستماع المتواصل",
-                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                    color = if (isContinuousPlayEnabled) DarkImmersiveBg else androidx.compose.ui.graphics.Color.White,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                )
-                Icon(
-                    imageVector = Icons.Default.Repeat,
-                    contentDescription = null,
-                    tint = if (isContinuousPlayEnabled) DarkImmersiveBg else AccessibleGold,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
         }
     }
 }

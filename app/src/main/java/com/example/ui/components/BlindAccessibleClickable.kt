@@ -11,6 +11,9 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import com.example.accessibility.LocalTalkBackEnabled
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import com.example.accessibility.LocalPendingBlindAction
 
 /**
  * A custom modifier that requires a physical double-tap to activate when TalkBack is OFF,
@@ -43,11 +46,25 @@ fun Modifier.blindAccessibleClickable(
         )
     } else {
         // إذا كان TalkBack معطلاً، نستخدم المنطق المخصص لتطبيقنا (المساعد الداخلي).
-        // ضغطة واحدة = نطق، ضغطتين = تفعيل.
+        // ضغطة واحدة = نطق وتخزين الإجراء للـ Global Interceptor
+        val pendingBlindAction = LocalPendingBlindAction.current
+        val currentOnClick by rememberUpdatedState(onClick)
+        
         this.combinedClickable(
             role = role,
-            onClick = onSingleTap,
-            onDoubleClick = onClick,
+            onClick = {
+                // منع الصدى الشبحي (Ghost Echo Barrier):
+                // إذا تم تنفيذ نقر مزدوج عالمي خلال الـ 500 ملي ثانية الماضية، نتجاهل هذه النقرة تماماً.
+                if (System.currentTimeMillis() - GlobalBlindGestureState.lastDoubleTapTime < 500) {
+                    return@combinedClickable
+                }
+                onSingleTap()
+                pendingBlindAction.registerAction { currentOnClick() }
+            },
+            onDoubleClick = {
+                currentOnClick()
+                pendingBlindAction.clear()
+            },
             onLongClick = onLongClick
         )
     }

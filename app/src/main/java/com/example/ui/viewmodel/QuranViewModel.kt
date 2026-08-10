@@ -164,6 +164,29 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    super.onMediaItemTransition(mediaItem, reason)
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                        val mediaId = mediaItem?.mediaId ?: return
+                        val parts = mediaId.split("_")
+                        if (parts.size == 2) {
+                            val surahId = parts[0].toIntOrNull()
+                            val ayahNumber = parts[1].toIntOrNull()
+                            if (surahId != null && ayahNumber != null) {
+                                val currentAyahs = _playbackUiState.value.currentAyahs
+                                val newIndex = currentAyahs.indexOfFirst { it.surahId == surahId && it.numberInSurah == ayahNumber }
+                                if (newIndex != -1 && newIndex != _playbackUiState.value.currentAyahIndex) {
+                                    _playbackUiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1) }
+                                    viewModelScope.launch {
+                                        val bookmarked = repository.isBookmarked(surahId, ayahNumber)
+                                        _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 override fun onPlayerError(error: PlaybackException) {
                     pendingAyahAnnouncement = null
                     if (isNetworkRelatedError(error)) {
@@ -185,16 +208,10 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
         val savedSession = sessionPrefs.getSession()
         if (savedSession != null) {
-            val reciter = Reciter.DEFAULT_RECITERS.find { it.serverIdentifier == savedSession.reciterId || it.id == savedSession.reciterId } ?: Reciter.DEFAULT_RECITERS.first()
+            val reciter = Reciter.DEFAULT_RECITERS.find { it.serverIdentifier == savedSession.reciterId } ?: Reciter.DEFAULT_RECITERS.first()
             _settingsUiState.update { it.copy(selectedReciter = reciter) }
-            _dialogUiState.update { 
-                it.copy(
-                    startupStep = StartupStep.COMPLETED,
-                    showReciterDialog = false,
-                    showSurahIndex = false
-                ) 
-            }
-            loadSurah(savedSession.surahId, savedSession.ayahIndex, autoPlay = false)
+            closeStartupDialogs()
+            loadSurah(savedSession.surahId, savedSession.ayahIndex, autoPlay = true)
             
             if (speechManager.isTalkBackEnabled()) {
                 announce("استئناف التلاوة.")
@@ -205,13 +222,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             // First launch fallback: Al-Fatihah, Ayah 1
             val defaultReciter = Reciter.DEFAULT_RECITERS.first()
             _settingsUiState.update { it.copy(selectedReciter = defaultReciter) }
-            _dialogUiState.update { 
-                it.copy(
-                    startupStep = StartupStep.COMPLETED,
-                    showReciterDialog = false,
-                    showSurahIndex = false
-                ) 
-            }
+            closeStartupDialogs()
             loadSurah(surahId = 1, targetAyahIndex = 0, autoPlay = false)
 
             if (speechManager.isTalkBackEnabled()) {
@@ -294,7 +305,24 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
         val controller = mediaController
         if (controller != null) {
-            controller.setMediaItem(MediaItem.fromUri(activeAyah.audioUrl), 0L)
+            val isContinuous = _settingsUiState.value.isContinuousPlayEnabled
+            val repeatMode = _settingsUiState.value.tarkizRepeatMode
+            
+            if (isContinuous && repeatMode <= 1) {
+                val mediaItems = ayahs.drop(index).map { ayah ->
+                    androidx.media3.common.MediaItem.Builder()
+                        .setUri(ayah.audioUrl)
+                        .setMediaId("${ayah.surahId}_${ayah.numberInSurah}")
+                        .build()
+                }
+                controller.setMediaItems(mediaItems, 0, 0L)
+            } else {
+                val mediaItem = androidx.media3.common.MediaItem.Builder()
+                    .setUri(activeAyah.audioUrl)
+                    .setMediaId("${activeAyah.surahId}_${activeAyah.numberInSurah}")
+                    .build()
+                controller.setMediaItem(mediaItem, 0L)
+            }
             controller.prepare()
             controller.play()
         } else {
@@ -341,6 +369,18 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                 mediaController?.play()
                 performAction("جاري التشغيل", HapticType.DOUBLE_TAP)
             }
+        }
+    }
+
+    fun pausePlayback() {
+        if (mediaController?.isPlaying == true) {
+            mediaController?.pause()
+        }
+    }
+
+    fun resumePlayback() {
+        if (mediaController?.isPlaying == false) {
+            mediaController?.play()
         }
     }
 
@@ -403,7 +443,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             ayahIndex = index
         )
         
-        haptic.vibrateClick()
+        performAction("", HapticType.CLICK)
 
         if (autoPlay) {
             playCurrentAyah()
@@ -481,12 +521,13 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startVoiceCommand() {
-        haptic.vibrateVoiceListeningStarted()
+        performAction("", HapticType.VOICE_LISTENING_STARTED)
 
         // Pause Quran audio while listening to avoid the microphone picking up the recitation.
         val wasPlaying = mediaController?.isPlaying == true
         if (wasPlaying) {
             mediaController?.pause()
+            _playbackUiState.update { it.copy(isLoadingAudio = false) }
         }
 
         voiceManager.startListening(
@@ -598,23 +639,33 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun closeStartupDialogs() {
+        _dialogUiState.update { 
+            it.copy(
+                startupStep = StartupStep.COMPLETED,
+                showReciterDialog = false,
+                showSurahIndex = false
+            ) 
+        }
+    }
+
     fun toggleSurahIndex(show: Boolean) {
-        haptic.vibrateClick()
+        performAction("", HapticType.CLICK)
         _dialogUiState.update { it.copy(showSurahIndex = show) }
     }
 
     fun toggleBookmarksSheet(show: Boolean) {
-        haptic.vibrateClick()
+        performAction("", HapticType.CLICK)
         _dialogUiState.update { it.copy(showBookmarksSheet = show) }
     }
 
     fun toggleReciterDialog(show: Boolean) {
-        haptic.vibrateClick()
+        performAction("", HapticType.CLICK)
         _dialogUiState.update { it.copy(showReciterDialog = show) }
     }
 
     fun toggleHelpDialog(show: Boolean) {
-        haptic.vibrateClick()
+        performAction("", HapticType.CLICK)
         _dialogUiState.update { it.copy(showHelpDialog = show) }
     }
 

@@ -19,7 +19,21 @@ import com.example.ui.screens.TrialExpiredScreen
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.viewmodel.QuranViewModel
 import kotlinx.coroutines.launch
-
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import android.view.ViewConfiguration
+import com.example.accessibility.PendingBlindActionManager
+import com.example.accessibility.LocalPendingBlindAction
+import com.example.ui.components.interceptBlindDoubleTap
 class MainActivity : ComponentActivity() {
 
     private val viewModel: QuranViewModel by viewModels()
@@ -50,19 +64,65 @@ class MainActivity : ComponentActivity() {
             QuranBlindTheme {
                 val trialExpired by viewModel.isTrialExpired.collectAsState(initial = null)
                 val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
+                val scope = rememberCoroutineScope()
+                val pendingActionManager = remember { PendingBlindActionManager(scope) }
+                val context = LocalContext.current
+                val doubleTapSlop = remember(context) {
+                    ViewConfiguration.get(context).scaledDoubleTapSlop.toFloat()
+                }
 
-                when (trialExpired) {
-                    null -> {
-                        // Loading state while checking trial
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
+                                pendingActionManager.clear()
+                                viewModel.pausePlayback()
+                            }
+                            Lifecycle.Event.ON_START -> {
+                                viewModel.resumePlayback()
+                            }
+                            else -> {}
+                        }
                     }
-                    true -> {
-                        TrialExpiredScreen(
-                            isTalkBackEnabled = isTalkBackEnabled,
-                            onAnnounce = { msg -> viewModel.announce(msg) }
-                        )
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
                     }
-                    false -> {
-                        QuranPlayerScreen(viewModel = viewModel)
+                }
+
+                CompositionLocalProvider(
+                    LocalPendingBlindAction provides pendingActionManager
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .interceptBlindDoubleTap(
+                                isTalkBackEnabled = isTalkBackEnabled,
+                                doubleTapSlop = doubleTapSlop,
+                                onDoubleTap = {
+                                    pendingActionManager.execute()
+                                    pendingActionManager.clear()
+                                },
+                                onDragDetected = {
+                                    pendingActionManager.clear()
+                                }
+                            )
+                    ) {
+                        when (trialExpired) {
+                            null -> {
+                                // Loading state while checking trial
+                            }
+                            true -> {
+                                TrialExpiredScreen(
+                                    isTalkBackEnabled = isTalkBackEnabled,
+                                    onAnnounce = { msg -> viewModel.announce(msg) }
+                                )
+                            }
+                            false -> {
+                                QuranPlayerScreen(viewModel = viewModel)
+                            }
+                        }
                     }
                 }
             }

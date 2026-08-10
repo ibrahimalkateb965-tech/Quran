@@ -34,10 +34,10 @@ import com.example.ui.theme.DarkImmersiveSurface
 import com.example.ui.theme.TextMutedZinc
 import com.example.ui.theme.TextPrimaryWhite
 
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.CustomAccessibilityAction
+
 import com.example.ui.components.blindAccessibleClickable
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.foundation.ExperimentalFoundationApi
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -64,17 +64,11 @@ fun AyahCard(
         modifier = modifier
             .fillMaxSize()
             .clearAndSetSemantics { 
-                contentDescription = "الآية ${ayah.numberInSurah}"
-                customActions = listOf(
-                    CustomAccessibilityAction("إعادة التلاوة") {
-                        onDoubleTap()
-                        true
-                    }
-                )
+                contentDescription = ","
             }
             .blindAccessibleClickable(
-                onClickLabel = "تشغيل أو إيقاف",
-                onLongClickLabel = "إعادة التلاوة",
+                onClickLabel = "", // إفراغ النص لمنع نطق TalkBack الافتراضي بالإنجليزية
+                onLongClickLabel = "",
                 onClick = onClick,
                 onSingleTap = onSingleTap,
                 onLongClick = onDoubleTap

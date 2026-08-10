@@ -88,25 +88,34 @@ class TrialManager private constructor(context: Context) {
             return sntpTime
         }
 
-        // المحاولة الثانية: تقدير بالوقت المنقضي منذ التثبيت.
+        // المحاولة الثانية: الكشف عن إعادة التشغيل وتتبع الوقت الجداري
         val elapsedNow = SystemClock.elapsedRealtime()
-        val elapsedSinceInstall = elapsedNow - installElapsed
-        if (elapsedSinceInstall < 0) {
-            // الجهاز أُعيد تشغيله أو elapsedRealtime تراجع (لا يحدث عادة) — علامة تلاعب.
-            Log.w(TAG, "elapsedRealtime أقل من قيمة التثبيت — احتمال تلاعب")
-            return null
-        }
-
-        val estimatedWallTime = installWallTime + elapsedSinceInstall
+        val lastKnownElapsed = prefs.getLong(KEY_LAST_KNOWN_ELAPSED_REALTIME, installElapsed)
+        val lastKnownWallTime = prefs.getLong(KEY_LAST_KNOWN_WALL_TIME, installWallTime)
         val systemWallTime = System.currentTimeMillis()
 
-        // كشف تراجع تاريخ الجهاز إلى الوراء بأكثر من 5 دقائق.
+        if (elapsedNow < lastKnownElapsed) {
+            // الجهاز أُعيد تشغيله (Reboot) — قيمة elapsedRealtime عادت للصفر.
+            Log.i(TAG, "تم رصد إعادة تشغيل للجهاز. سيتم الاعتماد على آخر وقت جداري موثوق.")
+            // نتحقق من أن تاريخ الجهاز لم يتم التلاعب به وإرجاعه للخلف أثناء فترة انقطاع الإنترنت.
+            if (systemWallTime < lastKnownWallTime - ROLLBACK_TOLERANCE_MILLIS) {
+                Log.w(TAG, "تم اكتشاف تراجع في وقت الجهاز بعد إعادة التشغيل.")
+                return null
+            }
+            // بما أننا فقدنا التتبع المستمر، نثق بوقت النظام الحالي طالما أنه لا يقل عن آخر وقت موثوق.
+            return systemWallTime
+        }
+
+        // لم يحدث Reboot منذ آخر فحص
+        val elapsedSinceLastCheck = elapsedNow - lastKnownElapsed
+        val estimatedWallTime = lastKnownWallTime + elapsedSinceLastCheck
+
+        // كشف تراجع تاريخ الجهاز إلى الوراء بأكثر من التفاوت المسموح.
         if (systemWallTime < estimatedWallTime - ROLLBACK_TOLERANCE_MILLIS) {
-            Log.w(TAG, "تم اكتشاف تراجع في وقت الجهاز")
+            Log.w(TAG, "تم اكتشاف تراجع صريح في وقت الجهاز.")
             return null
         }
 
-        // نستخدم التقدير المحسوب من elapsedRealtime (أكثر أماناً من systemWallTime وحده).
         return estimatedWallTime
     }
 

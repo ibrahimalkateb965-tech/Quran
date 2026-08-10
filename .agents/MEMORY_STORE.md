@@ -63,6 +63,32 @@
   content: "عند تشغيل بوت تليجرام باستخدام getUpdates، فإن أي نسخة قديمة نشطة في الخلفية ستسبب خطأ Conflict (رمز 409). لحلها يجب تحديد معرّف العملية (PID) لـ pythonw.exe أو python.exe وإنهاؤها قسراً. وإذا كانت العملية تعمل بصلاحيات مدير (Elevated) فيجب فتح Terminal كمسؤول (Run as Admin) لتنفيذ أمر `taskkill /F /PID <PID>` بنجاح."
   tags: [process-management, taskkill, telegram-bot, conflict, windows]
   status: active
+
+- id: MEM-2026-08-09-001
+  type: preference
+  timestamp: "2026-08-09T19:27:00+03:00"
+  agents: [persistent-memory-engine]
+  context: "سلوك نسخ النصوص في واجهات الويب (Copy Action Behavior)"
+  content: "عند استخدام زر النسخ في تطبيق الويب، يجب ألا ينسخ الوصف، بل المحفز (Trigger) فقط لمنع تداخل النصوص ونسخ معلومات إضافية غير مرغوبة."
+  tags: [web-app, ux, copy-action, prompt-trigger]
+  status: active
+
+- id: MEM-2026-08-09-002
+  type: lesson
+  timestamp: "2026-08-09T21:05:00+03:00"
+  agents: [agent-optimizer, code-reviewer-quality]
+  context: "التدقيق المعماري الصارم (Devil's Advocate Audit)"
+  content: "الاعتماد الأولي على النماذج قد يولد حلولاً سطحية (Band-aids) مثل الاعتماد على taskkill أو التحايل بالبايثون لحل مشاكل PowerShell. يجب دائماً تفعيل وكلاء الجودة (5، 6، 7) معاً تحت دور المدقق الصارم (محامي الشيطان) لتمزيق الحلول السطحية وفرض حلول هندسية جذرية مثل (Mutex Locks، وتصحيح ترميز الكونسول مباشرة)."
+  tags: [quality-audit, best-practices, devil-advocate]
+  status: active
+- id: MEM-2026-08-10-001
+  type: lesson
+  timestamp: "2026-08-10T19:30:00+03:00"
+  agents: [persistent-memory-engine, agent-optimizer]
+  context: "تكرار أخطاء مسجلة مسبقاً (استخدام Fully Qualified Names لدوال الامتداد) بسبب تجاهل قراءة الذاكرة."
+  content: "مجرد (تسجيل) الذكريات لا يكفي. يقع الوكيل أحياناً في (Shortcut Anti-Pattern) محاولاً اختصار الوقت. تم إقرار مبدأ (حقن السياق الإجباري Mandatory Context Injection): يجب أن تُمرر الدروس والأخطاء الشائعة ذات الصلة قسرياً للوكيل قبل بدء البرمجة، لضمان عدم استناده فقط لحفظه الخاطئ للغة المترجم."
+  tags: [architecture, global, agent-behavior, context-injection, anti-pattern]
+  status: active
 ```
 
 ---
@@ -110,20 +136,18 @@
   type: decision
   timestamp: "2026-07-21T16:50:00+03:00"
   agents: [persistent-memory-engine, code-architect]
-  context: "نمط الإيقاظ الفردي لبوتات التطوير (One-Shot Polling Pattern)"
-  content: "لتفعيل دورة ا�## سجل الأخطاء المحلولة والقائمة (Resolved & Pending Bugs)
-
-```yaml
-- id: MEM-2026-08-01-001
-  type: bug-fix
-  timestamp: "2026-08-01T01:25:00+03:00"
-  agents: [persistent-memory-engine, android-kotlin-pro, debugger]
-  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف (صوت أنثوي بدلاً من المألوف)"
-  content: "الدروس المستفادة من هذه المرحلة:\n1. منع الميكروفون من العمل أثناء النطق لتفادي تعارض Audio Focus.\n2. ضرورة إضافة `<queries>` لخدمة `RecognitionService` في أندرويد 11+.\n3. تطبيق تطبيع الحروف العربية للنصوص الملتقطة بالصوت (Normalization).\n\nالمشكلة المتبقية: لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب في جلسة العمل القادمة إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
-  tags: [tts, accessibility, speech-recognizer, pending]
-  status: pending_investigation
-```�طافات لتطبيق الويب، يجب الالتزام الصارم بتخصيص العمود الثالث ليكون (المحفزات - Triggers فقط) لضمان أن زر النسخ في التطبيق ينسخ المحفز فقط لتشغيل الوكيل، بينما يتم عزل (الوصف والتفاصيل) في عمود مستقل (الأخير) ليتم عرضه للمستخدم كمعلومات دون أن يتداخل مع النص المنسوخ."
+  context: "تخصيص أعمدة لوحة القيادة (Dashboard Columns)"
+  content: "لتفعيل دورة إضافات لتطبيق الويب، يجب الالتزام الصارم بتخصيص العمود الثالث ليكون (المحفزات - Triggers فقط) لضمان أن زر النسخ في التطبيق ينسخ المحفز فقط لتشغيل الوكيل، بينما يتم عزل (الوصف والتفاصيل) في عمود مستقل (الأخير) ليتم عرضه للمستخدم كمعلومات دون أن يتداخل مع النص المنسوخ."
   tags: [excel-export, ui-preference, prompt-library, copy-action]
+  status: active
+
+- id: ADR-2026-08-09-002
+  type: decision
+  timestamp: "2026-08-09T21:05:00+03:00"
+  agents: [persistent-memory-engine, agent-optimizer]
+  context: "اعتماد الخطاف الحارس (Watchdog Hook) لمنع فقدان الذاكرة"
+  content: "اكتشفنا ظاهرة (المشاريع فارغة الذاكرة) في تطبيقي (تاج الوقار) و(تيجان النور) بسبب عدم تفعيل المستخدم لخطاف حفظ الذاكرة في نهاية الجلسة. كقرار معماري، تم تعديل قالب (AGENTS_SEED) لإلزام النظام مستقبلاً بتضمين خطاف حارس (Watchdog) يستخرج الـ Diffs آلياً ويحفظها في الذاكرة دون انتظار طلب مباشر."
+  tags: [memory-architecture, compliance, watchdog-hook]
   status: active
 ```
 
@@ -140,15 +164,15 @@
   content: "لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
   tags: [tts, accessibility, pending]
   status: pending_investigation
-```
 
-</div>7-21-007
+- id: BUG-2026-07-21-007
   type: bug-fix
   timestamp: "2026-07-21T21:23:00+03:00"
   agents: [persistent-memory-engine, debugger]
   context: "فشل إنشاء سجل جديد (Failed to create record) في PocketBase مع بيانات استجابة فارغة (data: {})"
   content: "عند إرسال طلب لإنشاء سجل يحتوي على حقول علاقات (Relations)، يجب التأكد أن قيمة الحقل المُرسلة هي الـ ID الخاص بالعنصر (وهو نص مكون من 15 حرفاً). استخدام الاسم كـ ID يؤدي لرفض السيرفر بـ 400 Bad Request مع رسالة فشل عامة فارغة data. تم تطبيق آلية لاستخراج الـ ID الصحيح، لكن المشكلة لا تزال قائمة (جاري التحقيق لاحقاً في احتمالية أن المشكلة في relation آخر مثل created_by_admin أو مشكلة في الـ Rules)."
   tags: [pocketbase, bug-fix, relations, api, pending]
+
 - id: MEM-2026-08-01-001
   type: bug-fix
   timestamp: "2026-08-01T01:25:00+03:00"
@@ -157,6 +181,45 @@
   content: "الدروس المستفادة من هذه المرحلة:\n1. منع الميكروفون من العمل أثناء النطق لتفادي تعارض Audio Focus.\n2. ضرورة إضافة `<queries>` لخدمة `RecognitionService` في أندرويد 11+.\n3. تطبيق تطبيع الحروف العربية للنصوص الملتقطة بالصوت (Normalization).\n\nالمشكلة المتبقية: لم يتم حل المشكلة الجذرية المتعلقة بنوع الصوت الداخلي للتطبيق (لا يزال أنثوياً ومختلفاً عن صوت الهاتف الفعلي). يجب في جلسة العمل القادمة إجبار التطبيق على تبني محرك وصوت الـ TTS الافتراضي للنظام بالكامل."
   tags: [tts, accessibility, speech-recognizer, pending]
   status: pending_investigation
+
+- id: BUG-2026-08-01-002
+  type: bug-fix
+  timestamp: "2026-08-01T15:34:00+03:00"
+  agents: [persistent-memory-engine, debugger, android-testing]
+  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف وتعارض الميكروفون عند الاستماع، وفشل اختبارات VoiceCommandManagerTest."
+  resolution: "إدارة الـ Audio Focus بشكل صارم في VoiceCommandManager (requestAudioFocus و abandonAudioFocus). تعديل VoiceCommandManager ليعيد النص الخام. وتجاوز اختبارات VoiceCommandManagerTest بعد عمل Mock لـ AudioManager لمنع ClassCastException."
+
+- id: BUG-2026-08-02-001
+  type: bug-fix
+  timestamp: "2026-08-02T14:22:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "إغلاق التطبيق (Crash) والدخول في حلقة لا نهائية عند تمرير واجهة Pager."
+  content: "كان التطبيق ينهار أو يتخطى الآيات سريعاً بسبب التقاط حالة قديمة (Stale State) داخل بيئة LaunchedEffect في Compose. تم استبدال القراءة بحالة حية `viewModel.uiState.value.currentIndex` واستخدام أمر انتقال مباشر `goToAyah` لتفادي المشكلة."
+  tags: [compose, launched-effect, bug-fix, ui]
+
+- id: ADR-2026-08-09-002
+  type: decision
+  timestamp: "2026-08-09T21:20:00+03:00"
+  agents: [agent-optimizer, persistent-memory-engine]
+  context: "تكرار ظاهرة 'المشاريع فارغة الذاكرة' في المشاريع السابقة مثل تاج الوقار."
+  content: "تقرر اعتماد مبدأ 'الخطاف الحارس' (Watchdog Hook) لمنع فقدان الذاكرة. لا يمكن الاعتماد على نوايا المستخدم لتفعيل وكيل الذاكرة يدوياً، بل يجب أن يقوم النظام بأخذ لقطة للمتغيرات وحفظها في MEMORY_STORE.md بشكل إجباري قبل الإغلاق."
+  tags: [architecture, memory, watchdog, reliability, global]
+
+- id: MEM-2026-08-09-003
+  type: lesson
+  timestamp: "2026-08-09T21:20:00+03:00"
+  agents: [agent-optimizer, code-reviewer-quality]
+  context: "مراجعة قوالب التأسيس العالمية واكتشاف ترقيعات (Band-Aids) متراكمة."
+  content: "تم إرساء مبدأ دور 'محامي الشيطان' (Devil's Advocate) للتدقيق المعماري الصارم، والذي يمنع رفض أي ترقيع سطحي (مثل استخدام taskkill لمعالجة تعارض العمليات، أو سكربتات بايثون لحل مشكلة ترميز PowerShell) واستبدالها بحلول جذرية مستدامة."
+  tags: [architecture, auditing, clean-code, global]
+
+- id: ADR-2026-08-09-004
+  type: decision
+  timestamp: "2026-08-09T21:44:00+03:00"
+  agents: [agent-optimizer, persistent-memory-engine, mcp-tool-builder]
+  context: "الحاجة إلى مزامنة الدروس المستفادة عبر كافة المشاريع المحلية في بيئة التطوير (IDE)."
+  content: "تم ابتكار وتصميم أول خادم (MCP Server) مخصص لبيئة المحرر باستخدام `FastMCP`. وظيفته فحص الذاكرة المحلية لأي مشروع ومزامنة الدروس العالمية إلى المستودع المركزي. وتم دمج السكربت كإضافة (Plugin) متكاملة في مجلد الإعدادات ليعمل بشكل مركزي مع أي مشروع."
+  tags: [mcp, architecture, memory, automation, global]
 ```
 
 ---
@@ -175,13 +238,6 @@
 | **القانون** | 6 | contract-reviewer, nda-triage, compliance-officer, legal-risk-assessor, vendor-vetter, signature-wrangler |
 | **الوكلاء الأصليون** | 23 | (راجع sub_agents.yaml للقائمة الكاملة) |
 
-</div>
-- id: BUG-2026-08-01-002
-  type: bug-fix
-  timestamp: "2026-08-01T15:34:00+03:00"
-  agents: [persistent-memory-engine, debugger, android-testing]
-  context: "مشكلة عدم توافق صوت الـ TTS الداخلي مع صوت الهاتف وتعارض الميكروفون عند الاستماع، وفشل اختبارات VoiceCommandManagerTest."
-  resolution: "إدارة الـ Audio Focus بشكل صارم في VoiceCommandManager (requestAudioFocus و abandonAudioFocus). تعديل VoiceCommandManager ليعيد النص الخام. وتجاوز اختبارات VoiceCommandManagerTest بعد عمل Mock لـ AudioManager لمنع ClassCastException."
 
 ## الدروس المستفادة من مشروع تطبيق المكفوفين (TTS & STT)
 1. **احترام تفضيلات النطق للمستخدم الكفيف (Accessibility UX)**
@@ -205,3 +261,29 @@
 7. **محاكاة خدمات النظام في اختبارات الوحدة**
    - المشكلة: حقن Context يحمل getSystemService يسبب ClassCastException مع MockK.
    - الحل: عمل Mock صريح للخدمة وإرجاعها عند طلبها من الـ Context.
+8. **تعارض التقاط الحالة القديمة في Compose (Stale State Capture in LaunchedEffect)**
+   - المشكلة: الاعتماد على قيمة مقروءة من الـ `uiState` داخل كتلة `snapshotFlow` يؤدي لالتقاط قيمة قديمة (Stale Value)، مما قد يسبب حلقة لا نهائية (Infinite Loop) من التنقل العشوائي أو توقف التطبيق (Crash).
+   - الحل: قراءة القيمة الحية مباشرة من المرجع داخل كتلة الـ `collect` مثل `viewModel.uiState.value.currentIndex` وتجنب استخدام المتغيرات الملتقطة، وكذلك الاعتماد على القفز المباشر `goToAyah(index)` بدلاً من حسابات الزيادة/النقصان النسبية.
+9. **تطبيق مبدأ DRY (لا تكرر نفسك) على الروابط المركزية**
+   - المشكلة: تكرار الرابط الأساسي (`https://verse.mp3quran.net/data/`) في كل عنصر ضمن قائمة القراء يرفع نسبة الخطأ ويجعل الصيانة صعبة.
+   - الحل: استخراج الرابط كمتغير ثابت (`private const val BASE_URL`) وتمريره برمجياً لكل عنصر.
+10. **توظيف أدوات Android Studio لحل قيود التعديل الخارجي**
+   - المشكلة: الحاجة لقص وتعديل مقاسات الأيقونات (Image Processing) مع وجود قيد صارم يمنع تشغيل سكريبتات أو أوامر طرفية خارجية (No Shell Commands).
+   - الحل: توجيه المستخدم لاستخدام الأداة المدمجة `Image Asset Studio` كخيار قياسي وأكثر أماناً لتوليد (Adaptive Icons) لجميع مقاسات الشاشات.
+11. **التشغيل المتصل الديناميكي ومراعاة نمط المستخدم**
+    - المشكلة: فرض قائمة تشغيل (Playlist) مستمرة يكسر النمط الافتراضي للتطبيق المبني على السحب اليدوي (Swipe-to-Read).
+    - الحل: حقن قائمة الآيات المترابطة في `ExoPlayer` فقط عند تفعيل (الاستماع المتواصل)، واستخدام مستمع `onMediaItemTransition` لتحديث الواجهة، بينما يُترك النمط الفردي لتجربة السحب اليدوي الافتراضية.
+12. **معالجة تعارض الصوت التلقائي عبر ContentType**
+    - المشكلة: محاولة إدارة التركيز الصوتي (Audio Focus) يدوياً للإيقاف عند نطق TalkBack معقدة.
+    - الحل: تغيير `ContentType` لمشغل `ExoPlayer` إلى `C.AUDIO_CONTENT_TYPE_SPEECH`. هذه الميزة المدمجة تجبر المشغل على الإيقاف المؤقت (Pause) تلقائياً عندما يتحدث المساعد (Ducking)، واستئناف التشغيل فور سكوته، دون الحاجة لمستمع صوتي يدوي.
+13. **التدقيق المعماري الصارم ومنع الترقيعات السطحية (No Band-Aids)**
+    - المشكلة: تراكم ديون تقنية بسبب استخدام حلول مؤقتة مثل `taskkill` لإنهاء العمليات المعلقة أو سكربتات خارجية لحل مشاكل ترميز.
+    - الحل: تفعيل وكيل بدور "محامي الشيطان" لرفض هذه الترقيعات وفرض حلول هندسية صلبة (مثل Mutex Locks ووضع ترميز `UTF-8` محلي في `PowerShell`).
+14. **ضمان استدامة الذاكرة عبر الخطاف الحارس (Watchdog Hook)**
+    - المشكلة: مشاريع عملاقة (مثل تاج الوقار) لم تُسجل فيها أي ذكريات بسبب الاعتماد على تذكر المستخدم لاستدعاء وكيل الذاكرة.
+    - الحل: بناء خطاف حارس مستقل يجبر النظام على استخراج الـ Diffs وتخزينها تلقائياً عند اقتراب انتهاء المهام.
+15. **تنسيق عرض ماركداون للغة العربية في بيئة التطوير (IDE RTL Rendering)**
+    - المشكلة: ملفات التوثيق العربية (`AGENTS.md` وغيرها) تظهر بشكل مشوه ومعكوس (الأرقام والرموز متداخلة) في واجهة العرض داخل المحرر.
+    - الحل: تغليف جميع مستندات الماركداون والتقارير بـ `<div dir="rtl">` في بدايتها و `</div>` في نهايتها بشكل إجباري لضمان محاذاة صحيحة.
+
+</div>

@@ -23,11 +23,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 
 @Composable
 fun ScreenOffSaverOverlay(
     onWakeUp: () -> Unit
 ) {
+    BackHandler {
+        onWakeUp()
+    }
+    
     Box(
         modifier = Modifier
             .fillMaxSize()

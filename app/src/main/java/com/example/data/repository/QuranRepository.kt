@@ -87,16 +87,12 @@ class QuranRepository(private val context: Context) {
         } else {
             // 2. Fetch from Network
             try {
-                val response = apiService.getSurahAyahs(surahId, reciterIdentifier)
+                val response = apiService.getSurahAyahs(surahId, "quran-simple")
                 if (response.isSuccessful && response.body() != null) {
                     val remoteAyahs = response.body()!!.data.ayahs
                     val entities = remoteAyahs.map {
                         
-                        val finalAudioUrl = if (!it.audioUrl.isNullOrBlank()) {
-                            it.audioUrl
-                        } else {
-                            resolveAudioEndpoint(reciterIdentifier, surahId, it.numberInSurah, it.globalNumber)
-                        }
+                        val finalAudioUrl = resolveAudioEndpoint(reciterIdentifier, surahId, it.numberInSurah)
                         
                         AyahEntity(
                             globalNumber = it.globalNumber,
@@ -151,7 +147,7 @@ class QuranRepository(private val context: Context) {
                 else -> "آية رقم $i من ${surah.nameArabic}"
             }
 
-            val finalAudioUrl = resolveAudioEndpoint(reciterIdentifier, surah.id, i, globalNum)
+            val finalAudioUrl = resolveAudioEndpoint(reciterIdentifier, surah.id, i)
 
             list.add(
                 Ayah(
@@ -167,18 +163,13 @@ class QuranRepository(private val context: Context) {
     }
 
     private fun resolveAudioEndpoint(
-        reciterIdentifier: String,
+        audioBaseUrl: String,
         surahId: Int,
-        ayahInSurah: Int,
-        globalNum: Int
+        ayahInSurah: Int
     ): String {
-        // Fallback strategy if API does not return an audioUrl
-        return if (reciterIdentifier == "ar.husary") {
-            val formattedSurah = surahId.toString().padStart(3, '0')
-            val formattedAyah = ayahInSurah.toString().padStart(3, '0')
-            "https://verse.mp3quran.net/data/Husary_64kbps/$formattedSurah$formattedAyah.mp3"
-        } else {
-            "https://cdn.islamic.network/quran/audio/128/$reciterIdentifier/$globalNum.mp3"
-        }
+        val sanitizedBaseUrl = if (audioBaseUrl.endsWith("/")) audioBaseUrl else "$audioBaseUrl/"
+        val formattedSurah = surahId.toString().padStart(3, '0')
+        val formattedAyah = ayahInSurah.toString().padStart(3, '0')
+        return "$sanitizedBaseUrl$formattedSurah$formattedAyah.mp3"
     }
 }

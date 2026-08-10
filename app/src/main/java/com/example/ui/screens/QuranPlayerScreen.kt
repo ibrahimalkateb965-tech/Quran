@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,6 +59,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import com.example.ui.components.player.AudioEqualizerBars
 import com.example.ui.components.player.AyahCard
+import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.components.player.AyahNumberCard
 import com.example.ui.components.player.BigVoiceMicrophoneButton
 import com.example.ui.components.player.ControlPanel
@@ -77,16 +79,19 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -113,6 +118,8 @@ import com.example.ui.theme.DarkImmersiveBorder
 import com.example.ui.theme.TextMutedZinc
 import com.example.ui.theme.TextPrimaryWhite
 import com.example.ui.viewmodel.QuranViewModel
+import com.example.data.model.Ayah
+import com.example.ui.viewmodel.ScreenModeUiState
 
 @Composable
 fun QuranPlayerScreen(
@@ -136,11 +143,26 @@ fun QuranPlayerScreen(
             }
         }
     }
+    
+    val pendingActionManager = com.example.accessibility.LocalPendingBlindAction.current
+    LaunchedEffect(Unit) {
+        pendingActionManager.setFallback { viewModel.replayCurrentAyah() }
+    }
+    LaunchedEffect(dialogUiState) {
+        pendingActionManager.clear()
+    }
 
     CompositionLocalProvider(
         LocalLayoutDirection provides LayoutDirection.Rtl,
         LocalTalkBackEnabled provides isTalkBackEnabled
     ) {
+        // Optimize Recomposition by breaking down the monolithic State using derivedStateOf
+        val activeSurah by remember { derivedStateOf { playbackUiState.currentSurah } }
+        val ayahs by remember { derivedStateOf { playbackUiState.currentAyahs } }
+        val currentAyahIndex by remember { derivedStateOf { playbackUiState.currentAyahIndex } }
+        val isPlaying by remember { derivedStateOf { playbackUiState.isPlaying } }
+        val currentAyah = ayahs.getOrNull(currentAyahIndex)
+
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = DarkImmersiveBg
@@ -159,14 +181,6 @@ fun QuranPlayerScreen(
                             radius = 1200f
                         )
                     )
-                    // Full Screen Gestures for Blind Users
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                viewModel.replayCurrentAyah()
-                            }
-                        )
-                    }
                     ) {
                 // Main Accessible Content
                 Column(
@@ -187,16 +201,13 @@ fun QuranPlayerScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Dynamic TalkBack Live Announcement & Voice Feedback
-                    val activeSurah = playbackUiState.currentSurah
-                    val ayahs = playbackUiState.currentAyahs
-                    val currentAyah = ayahs.getOrNull(playbackUiState.currentAyahIndex)
-
                     val talkBackDescription = buildString {
                         append("تطبيق القرآن الكريم للمكفوفين. ")
-                        if (activeSurah != null) {
-                            append("سورة ${activeSurah.nameArabic}، الآية ${currentAyah?.numberInSurah ?: 1} من أصل ${activeSurah.ayahCount}. ")
+                        val surah = activeSurah
+                        if (surah != null) {
+                            append("سورة ${surah.nameArabic}، الآية ${currentAyah?.numberInSurah ?: 1} من أصل ${surah.ayahCount}. ")
                         }
-                        if (playbackUiState.isPlaying) append("جاري التشغيل. ") else append("متوقف مؤقتاً. ")
+                        if (isPlaying) append("جاري التشغيل. ") else append("متوقف مؤقتاً. ")
                         if (settingsUiState.tarkizRepeatMode > 1) append("وضع التكرار مفعّل. ")
                         append("انقر مرتين للتشغيل أو الإيقاف. اسحب يميناً ويساراً للتنقل.")
                     }
@@ -221,15 +232,28 @@ fun QuranPlayerScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Surah Info Header
-                    Text(
-                        text = "سورة ${activeSurah?.nameArabic ?: ""} ( اختيار الآية )",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AccessibleGold,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .semantics { contentDescription = "سورة ${activeSurah?.nameArabic} ( اختيار الآية )" }
-                    )
+                    // Surah Info & Ayah Number Header
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "سورة ${activeSurah?.nameArabic ?: ""}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = AccessibleGold,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .semantics { contentDescription = "سورة ${activeSurah?.nameArabic}" }
+                        )
+                        if (currentAyah != null) {
+                            Spacer(modifier = Modifier.width(16.dp))
+                            AyahNumberCard(
+                                number = currentAyah.numberInSurah,
+                                onClick = { viewModel.announce("الآية ${currentAyah.numberInSurah}") }
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (ayahs.isEmpty()) {
@@ -244,12 +268,12 @@ fun QuranPlayerScreen(
                     } else {
                         // HorizontalPager for Ayahs
                         val pagerState = rememberPagerState(
-                            initialPage = playbackUiState.currentAyahIndex,
+                            initialPage = currentAyahIndex,
                             pageCount = { ayahs.size }
                         )
                         // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
-                        LaunchedEffect(playbackUiState.currentAyahIndex) {
-                            val target = playbackUiState.currentAyahIndex
+                        LaunchedEffect(currentAyahIndex) {
+                            val target = currentAyahIndex
                             if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
                                 pagerState.animateScrollToPage(target)
                             }
@@ -268,36 +292,57 @@ fun QuranPlayerScreen(
                                 }
                         }
 
-                        HorizontalPager(
-                            state = pagerState,
+                        val ayahFocusRequester = remember { FocusRequester() }
+                        var ayahFocusPending by remember { mutableStateOf(false) }
+
+                        LaunchedEffect(pagerState.settledPage, isTalkBackEnabled) {
+                            if (isTalkBackEnabled && ayahs.isNotEmpty()) {
+                                ayahFocusPending = true
+                            }
+                        }
+
+                        // Standard Pager for all users (sighted and blind)
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                        ) { page ->
-                            val ayah = ayahs.getOrNull(page)
-                            if (ayah != null) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    AyahCard(
-                                        ayah = ayah,
-                                        isCurrentProvider = { page == viewModel.playbackUiState.value.currentAyahIndex },
-                                        isPlayingProvider = { page == viewModel.playbackUiState.value.currentAyahIndex && viewModel.playbackUiState.value.isPlaying },
-                                        isScreenOffModeProvider = { screenModeUiState.isScreenOffMode },
-                                        onClick = { viewModel.togglePlayback() },
-                                        onDoubleTap = { viewModel.replayCurrentAyah() },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    AyahNumberCard(
-                                        number = ayah.numberInSurah,
-                                        onClick = { viewModel.announce("الآية ${ayah.numberInSurah}") }
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
+                        ) {
+                            HorizontalPager(
+                                state = pagerState,
+                                userScrollEnabled = true,
+                                modifier = Modifier.fillMaxSize()
+                            ) { page ->
+                                val ayah = ayahs.getOrNull(page)
+                                if (ayah != null) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        AyahCard(
+                                            ayah = ayah,
+                                            isCurrentProvider = { page == currentAyahIndex },
+                                            isPlayingProvider = { page == currentAyahIndex && isPlaying },
+                                            isScreenOffModeProvider = { screenModeUiState.isScreenOffMode },
+                                            onClick = { viewModel.togglePlayback() },
+                                            onDoubleTap = { viewModel.replayCurrentAyah() },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                .then(
+                                                    if (page == currentAyahIndex) {
+                                                        Modifier
+                                                            .focusRequester(ayahFocusRequester)
+                                                            .onGloballyPositioned {
+                                                                if (ayahFocusPending) {
+                                                                    ayahFocusPending = false
+                                                                    ayahFocusRequester.requestFocus()
+                                                                }
+                                                            }
+                                                    } else Modifier
+                                                )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -352,8 +397,8 @@ fun QuranPlayerScreen(
                 if (dialogUiState.showSurahIndex) {
                     SurahIndexSheet(
                         surahs = playbackUiState.surahs,
-                        currentSurahId = playbackUiState.currentSurah?.id,
-                        currentAyahIndex = playbackUiState.currentAyahIndex,
+                        currentSurahId = activeSurah?.id,
+                        currentAyahIndex = currentAyahIndex,
                         onSelectSurah = { surahId, ayahIndex ->
                             viewModel.loadSurah(surahId, targetAyahIndex = ayahIndex, autoPlay = true)
                             viewModel.toggleSurahIndex(false)
@@ -393,3 +438,4 @@ fun QuranPlayerScreen(
         }
     }
 }
+

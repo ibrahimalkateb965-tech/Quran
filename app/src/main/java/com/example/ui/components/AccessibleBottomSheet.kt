@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -45,6 +46,10 @@ fun AccessibleBottomSheet(
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismiss)
     val currentOnAnnounce by rememberUpdatedState(onAnnounce)
+
+    BackHandler {
+        currentOnDismiss()
+    }
 
     Surface(
         modifier = Modifier

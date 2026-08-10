@@ -30,7 +30,7 @@ class QuranAudioService : MediaSessionService() {
         super.onCreate()
 
         val audioAttributes = AudioAttributes.Builder()
-            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
             .setUsage(C.USAGE_MEDIA)
             .build()
 

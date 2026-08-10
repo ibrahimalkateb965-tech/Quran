@@ -19,10 +19,20 @@ fun announceForAccessibility(context: Context, text: String) {
 
     if (!accessibilityManager.isEnabled) return
 
-    val event = AccessibilityEvent.obtain(AccessibilityEvent.TYPE_ANNOUNCEMENT).apply {
+    val event = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        AccessibilityEvent(AccessibilityEvent.TYPE_ANNOUNCEMENT)
+    } else {
+        @Suppress("DEPRECATION")
+        AccessibilityEvent.obtain(AccessibilityEvent.TYPE_ANNOUNCEMENT)
+    }
+
+    event?.apply {
         this.text.add(text)
         className = View::class.java.name
         packageName = context.packageName
     }
-    accessibilityManager.sendAccessibilityEvent(event)
+    
+    event?.let {
+        accessibilityManager.sendAccessibilityEvent(it)
+    }
 }

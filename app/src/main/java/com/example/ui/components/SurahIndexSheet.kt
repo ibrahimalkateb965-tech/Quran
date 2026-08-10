@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,27 +75,19 @@ fun SurahIndexSheet(
         contentDescriptionText = if (selectedSurahForAyahs != null) "قائمة آيات سورة ${selectedSurahForAyahs!!.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
-        navigationIcon = if (selectedSurahForAyahs != null) {
-            {
-                BlindAccessibleIconButton(
-                    onClick = { selectedSurahForAyahs = null },
-                    onClickLabel = "العودة لقائمة السور",
-                    onSingleTap = { onAnnounce("العودة لقائمة السور") },
-                    modifier = Modifier
-                        .height(48.dp)
-                        .width(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "رجوع لقائمة السور",
-                        tint = AccessibleGold
-                    )
-                }
-            }
-        } else null,
+        navigationIcon = null,
         headerContent = null,
         showCloseButton = false
     ) {
+            LaunchedEffect(currentSurahId, selectedSurahForAyahs) {
+                if (selectedSurahForAyahs == null && currentSurahId != null) {
+                    // الفهرس هو (id - 1) لأن المعرفات تبدأ من 1.
+                    // نطرح 3 إضافية لنجعل العنصر قريباً من منتصف الشاشة.
+                    val targetIndex = maxOf(0, currentSurahId - 1 - 3)
+                    surahListState.scrollToItem(targetIndex)
+                }
+            }
+
             LaunchedEffect(selectedSurahForAyahs) {
                 if (selectedSurahForAyahs != null) {
                     if (selectedSurahForAyahs!!.id == currentSurahId && currentAyahIndex > 0) {
@@ -102,6 +95,17 @@ fun SurahIndexSheet(
                     } else {
                         ayahListState.scrollToItem(0)
                     }
+                }
+            }
+
+            // نظام اعتراض التراجع
+            BackHandler(enabled = true) {
+                keyboardController?.hide()
+                if (selectedSurahForAyahs != null) {
+                    selectedSurahForAyahs = null
+                    onAnnounce("تم العودة لقائمة السور")
+                } else {
+                    onDismiss()
                 }
             }
 
@@ -146,8 +150,8 @@ fun SurahIndexSheet(
                     }
                 }
             } else {
-                val displaySurahs = remember(surahs, currentSurahId) {
-                    surahs.sortedBy { if (it.id == currentSurahId) 0 else 1 }
+                val displaySurahs = remember(surahs) {
+                    surahs.sortedBy { it.id }
                 }
                 LazyColumn(
                     state = surahListState,

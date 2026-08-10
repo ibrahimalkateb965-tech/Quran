@@ -270,3 +270,180 @@ private fun playCurrentAyah() {
 - [ ] الانتقال بين الآيات يعمل بسلاسة.
 - [ ] إذا تم تطبيق الخيار 2، يجب اختبار عدم إعادة تحميل ملف السورة عند تغيير الآية.
 
+---
+
+# خطة رقم 67: توحيد التنقل بين الآيات عبر HorizontalPager القياسي مع TalkBack
+
+**الحالة:** خطة جاهزة للتنفيذ — لم يُعدَّل أي كود بعد.
+**المنفِّذ:** وكيل التطوير.
+**النطاق المحصور:** `QuranPlayerScreen.kt` فقط + ملف اختبار جديد. لا تعديل على `AyahCard.kt` ولا `QuranViewModel` ولا أي ملف آخر.
+
+## 1. الهدف
+
+جعل التنقل بين الآيات يعمل مع TalkBack عبر `HorizontalPager` القياسي الموحّد لجميع المستخدمين (مكفوفين ومبصرين)، مع:
+- حذف المكوّن المخصص `SilentAccessiblePager` **بالكامل** (لا إعادة تسمية — حذف).
+- تفعيل `userScrollEnabled = true` صراحةً.
+- تأمين الفوكس عبر `LaunchedEffect(pagerState.settledPage)` بآلية خالية من سباق Recomposition ومن `IllegalStateException`.
+- تصميم صامت تماماً: يبقى `contentDescription = ","` كما هو. **ممنوع** إضافة `stateDescription` أو `customActions` أو أي نصوص منطوقة جديدة.
+
+## 2. القرارات المُلزمة (من صاحب المنتج)
+
+| # | القرار |
+|---|--------|
+| D1 | `HorizontalPager` القياسي هو المكوّن الوحيد للجميع. لا عقد مستقرة وهمية ولا Anchors. |
+| D2 | صمت تام: لا `stateDescription`، لا `customActions`، لا تعديل على صمت `AyahCard`. |
+| D3 | حذف `SilentAccessiblePager` نهائياً من الكود. |
+| D4 | تأمين الفوكس عبر `LaunchedEffect(pagerState.settledPage)`. |
+
+## 3. ملخص سبب الفشل الحالي (للفهم فقط — لا حاجة لإعادة التحقيق)
+
+1. السحب الأفقي بإصبع واحد في TalkBack = تنقّل خطّي بين العقد، ولا يُرسل `scrollBy` أبداً — لذا كان كود `scrollBy` على الـ `Row` ميتاً لهذه الإيماءة.
+2. الـ Anchors (عقد 10.dp) تستدعي `goToAyah()` فور وصول الفوكس → تدمير العقدة الحاملة للفوكس أثناء الإيماءة → TalkBack يفقد موضعه ويعود لأعلى الشاشة → يظهر خارجياً كأن "السحب توقف".
+3. `FocusRequester.requestFocus()` في الكود القديم كان يسبق اكتمال Recomposition → `IllegalStateException` (انهيارات الفوكس القديمة).
+4. **لماذا ينجح الحل الجديد:** `HorizontalPager` يعرض `horizontalScrollAxisRange` + `scrollBy` **بشكل مدمج** على عقدته. عندما يكون الفوكس على `AyahCard` داخله ويمرّر المستخدم بإصبعين (أو إيماءة يمين-ثم-يسار)، يفوّض TalkBack إجراء التمرير لأقرب سلف Scrollable — وهو الـ Pager نفسه → يقلب صفحة واحدة → `settledPage` يتغير → مزامنة الـ ViewModel. الاتجاه RTL يُشتق تلقائياً من `LocalLayoutDirection.Rtl` المفروض أصلاً في الشاشة (~سطر 163).
+
+## 4. التعديلات التفصيلية — `app/src/main/java/com/example/ui/screens/QuranPlayerScreen.kt`
+
+### الخطوة 4.1 — حذف المكوّن المخصص
+- حذف `SilentAccessiblePager` كاملاً (~السطور 438–546).
+- حذف التفرع:
+  ```kotlin
+  if (isTalkBackEnabled) { SilentAccessiblePager(...) } else { ... }
+  ```
+  واستبداله بمسار واحد موحّد (الخطوة 4.2).
+
+### الخطوة 4.2 — مسار Pager موحّد للجميع
+الإبقاء على `pagerState` وتأثيرَي المزامنة الموجودَين (~السطور 277–300) **كما هما مع حارسيهما** (`!pagerState.isScrollInProgress` و `page != currentIndex` و `distinctUntilChanged`) — هذه الحراسات تمنع حلقة التغذية المرتدة بين المزامنتين، ولا يجوز إزالتها.
+
+البنية المستهدفة:
+
+```kotlin
+Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+    HorizontalPager(
+        state = pagerState,
+        userScrollEnabled = true, // صراحةً وفق القرار D1 (وهو الافتراضي أصلاً)
+        modifier = Modifier.fillMaxSize()
+    ) { page ->
+        val ayah = ayahs.getOrNull(page)
+        if (ayah != null) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                AyahCard(
+                    ayah = ayah,
+                    isCurrentProvider = { page == currentAyahIndex },
+                    isPlayingProvider = { page == currentAyahIndex && isPlaying },
+                    isScreenOffModeProvider = { screenModeUiState.isScreenOffMode },
+                    onClick = { viewModel.togglePlayback() },
+                    onDoubleTap = { viewModel.replayCurrentAyah() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        // ↓↓ تأمين الفوكس — يُضاف في الخطوة 4.3 ↓↓
+                        .then(focusSecuringModifier(page))
+                )
+            }
+        }
+    }
+}
+```
+
+### الخطوة 4.3 — تأمين الفوكس (التنفيذ الإلزامي للقرار D4)
+
+**المشكلة التي يجب تفاديها:** `FocusRequester.requestFocus()` قبل ارتباط الـ modifier بعقدة مركَّبة = `IllegalStateException`. لذلك الآلية: علم `focusPending` + طلب الفوكس من داخل `onGloballyPositioned` (ضمان أن العقدة مركَّبة والـ focusRequester مرفق بها). لا `delay()` ولا `coroutineScope.launch` مكشوف.
+
+```kotlin
+// داخل QuranPlayerScreen، قبل الـ HorizontalPager:
+val ayahFocusRequester = remember { FocusRequester() }
+var ayahFocusPending by remember { mutableStateOf(false) }
+
+// القرار D4: التأمين مربوط باستقرار الصفحة
+LaunchedEffect(pagerState.settledPage, isTalkBackEnabled) {
+    if (isTalkBackEnabled && ayahs.isNotEmpty()) {
+        ayahFocusPending = true
+    }
+}
+```
+
+ودالة مساعدة خاصة داخل نفس الملف (تُمرَّر لها الحالات عبر معاملات أو إغلاق):
+
+```kotlin
+// تُرفق الـ FocusRequester ببطاقة الآية الحالية فقط، وتطلب الفوكس بعد اكتمال التركيب
+private fun focusSecuringModifier(page: Int): Modifier {
+    return if (page == currentAyahIndex) {
+        Modifier
+            .focusRequester(ayahFocusRequester)
+            .onGloballyPositioned {
+                if (ayahFocusPending) {
+                    ayahFocusPending = false
+                    ayahFocusRequester.requestFocus()
+                }
+            }
+    } else Modifier
+}
+```
+
+**قيود صارمة على المنفِّذ:**
+- الـ `focusRequester` يُرفق **بصفحة واحدة فقط** (صفحة `currentAyahIndex`) — إرفاقه بأكثر من عقدة = `IllegalStateException`.
+- طلب الفوكس يحدث **فقط** داخل `onGloballyPositioned` وبشرط العلم — هذا يلغي كامل فئة انهيارات السباق القديمة.
+- التأمين يعمل فقط عند `isTalkBackEnabled == true` — تجربة المبصر لا تتغير إطلاقاً.
+- **قرار متروك للمنفِّذ (موثّق):** `LaunchedEffect` يعمل عند أول تركيب أيضاً وقد يضبط العلم `true` (فوكس أولي على البطاقة). إن كان ذلك غير مرغوب، تُتخطّى القيمة الأولى عبر `snapshotFlow { pagerState.settledPage }.drop(1)` داخل `LaunchedEffect(Unit)`. يُختبر في البند اليدوي #1.
+
+### الخطوة 4.4 — تنظيف الاستيرادات الميتة
+بعد الحذف، تُزال الاستيرادات التي لم يعد لها استخدام (تحقق بالـ Build): `horizontalScrollAxisRange`, `scrollBy`, `ScrollAxisRange`, `onFocusChanged`, `focusable`, `rememberUpdatedState`, `clearAndSetSemantics` (إن لم يبقَ استخدام آخر لها في الملف), `rememberCoroutineScope` (إن لم يبقَ استخدام)، وأي استيراد مكرر (يوجد استيراد مكرر لـ `LocalTalkBackEnabled` حالياً).
+**يبقى** `CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, LocalTalkBackEnabled provides isTalkBackEnabled)` كما هو — ضروري لاتجاه الـ Pager ولمكوّنات أخرى.
+**يُضاف** استيراد `androidx.compose.ui.layout.onGloballyPositioned` و `androidx.compose.ui.focus.focusRequester` (موجود مسبقاً).
+
+### الخطوة 4.5 — ما لا يُمسّ
+- `AyahCard.kt`: لا تعديل إطلاقاً. الصمت (`","`) يبقى كما هو (D2).
+- `QuranViewModel`, `goToAyah`, `blindAccessibleClickable`, `LocalPendingBlindAction`: لا تعديل.
+- نصوص التلميح الموجودة (Header/Hint chips): لا تعديل في هذه المهمة.
+
+## 5. الاختبارات الآلية (تُكتب قبل أو مع التنفيذ)
+
+ملف جديد: `app/src/androidTest/java/com/example/ui/screens/QuranPlayerPagerTalkBackTest.kt`.
+
+ملاحظة للمنفِّذ: إن كان إنشاء `QuranViewModel` وهمياً مكلفاً، يُبنى **harness مصغّر** يكرّر نفس تسلكيب الـ Pager + المزامنة + تأمين الفوكس حرفياً، مع ViewModel مزيّف يسجّل الاستدعاءات:
+
+1. **T1 — أفعال التمرير موجودة:** عقدة الـ Pager تملك `SemanticsActions.ScrollBy` (مدمجة من مكتبة foundation).
+2. **T2 — مزامنة الاتجاهين:** تغيير `settledPage` يستدعي `goToAyah(page, autoPlay = true)` مرة واحدة فقط؛ وتغيير `currentAyahIndex` من الـ ViewModel يحرّك الـ Pager دون استدعاء `goToAyah` عكسياً (لا حلقة مرتدة).
+3. **T3 — لا انهيار فوكس:** مع محاكاة TalkBack مفعّل، 10 تقليبات صفحات متتالية سريعة → لا استثناءات (تحديداً لا `IllegalStateException` من FocusRequester).
+4. **T4 — ثبات الصمت:** كل بطاقات الآيات المكشوفة في شجرة Semantics تحمل `contentDescription == ","` ولا تحمل `stateDescription`.
+
+أمر التشغيل: `./gradlew :app:compileDebugKotlin` ثم `./gradlew :app:connectedDebugAndroidTest` على جهاز/محاكٍ.
+
+## 6. بروتوكول التحقق اليدوي على الجهاز (معيار القبول)
+
+| # | السيناريو | النتيجة المطلوبة |
+|---|-----------|------------------|
+| 1 | فتح الشاشة مع TalkBack | لا فوكس عشوائي مسروق؛ لا انهيار (راجع القرار الموثّق في 4.3) |
+| 2 | سحب بإصبعين يساراً | الانتقال للآية التالية + تشغيل الصوت وفق السلوك الحالي |
+| 3 | سحب بإصبعين يميناً | العودة للآية السابقة |
+| 4 | 10 تقليبات سريعة متتالية | صفر انهيارات في logcat (ابحث عن `IllegalStateException` و `FocusRequester`) |
+| 5 | أول آية + سحب بإصبعين يميناً / آخر آية + يساراً | لا تمرير، لا انهيار |
+| 6 | سحب بإصبع واحد يمين/يسار | تنقّل خطّي هادئ بين العناصر (أزرار التحكم...) بلا قفز ولا إعادة فوكس لأعلى الشاشة |
+| 7 | تفعيل التقدّم التلقائي بالصوت (Continuous Play) مع TalkBack | الـ Pager يتبع `currentAyahIndex` بلا تعليق ولا حلقة |
+| 8 | إيقاف TalkBack | السحب اللمسي العادي يعمل (`userScrollEnabled = true`) والنقر المزدوج للتشغيل سليم |
+
+## 7. المخاطر الموثّقة (إلزامية القراءة للمنفِّذ)
+
+| # | الخطر | التخفيف |
+|---|-------|---------|
+| R1 | طلب System Focus قد لا يسحب معه Accessibility Focus الخاص بـ TalkBack على كل إصدارات أندرويد/TalkBack؛ عندها يعيد TalkBack الاستقرار على موضع افتراضي بعد قلب الصفحة | آلية `onGloballyPositioned` تضمن عدم الانهيار على الأقل؛ يُقيَّم السلوك فعلياً في البند اليدوي #2/#4. إن كان غير مقبول منتجياً، يُرفع تقرير لصاحب المنتج — **ممنوع إضافة حل بديل (customActions/إعلانات/Anchors) دون موافقته** |
+| R2 | السحب بإصبع واحد لا يقلب الصفحات (الصفحات المجاورة غير مُركَّبة افتراضياً) — سلوك متوقَّع ومقبول وفق D1؛ التقليب عبر إيماءات التمرير (إصبعان / يمين-ثم-يسار) | موثّق هنا فقط؛ ممنوع "إصلاحه" بإعادة Anchors أو تغيير `beyondViewportPageCount` دون موافقة |
+| R3 | حلقة تغذية مرتدة بين مزامنتي الـ Pager والـ ViewModel | الحارسان الموجودان يبقيان؛ T2 يتحقق آلياً |
+| R4 | `goToAyah` قد لا يكون آمناً للدخول المتكرر أثناء تقليبات سريعة مع تحميل صوت | يُتحقق في البند اليدوي #4 وT3؛ إن وُجد خلل في الـ ViewModel يُوثَّق ويُرفع — **لا يُعدَّل الـ ViewModel ضمن هذه المهمة** |
+
+## 8. تعريف الإنجاز (Definition of Done)
+
+- [ ] `SilentAccessiblePager` محذوف كلياً ولا يوجد أي مرجع له.
+- [ ] مسار واحد: `HorizontalPager` بـ `userScrollEnabled = true` لجميع المستخدمين.
+- [ ] تأمين الفوكس عبر `settledPage` + `onGloballyPositioned`، TalkBack فقط.
+- [ ] صفر `stateDescription`/`customActions`/نصوص منطوقة جديدة.
+- [ ] `compileDebugKotlin` نظيف + صفر استيرادات ميتة.
+- [ ] T1–T4 خضراء.
+- [ ] بنود التحقق اليدوي 1–8 موقّعة على جهاز حقيقي مع TalkBack.
+
+

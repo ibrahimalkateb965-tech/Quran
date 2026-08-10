@@ -305,11 +305,32 @@
     - المشكلة: انهيار التطبيق بـ NullPointerException عند الضغط على زر الرجوع من قائمة الآيات، بسبب تعيين الحالة إلى null بينما لا يزال `LazyColumn` يحاول إعادة بناء عناصره بناءً على حالة قديمة. (تسريب مرجعي).
     - الحل: تطبيق نمط (Snapshot Capture) بالتقاط قيمة المتغير الثابتة قبل الـ if-condition (`val currentSurah = selectedSurahForAyahs`) واستخدامه لتهيئة الـ LazyColumn وتجنب أي استخدام لـ `!!` مع State متغيرة داخل دالة التكوين.
 
-</div>
+- id: MEM-2026-08-10-004
+  type: lesson
+  timestamp: "2026-08-10T20:30:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "إصلاحات قارئ الشاشة والسحب الأفقي"
+  content: "تم إزالة تعديل الفاصلة (,) من AyahCard لمنع TalkBack من قراءة 'comma page'. كما تم إعادة الاعتماد على currentPage بدلاً من settledPage في مكون HorizontalPager مع إضافة متغير isProgrammaticScroll لتجنب تأخير تزامن الصوت عند التمرير الأفقي."
+  tags: [accessibility, talkback, bug-fix, horizontal-pager]
+  status: active
 
-- **MEM-2026-08-10-004:** إصلاحات قارئ الشاشة والسحب الأفقي: تم إزالة تعديل الفاصلة (,) من AyahCard لمنع TalkBack من قراءة 'comma page'. كما تم إعادة الاعتماد على currentPage بدلاً من settledPage في مكون HorizontalPager مع إضافة متغير isProgrammaticScroll لتجنب تأخير تزامن الصوت عند التمرير الأفقي.
+- id: MEM-2026-08-11-001
+  type: lesson
+  timestamp: "2026-08-11T00:05:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "إصلاح انهيار التطبيق (NPE) داخل LazyColumn"
+  content: "تم تطبيق حل Snapshot Capture لحماية القوائم الكسولة في Jetpack Compose من استثناءات NullPointer الناتجة عن التفريغ السريع للمتغيرات المشتركة."
+  tags: [compose, lazycolumn, bug-fix, state]
+  status: active
 
-- **MEM-2026-08-11-001:** تم تطبيق حل Snapshot Capture لحماية القوائم الكسولة في Jetpack Compose من استثناءات NullPointer الناتجة عن التفريغ السريع للمتغيرات المشتركة.
-
-</div>
+- id: MEM-2026-08-11-002
+  type: lesson
+  timestamp: "2026-08-11T00:25:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "تخصيص ترتيب البيانات الثابتة وتجاوز الفرز الافتراضي (Custom Sorting Override)"
+  content: "لتطبيق فرز مخصص يطلبه المستخدم ويخالف الترتيب الأبجدي أو الافتراضي، الأفضل تطبيق نظام (أوزان مخصصة Custom Weights) باستخدام قائمة `indexOf` واسترجاع رقم أولوية (Priority). وللحفاظ على أي بيانات إضافية خارج القائمة المخصصة، يتم إعطاؤها وزناً كبيراً (مثل 999) لضمان إلحاقها دائماً في النهاية دون حذفها."
+  tags: [kotlin, sorting, architecture, custom-logic]
+  status: active
 ```
+
+</div>

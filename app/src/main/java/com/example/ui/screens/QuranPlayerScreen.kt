@@ -252,19 +252,27 @@ fun QuranPlayerScreen(
                             initialPage = currentAyahIndex,
                             pageCount = { ayahs.size }
                         )
+                        var isProgrammaticScroll by remember { mutableStateOf(false) }
+
                         // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
                         LaunchedEffect(currentAyahIndex) {
                             val target = currentAyahIndex
                             if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
-                                pagerState.animateScrollToPage(target)
+                                isProgrammaticScroll = true
+                                try {
+                                    pagerState.animateScrollToPage(target)
+                                } finally {
+                                    isProgrammaticScroll = false
+                                }
                             }
                         }
 
                         // Sync Pager state to ViewModel (when user swipes)
                         LaunchedEffect(pagerState) {
-                            snapshotFlow { pagerState.settledPage }
+                            snapshotFlow { pagerState.currentPage }
                                 .distinctUntilChanged()
                                 .collect { page ->
+                                    if (isProgrammaticScroll) return@collect
                                     val currentState = viewModel.playbackUiState.value
                                     val currentIndex = currentState.currentAyahIndex
                                     if (page != currentIndex && page in currentState.currentAyahs.indices) {

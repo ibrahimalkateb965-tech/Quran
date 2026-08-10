@@ -62,9 +62,6 @@ fun AyahCard(
     Card(
         modifier = modifier
             .fillMaxSize()
-            .clearAndSetSemantics { 
-                contentDescription = ","
-            }
             .blindAccessibleClickable(
                 onClickLabel = "", // إفراغ النص لمنع نطق TalkBack الافتراضي بالإنجليزية
                 onLongClickLabel = "",

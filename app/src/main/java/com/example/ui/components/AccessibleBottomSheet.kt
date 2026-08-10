@@ -39,22 +39,15 @@ fun AccessibleBottomSheet(
     onDismiss: () -> Unit,
     onAnnounce: (String) -> Unit,
     dismissLabel: String = "إغلاق النافذة",
-    navigationIcon: (@Composable () -> Unit)? = null,
     headerContent: (@Composable () -> Unit)? = null,
     showCloseButton: Boolean = true,
-    onBackPress: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismiss)
     val currentOnAnnounce by rememberUpdatedState(onAnnounce)
-    val currentOnBackPress by rememberUpdatedState(onBackPress)
 
     BackHandler {
-        if (currentOnBackPress != null) {
-            currentOnBackPress?.invoke()
-        } else {
-            currentOnDismiss()
-        }
+        currentOnDismiss()
     }
 
     Surface(
@@ -84,10 +77,6 @@ fun AccessibleBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (navigationIcon != null) {
-                        navigationIcon()
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
                     Text(
                         text = title,
                         style = MaterialTheme.typography.headlineLarge,

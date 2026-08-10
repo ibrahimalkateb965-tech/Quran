@@ -68,28 +68,26 @@ fun SurahIndexSheet(
     var selectedSurahForAyahs by remember { mutableStateOf<Surah?>(null) }
     val surahListState = rememberLazyListState()
     val ayahListState = rememberLazyListState()
-    val keyboardController = LocalSoftwareKeyboardController.current
+
+    val currentSurah = selectedSurahForAyahs
+
+    if (currentSurah != null) {
+        BackHandler {
+            selectedSurahForAyahs = null
+            onAnnounce("تم العودة لقائمة السور")
+        }
+    }
 
     AccessibleBottomSheet(
-        title = if (selectedSurahForAyahs != null) "سورة ${selectedSurahForAyahs!!.nameArabic} ( اختيار الآية )" else "اختيار السورة (114 سورة)",
-        contentDescriptionText = if (selectedSurahForAyahs != null) "قائمة آيات سورة ${selectedSurahForAyahs!!.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
+        title = if (currentSurah != null) "سورة ${currentSurah.nameArabic} ( اختيار الآية )" else "اختيار السورة (114 سورة)",
+        contentDescriptionText = if (currentSurah != null) "قائمة آيات سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
-        navigationIcon = null,
         headerContent = null,
-        showCloseButton = true,
-        onBackPress = {
-            keyboardController?.hide()
-            if (selectedSurahForAyahs != null) {
-                selectedSurahForAyahs = null
-                onAnnounce("تم العودة لقائمة السور")
-            } else {
-                onDismiss()
-            }
-        }
+        showCloseButton = true
     ) {
-            LaunchedEffect(currentSurahId, selectedSurahForAyahs) {
-                if (selectedSurahForAyahs == null && currentSurahId != null) {
+            LaunchedEffect(currentSurahId, currentSurah) {
+                if (currentSurah == null && currentSurahId != null) {
                     // الفهرس هو (id - 1) لأن المعرفات تبدأ من 1.
                     // نطرح 3 إضافية لنجعل العنصر قريباً من منتصف الشاشة.
                     val targetIndex = maxOf(0, currentSurahId - 1 - 3)
@@ -97,9 +95,9 @@ fun SurahIndexSheet(
                 }
             }
 
-            LaunchedEffect(selectedSurahForAyahs) {
-                if (selectedSurahForAyahs != null) {
-                    if (selectedSurahForAyahs!!.id == currentSurahId && currentAyahIndex > 0) {
+            LaunchedEffect(currentSurah) {
+                if (currentSurah != null) {
+                    if (currentSurah.id == currentSurahId && currentAyahIndex > 0) {
                         ayahListState.scrollToItem(currentAyahIndex)
                     } else {
                         ayahListState.scrollToItem(0)
@@ -109,13 +107,13 @@ fun SurahIndexSheet(
 
             // تم نقل نظام اعتراض التراجع إلى onBackPress في AccessibleBottomSheet
 
-            if (selectedSurahForAyahs != null) {
+            if (currentSurah != null) {
                 LazyColumn(
                     state = ayahListState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    val count = selectedSurahForAyahs!!.ayahCount
+                    val count = currentSurah.ayahCount
                     items(count, key = { it }) { index ->
                         val ayahNumber = index + 1
                         Card(
@@ -124,7 +122,7 @@ fun SurahIndexSheet(
                                 .height(64.dp)
                                 .blindAccessibleClickable(
                                     onClickLabel = "تشغيل من الآية $ayahNumber",
-                                    onClick = { onSelectSurah(selectedSurahForAyahs!!.id, index) }
+                                    onClick = { onSelectSurah(currentSurah.id, index) }
                                 )
                                 .semantics {
                                     contentDescription = "الآية $ayahNumber. انقر مرتين للتشغيل من هذه الآية."
@@ -166,7 +164,6 @@ fun SurahIndexSheet(
                                 .blindAccessibleClickable(
                                     onClickLabel = "عرض آيات سورة ${surah.nameArabic}",
                                     onClick = { 
-                                        keyboardController?.hide()
                                         selectedSurahForAyahs = surah 
                                     }
                                 )

@@ -26,6 +26,30 @@ data class Reciter(
                 .replace(" قراءة ورش", "")
         }
 
+        private val customOrder = listOf(
+            "ابراهيم الأخضر",
+            "ابراهيم الدوسري",
+            "أحمد نعينع",
+            "أحمد خليل شاهين",
+            "أكرم العلقمي",
+            "خليفة الطنيجي",
+            "عبدالباسط عبد الصمد",
+            "عبدالرحمن الحذيفي",
+            "محمد أيوب",
+            "محمد صديق المنشاوي",
+            "محمود علي البنا",
+            "محمد جبريل",
+            "محمد الطبلاوي",
+            "محمود خليل الحصري",
+            "ياسر سلامة"
+        )
+
+        private fun getCustomOrderPriority(name: String): Int {
+            val baseName = getBaseName(name)
+            val index = customOrder.indexOf(baseName)
+            return if (index != -1) index else 999
+        }
+
         val DEFAULT_RECITERS = listOf(
             Reciter("akhdar", "ابراهيم الأخضر", "Ibrahim Akhdar", "${BASE_URL}Ibrahim_Akhdar_32kbps/"),
             Reciter("aldosary", "ابراهيم الدوسري قراءة ورش", "Ibrahim Aldosary", "${BASE_URL}warsh_ibrahim_aldosary_128kbps/"),
@@ -47,6 +71,6 @@ data class Reciter(
             Reciter("husary_muallim", "محمود خليل الحصري معلم", "Mahmoud Khalil Al-Husary Muallim", "${BASE_URL}Husary_Muallim_128kbps/"),
             Reciter("albanna", "محمود علي البنا", "Mahmoud Ali Al-Banna", "${BASE_URL}mahmoud_ali_al_banna_32kbps/"),
             Reciter("salamah", "ياسر سلامة", "Yaser Salamah", "${BASE_URL}Yaser_Salamah_128kbps/")
-        ).sortedWith(compareBy({ getBaseName(it.nameArabic) }, { getTypePriority(it.nameArabic) }))
+        ).sortedWith(compareBy({ getCustomOrderPriority(it.nameArabic) }, { getTypePriority(it.nameArabic) }))
     }
 }

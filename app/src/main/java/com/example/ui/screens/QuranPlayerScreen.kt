@@ -74,6 +74,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
@@ -93,8 +94,16 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.scrollBy
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.ScrollAxisRange
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.horizontalScrollAxisRange
 import com.example.ui.components.player.buildPlayerStatusDescription
 import com.example.ui.components.player.playerGestureHints
 import androidx.compose.ui.text.font.FontWeight
@@ -150,6 +159,7 @@ fun QuranPlayerScreen(
         LocalTalkBackEnabled provides isTalkBackEnabled
     ) {
         // Optimize Recomposition by breaking down the monolithic State using derivedStateOf
+        val scope = rememberCoroutineScope()
         val activeSurah by remember { derivedStateOf { playbackUiState.currentSurah } }
         val ayahs by remember { derivedStateOf { playbackUiState.currentAyahs } }
         val currentAyahIndex by remember { derivedStateOf { playbackUiState.currentAyahIndex } }
@@ -281,20 +291,48 @@ fun QuranPlayerScreen(
                                 }
                         }
 
-                        val ayahFocusRequester = remember { FocusRequester() }
-                        var ayahFocusPending by remember { mutableStateOf(false) }
-
-                        LaunchedEffect(pagerState.settledPage, isTalkBackEnabled) {
-                            if (isTalkBackEnabled && ayahs.isNotEmpty()) {
-                                ayahFocusPending = true
-                            }
-                        }
 
                         // Standard Pager for all users (sighted and blind)
+                        // Stealth Box: Wraps the pager to obliterate its native semantics when TalkBack is ON.
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .then(
+                                    if (isTalkBackEnabled) {
+                                        Modifier.clearAndSetSemantics {
+                                            contentDescription = "\u00A0" // صمت تام
+                                            
+                                            // 1. Play/Pause (كانت على الكارت)
+                                            onClick(label = "") {
+                                                viewModel.togglePlayback()
+                                                true
+                                            }
+                                            
+                                            // 2. Replay (كانت CustomAction في الكارت)
+                                            customActions = listOf(
+                                                androidx.compose.ui.semantics.CustomAccessibilityAction("إعادة التلاوة") {
+                                                    viewModel.replayCurrentAyah()
+                                                    true
+                                                }
+                                            )
+                                            
+                                            // 3. دعم تقليب الصفحات بالسحب بإصبعين
+                                            scrollBy(
+                                                action = { x: Float, y: Float ->
+                                                    scope.launch {
+                                                        if (x > 0f && pagerState.currentPage > 0) {
+                                                            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                                        } else if (x < 0f && pagerState.currentPage < ayahs.size - 1) {
+                                                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                                        }
+                                                    }
+                                                    true
+                                                }
+                                            )
+                                        }
+                                    } else Modifier
+                                )
                         ) {
                             HorizontalPager(
                                 state = pagerState,
@@ -318,18 +356,7 @@ fun QuranPlayerScreen(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                .then(
-                                                    if (page == currentAyahIndex) {
-                                                        Modifier
-                                                            .focusRequester(ayahFocusRequester)
-                                                            .onGloballyPositioned {
-                                                                if (ayahFocusPending) {
-                                                                    ayahFocusPending = false
-                                                                    ayahFocusRequester.requestFocus()
-                                                                }
-                                                            }
-                                                    } else Modifier
-                                                )
+
                                         )
                                     }
                                 }

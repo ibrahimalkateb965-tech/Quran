@@ -359,7 +359,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun togglePlayback() {
-        if (mediaController?.isPlaying == true) {
+        if (mediaController?.playWhenReady == true) {
             mediaController?.pause()
             performAction("تم الإيقاف المؤقت", HapticType.DOUBLE_TAP)
         } else {
@@ -373,16 +373,9 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun pausePlayback() {
-        if (mediaController?.isPlaying == true) {
-            mediaController?.pause()
-        }
+        mediaController?.pause()
     }
 
-    fun resumePlayback() {
-        if (mediaController?.isPlaying == false) {
-            mediaController?.play()
-        }
-    }
 
     fun replayCurrentAyah() {
         val state = _playbackUiState.value

@@ -70,9 +70,6 @@ class MainActivity : ComponentActivity() {
                             Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
                                 viewModel.pausePlayback()
                             }
-                            Lifecycle.Event.ON_START -> {
-                                viewModel.resumePlayback()
-                            }
                             else -> {}
                         }
                     }

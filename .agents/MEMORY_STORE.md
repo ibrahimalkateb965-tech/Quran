@@ -331,6 +331,32 @@
   content: "لتطبيق فرز مخصص يطلبه المستخدم ويخالف الترتيب الأبجدي أو الافتراضي، الأفضل تطبيق نظام (أوزان مخصصة Custom Weights) باستخدام قائمة `indexOf` واسترجاع رقم أولوية (Priority). وللحفاظ على أي بيانات إضافية خارج القائمة المخصصة، يتم إعطاؤها وزناً كبيراً (مثل 999) لضمان إلحاقها دائماً في النهاية دون حذفها."
   tags: [kotlin, sorting, architecture, custom-logic]
   status: active
+- id: MEM-2026-08-11-003
+  type: lesson
+  timestamp: "2026-08-11T12:00:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "إسكات حاويات التمرير (Pagers) تماماً مع الاحتفاظ بآلية السحب والنقر للمكفوفين (Stealth Box Pattern)"
+  content: "إذا كان عنصر التمرير (مثل HorizontalPager) يطلق إعلانات تلقائية مزعجة (مثل 'Page...') ولا يمكن إسكاته بالطرق العادية، يجب استخدام نمط (Stealth Box). يتم تغليف العنصر بـ Box مع تطبيق modifier `clearAndSetSemantics` لإلغاء جميع الدلالات الأصلية. ثم يتم بناء الدلالات المطلوبة (مثل onClick و customActions و scrollBy) يدوياً داخل هذا الـ Box. هذا يوفر 'ثقباً أسود' يبتلع إعلانات المكون الأصلي ويسمح بالتحكم الكامل في الـ Accessibility دون كسر واجهة المستخدم أو التفرع الشجري (Dual-Mode Architecture)."
+  tags: [accessibility, talkback, compose, stealth-box, dual-mode, bug-fix, global]
+  status: active
+- id: MEM-2026-08-11-004
+  type: lesson
+  timestamp: "2026-08-11T13:30:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "منع الاستئناف التلقائي للصوت عند تغير دورة الحياة (Screen Off/TalkBack)"
+  content: "لا يجب بناء آلية لاستئناف الصوت التلقائي `resumePlayback` مرتبطة بأحداث دورة الحياة مثل `ON_START` في تطبيقات الصوتيات الموجهة للمكفوفين (أو بشكل عام). والسبب أن تفعيل TalkBack واستجابته لغلق الشاشة قد يُرسل دورة حياة سريعة لتطبيقات الخلفية مما يتسبب في تشغيل مفاجئ ومزعج للصوت. الاستئناف يجب أن يكون دائماً قراراً واعياً يتخذه المستخدم بضغط زر (التشغيل)."
+  tags: [accessibility, talkback, lifecycle, media-playback, bug-fix]
+  status: active
+- id: MEM-2026-08-11-005
+  type: lesson
+  timestamp: "2026-08-11T13:46:00+03:00"
+  agents: [persistent-memory-engine, debugger]
+  context: "منع ExoPlayer من الاستئناف التلقائي المزعج بسبب تداخل TalkBack مع AudioFocus"
+  content: "عند تفعيل `setHandleAudioBecomingNoisy(true)` و `setAudioAttributes(.., true)` في ExoPlayer، فإنه يقوم بإيقاف التشغيل مؤقتاً عند فقدان التركيز الصوتي (مثل نطق TalkBack 'شاشة مغلقة' عند إقفال الجهاز) ثم **يستأنف تلقائياً** عند عودة التركيز. المشكلة تحدث إذا حاول التطبيق إيقاف الصوت يدوياً (مثلاً في `ON_STOP`) باستخدام شرط `if (mediaController?.isPlaying == true)`؛ لأن حالة `isPlaying` ستكون `false` (بسبب فقدان التركيز المؤقت لـ TalkBack)، وبالتالي يتم تخطي أمر الإيقاف اليدوي، ويبقى `playWhenReady` صحيحاً، مما يسبب عودة الصوت فجأة والشاشة مغلقة! **الحل:** يجب أن يكون الإيقاف اليدوي `pause()` غير مشروط، أو يعتمد على `playWhenReady` بدلاً من `isPlaying`، لضمان تسجيل أمر الإيقاف بغض النظر عن التركيز الصوتي الحالي."
+  tags: [accessibility, talkback, exoplayer, audio-focus, bug-fix, global]
+  status: active
 ```
 
 </div>
+ 
+ 

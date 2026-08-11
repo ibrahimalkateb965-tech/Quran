@@ -2,6 +2,7 @@ package com.example.ui.components.player
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +44,7 @@ import com.example.ui.components.blindAccessibleClickable
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.example.accessibility.LocalTalkBackEnabled
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -58,15 +64,28 @@ fun AyahCard(
     val borderColor = if (isCurrent) AccessibleGold else DarkImmersiveBorder
     val bgColor = if (isCurrent) DarkImmersiveSurface else DarkImmersiveCard
     val elevation = if (isCurrent) 8.dp else 2.dp
+    val isTalkBackEnabled = LocalTalkBackEnabled.current
+    
+    val semanticsModifier = if (isTalkBackEnabled) {
+        Modifier.clearAndSetSemantics { 
+            // إدراج مسافة غير مرئية (Non-breaking space) لمنع النطق تماماً
+            contentDescription = "\u00A0"
+            stateDescription = ""
+        }
+    } else {
+        Modifier
+    }
     
     Card(
         modifier = modifier
             .fillMaxSize()
-            .blindAccessibleClickable(
-                onClickLabel = "", // إفراغ النص لمنع نطق TalkBack الافتراضي بالإنجليزية
-                onLongClickLabel = "",
-                onClick = onClick,
-                onLongClick = onDoubleTap
+            .then(semanticsModifier)
+            .then(
+                if (isTalkBackEnabled) Modifier
+                else Modifier.combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onDoubleTap
+                )
             ),
         colors = CardDefaults.cardColors(containerColor = bgColor),
         shape = RoundedCornerShape(20.dp),

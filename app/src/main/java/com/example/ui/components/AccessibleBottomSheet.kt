@@ -29,8 +29,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.example.ui.theme.AccessibleGold
-import com.example.ui.theme.DarkImmersiveBg
+import com.example.ui.theme.WarmEarthBg
+import com.example.ui.theme.WarmTextPrimary
 
 @Composable
 fun AccessibleBottomSheet(
@@ -40,7 +40,8 @@ fun AccessibleBottomSheet(
     onAnnounce: (String) -> Unit,
     dismissLabel: String = "إغلاق النافذة",
     headerContent: (@Composable () -> Unit)? = null,
-    showCloseButton: Boolean = true,
+    titleContent: (@Composable () -> Unit)? = null,
+    showCloseButton: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -62,7 +63,7 @@ fun AccessibleBottomSheet(
                     }
                 )
             },
-        color = DarkImmersiveBg
+        color = WarmEarthBg
     ) {
         Column(
             modifier = Modifier
@@ -77,15 +78,19 @@ fun AccessibleBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = AccessibleGold,
-                        modifier = Modifier.semantics {
-                            contentDescription = contentDescriptionText
-                            heading()
-                        }
-                    )
+                    if (titleContent != null) {
+                        titleContent()
+                    } else {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = WarmTextPrimary,
+                            modifier = Modifier.semantics {
+                                contentDescription = contentDescriptionText
+                                heading()
+                            }
+                        )
+                    }
                 }
 
                 if (showCloseButton) {
@@ -99,7 +104,7 @@ fun AccessibleBottomSheet(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = dismissLabel,
-                            tint = AccessibleGold
+                            tint = WarmTextPrimary
                         )
                     }
                 }

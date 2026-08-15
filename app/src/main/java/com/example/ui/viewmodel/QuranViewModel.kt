@@ -41,7 +41,8 @@ data class PlaybackUiState(
     val isPlaying: Boolean = false,
     val isLoadingAudio: Boolean = false,
     val currentLoopCount: Int = 1,
-    val continuousPlayStartIndex: Int? = null
+    val continuousPlayStartIndex: Int? = null,
+    val playbackProgress: Float = 0f
 )
 
 data class SettingsUiState(
@@ -120,6 +121,32 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
+    private var progressJob: kotlinx.coroutines.Job? = null
+
+    private fun startProgressTracking() {
+        progressJob?.cancel()
+        progressJob = viewModelScope.launch {
+            while (true) {
+                val controller = mediaController
+                if (controller != null && controller.isPlaying) {
+                    val currentPos = controller.currentPosition
+                    val dur = controller.duration
+                    val prog = if (dur > 0L) (currentPos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
+                    _playbackUiState.update { it.copy(playbackProgress = prog) }
+                }
+                delay(60L)
+            }
+        }
+    }
+
+    private fun stopProgressTracking(resetProgress: Boolean = false) {
+        progressJob?.cancel()
+        progressJob = null
+        if (resetProgress) {
+            _playbackUiState.update { it.copy(playbackProgress = 0f) }
+        }
+    }
+
     init {
         viewModelScope.launch {
             _isTrialExpired.value = TrialManager.getInstance(application).isTrialExpired()
@@ -136,6 +163,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     _playbackUiState.update { it.copy(isPlaying = isPlaying) }
                     if (isPlaying) {
+                        startProgressTracking()
                         pendingAyahAnnouncement?.let { msg ->
                             pendingAyahAnnouncement = null
                             viewModelScope.launch { delay(400); announce(msg) }
@@ -146,6 +174,8 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                             haptic.vibrateNetworkRecovery()
                             announce("عاد الاتصال بالإنترنت، جاري مواصلة التلاوة")
                         }
+                    } else {
+                        stopProgressTracking()
                     }
                 }
 
@@ -176,7 +206,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                                 val currentAyahs = _playbackUiState.value.currentAyahs
                                 val newIndex = currentAyahs.indexOfFirst { it.surahId == surahId && it.numberInSurah == ayahNumber }
                                 if (newIndex != -1 && newIndex != _playbackUiState.value.currentAyahIndex) {
-                                    _playbackUiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1) }
+                                    _playbackUiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1, playbackProgress = 0f) }
                                     viewModelScope.launch {
                                         val bookmarked = repository.isBookmarked(surahId, ayahNumber)
                                         _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
@@ -355,16 +385,25 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
         if (_settingsUiState.value.isContinuousPlayEnabled) {
             goToAyah(playbackState.currentAyahIndex + 1, autoPlay = true, isManual = false)
+        } else {
+            mediaController?.pause()
+            _playbackUiState.update { it.copy(isPlaying = false) }
         }
     }
 
     fun togglePlayback() {
-        if (mediaController?.playWhenReady == true) {
+        if (mediaController?.playWhenReady == true && mediaController?.isPlaying == true) {
             mediaController?.pause()
             performAction("تم الإيقاف المؤقت", HapticType.DOUBLE_TAP)
         } else {
-            if (mediaController?.playbackState == Player.STATE_ENDED) {
+            val ayahs = _playbackUiState.value.currentAyahs
+            val index = _playbackUiState.value.currentAyahIndex
+            val activeAyah = ayahs.getOrNull(index)
+            val currentLoadedUri = mediaController?.currentMediaItem?.localConfiguration?.uri?.toString()
+
+            if (activeAyah != null && (currentLoadedUri == null || currentLoadedUri != activeAyah.audioUrl || mediaController?.playbackState == Player.STATE_ENDED || mediaController?.playbackState == Player.STATE_IDLE)) {
                 playCurrentAyah()
+                performAction("جاري التشغيل", HapticType.DOUBLE_TAP)
             } else {
                 mediaController?.play()
                 performAction("جاري التشغيل", HapticType.DOUBLE_TAP)
@@ -390,8 +429,36 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         if (next) {
             _playbackUiState.update { it.copy(continuousPlayStartIndex = it.currentAyahIndex) }
             performAction("وضع الاستماع المتواصل مفعّل", HapticType.CLICK, forceSpeak = forceSpeak)
+            mediaController?.let { controller ->
+                if (controller.playbackState != Player.STATE_IDLE && controller.playbackState != Player.STATE_ENDED) {
+                    val ayahs = _playbackUiState.value.currentAyahs
+                    val index = _playbackUiState.value.currentAyahIndex
+                    val repeatMode = _settingsUiState.value.tarkizRepeatMode
+                    if (repeatMode <= 1 && index + 1 < ayahs.size) {
+                        val mediaItemsToAdd = ayahs.drop(index + 1).map { ayah ->
+                            MediaItem.Builder()
+                                .setUri(ayah.audioUrl)
+                                .setMediaId("${ayah.surahId}_${ayah.numberInSurah}")
+                                .build()
+                        }
+                        val currentItemIndex = controller.currentMediaItemIndex
+                        if (currentItemIndex != -1) {
+                            if (controller.mediaItemCount > currentItemIndex + 1) {
+                                controller.removeMediaItems(currentItemIndex + 1, controller.mediaItemCount)
+                            }
+                            controller.addMediaItems(currentItemIndex + 1, mediaItemsToAdd)
+                        }
+                    }
+                }
+            }
         } else {
             performAction("تم إيقاف الاستماع المتواصل", HapticType.CLICK, forceSpeak = forceSpeak)
+            mediaController?.let { controller ->
+                val currentItemIndex = controller.currentMediaItemIndex
+                if (currentItemIndex != -1 && controller.mediaItemCount > currentItemIndex + 1) {
+                    controller.removeMediaItems(currentItemIndex + 1, controller.mediaItemCount)
+                }
+            }
         }
     }
 
@@ -425,7 +492,8 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 currentAyahIndex = index,
                 currentLoopCount = 1,
-                continuousPlayStartIndex = if (isManual) index else it.continuousPlayStartIndex
+                continuousPlayStartIndex = if (isManual) index else it.continuousPlayStartIndex,
+                playbackProgress = 0f
             )
         }
         val ayah = state.currentAyahs[index]
@@ -508,7 +576,9 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             performAction("تم تغيير القارئ إلى ${reciter.nameArabic}", HapticType.CLICK)
             val surah = _playbackUiState.value.currentSurah
             if (surah != null) {
-                loadSurah(surah.id, _playbackUiState.value.currentAyahIndex, autoPlay = _playbackUiState.value.isPlaying)
+                mediaController?.stop()
+                mediaController?.clearMediaItems()
+                loadSurah(surah.id, _playbackUiState.value.currentAyahIndex, autoPlay = true)
             }
         }
     }
@@ -644,21 +714,45 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleSurahIndex(show: Boolean) {
         performAction("", HapticType.CLICK)
+        if (show) {
+            if (mediaController?.isPlaying == true) {
+                mediaController?.pause()
+            }
+            _playbackUiState.update { it.copy(isLoadingAudio = false) }
+        }
         _dialogUiState.update { it.copy(showSurahIndex = show) }
     }
 
     fun toggleBookmarksSheet(show: Boolean) {
         performAction("", HapticType.CLICK)
+        if (show) {
+            if (mediaController?.isPlaying == true) {
+                mediaController?.pause()
+            }
+            _playbackUiState.update { it.copy(isLoadingAudio = false) }
+        }
         _dialogUiState.update { it.copy(showBookmarksSheet = show) }
     }
 
     fun toggleReciterDialog(show: Boolean) {
         performAction("", HapticType.CLICK)
+        if (show) {
+            if (mediaController?.isPlaying == true) {
+                mediaController?.pause()
+            }
+            _playbackUiState.update { it.copy(isLoadingAudio = false) }
+        }
         _dialogUiState.update { it.copy(showReciterDialog = show) }
     }
 
     fun toggleHelpDialog(show: Boolean) {
         performAction("", HapticType.CLICK)
+        if (show) {
+            if (mediaController?.isPlaying == true) {
+                mediaController?.pause()
+            }
+            _playbackUiState.update { it.copy(isLoadingAudio = false) }
+        }
         _dialogUiState.update { it.copy(showHelpDialog = show) }
     }
 
@@ -736,6 +830,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        stopProgressTracking(resetProgress = true)
         isControllerReleased = true
         networkRetryJob?.cancel()
         playerListener?.let { mediaController?.removeListener(it) }

@@ -22,8 +22,6 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.layout.size
 import com.example.ui.components.BlindAccessibleIconButton
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -48,13 +46,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Surah
-import com.example.ui.theme.AccessibleGold
-import com.example.ui.theme.DarkImmersiveBg
-import com.example.ui.theme.DarkImmersiveCard
-import com.example.ui.theme.DarkImmersiveSurface
-import com.example.ui.theme.DarkImmersiveBorder
-import com.example.ui.theme.TextPrimaryWhite
-import com.example.ui.components.blindAccessibleClickable
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import com.example.ui.theme.WarmAccentTerracotta
+import com.example.ui.theme.WarmAccentTerracottaBright
+import com.example.ui.theme.WarmCardActive
+import com.example.ui.theme.WarmCardLight
+import com.example.ui.theme.WarmTextLight
+import com.example.ui.theme.WarmTextPrimary
+import com.example.ui.theme.WarmTextSecondary
 
 @Composable
 fun SurahIndexSheet(
@@ -78,18 +79,47 @@ fun SurahIndexSheet(
         }
     }
 
+    val titleContent: @Composable () -> Unit = {
+        val annotatedTitle = if (currentSurah != null) {
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = WarmTextPrimary)) {
+                    append("سورة ${currentSurah.nameArabic} ")
+                }
+                withStyle(SpanStyle(color = WarmAccentTerracotta, fontSize = 20.sp)) {
+                    append("( اختيار الآية )")
+                }
+            }
+        } else {
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = WarmTextPrimary)) {
+                    append("اختيار السورة ")
+                }
+                withStyle(SpanStyle(color = WarmAccentTerracotta, fontSize = 20.sp)) {
+                    append("(114 سورة)")
+                }
+            }
+        }
+        Text(
+            text = annotatedTitle,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics {
+                contentDescription = if (currentSurah != null) "قائمة آيات سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة"
+            }
+        )
+    }
+
     AccessibleBottomSheet(
         title = if (currentSurah != null) "سورة ${currentSurah.nameArabic} ( اختيار الآية )" else "اختيار السورة (114 سورة)",
         contentDescriptionText = if (currentSurah != null) "قائمة آيات سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
         headerContent = null,
-        showCloseButton = true
+        titleContent = titleContent,
+        showCloseButton = false
     ) {
             LaunchedEffect(currentSurahId, currentSurah) {
                 if (currentSurah == null && currentSurahId != null) {
-                    // الفهرس هو (id - 1) لأن المعرفات تبدأ من 1.
-                    // نطرح 3 إضافية لنجعل العنصر قريباً من منتصف الشاشة.
                     val targetIndex = maxOf(0, currentSurahId - 1 - 3)
                     surahListState.scrollToItem(targetIndex)
                 }
@@ -105,8 +135,6 @@ fun SurahIndexSheet(
                 }
             }
 
-            // تم نقل نظام اعتراض التراجع إلى onBackPress في AccessibleBottomSheet
-
             if (currentSurah != null) {
                 LazyColumn(
                     state = ayahListState,
@@ -116,34 +144,15 @@ fun SurahIndexSheet(
                     val count = currentSurah.ayahCount
                     items(count, key = { it }) { index ->
                         val ayahNumber = index + 1
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp)
-                                .blindAccessibleClickable(
-                                    onClickLabel = "تشغيل من الآية $ayahNumber",
-                                    onClick = { onSelectSurah(currentSurah.id, index) }
-                                )
-                                .semantics {
-                                    contentDescription = "الآية $ayahNumber. انقر مرتين للتشغيل من هذه الآية."
-                                },
-                            colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 20.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Text(
-                                    text = "الآية $ayahNumber",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = TextPrimaryWhite,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                        val isCurrentAyahSelected = currentSurah.id == currentSurahId && index == currentAyahIndex
+                        AccessibleListItemCard(
+                            title = "الآية $ayahNumber",
+                            isSelected = isCurrentAyahSelected,
+                            onClickLabel = "تشغيل من الآية $ayahNumber",
+                            contentDescriptionText = "الآية $ayahNumber. ${if (isCurrentAyahSelected) "محددة حالياً. " else ""}انقر مرتين للتشغيل من هذه الآية.",
+                            onClick = { onSelectSurah(currentSurah.id, index) },
+                            cardHeight = 64.dp
+                        )
                     }
                 }
             } else {
@@ -157,77 +166,44 @@ fun SurahIndexSheet(
                 ) {
                     items(displaySurahs, key = { it.id }) { surah ->
                         val isSelected = surah.id == currentSurahId
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(72.dp)
-                                .blindAccessibleClickable(
-                                    onClickLabel = "عرض آيات سورة ${surah.nameArabic}",
-                                    onClick = { 
-                                        selectedSurahForAyahs = surah 
-                                    }
-                                )
-                                .semantics {
-                                    contentDescription = "سورة ${surah.nameArabic}. رقمها ${surah.id}. آياتها ${surah.ayahCount}. انقر مرتين لاختيار الآية."
+                        AccessibleListItemCard(
+                            title = "سورة ${surah.nameArabic}",
+                            subtitle = "${surah.revelationType} • ${surah.ayahCount} آية",
+                            isSelected = isSelected,
+                            onClickLabel = "عرض آيات سورة ${surah.nameArabic}",
+                            contentDescriptionText = "سورة ${surah.nameArabic}. رقمها ${surah.id}. آياتها ${surah.ayahCount}. انقر مرتين لاختيار الآية.",
+                            onClick = { selectedSurahForAyahs = surah },
+                            testTag = "surah_item_${surah.id}",
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .height(44.dp)
+                                        .width(44.dp)
+                                        .background(
+                                            if (isSelected) WarmAccentTerracotta else WarmCardActive,
+                                            shape = RoundedCornerShape(22.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${surah.id}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else WarmTextLight
+                                    )
                                 }
-                                .testTag("surah_item_${surah.id}"),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) DarkImmersiveSurface else DarkImmersiveCard
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .height(44.dp)
-                                            .width(44.dp)
-                                            .background(
-                                                if (isSelected) AccessibleGold else DarkImmersiveSurface,
-                                                shape = RoundedCornerShape(22.dp)
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${surah.id}",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = if (isSelected) DarkImmersiveBg else AccessibleGold
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(16.dp))
-
-                                    Column {
-                                        Text(
-                                            text = "سورة ${surah.nameArabic}",
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            color = if (isSelected) AccessibleGold else TextPrimaryWhite,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "${surah.revelationType} • ${surah.ayahCount} آية",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = Color.LightGray
-                                        )
-                                    }
-                                }
-
+                            },
+                            trailingContent = {
                                 if (isSelected) {
                                     Text(
                                         text = "مفتوحة الآن",
-                                        color = AccessibleGold,
+                                        color = WarmAccentTerracottaBright,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
                                 }
                             }
-                        }
+                        )
                     }
                 }
             }

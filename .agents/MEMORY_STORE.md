@@ -105,6 +105,14 @@
   content: "ميزة عالمية (Global Rule): يُمنع منعاً باتاً إعادة إضافة أي مكون واجهة مستخدم (UI Component) أو ميزة (Feature) تم حذفها مسبقاً (مثل شريط التشغيل PlayerControlPanel أو الأوامر الصوتية) إلا بطلب صريح ومباشر من المستخدم. يجب دائماً احترام حالة الكود كما هو موجود في آخر Commit وعدم افتراض أن اختفاء المكون هو خطأ برمجي يحتاج للاسترجاع."
   tags: [architecture, global, agent-behavior, ui-components]
   status: active
+- id: MEM-2026-08-13-002
+  type: lesson
+  timestamp: "2026-08-13T12:15:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "الفرض الإجباري لبرومبت 'محامي الشيطان' (Devil's Advocate Persona) على المستوى العالمي"
+  content: "لتجنب نسيان حلقة محامي الشيطان وتخطيها، يُفرض قسرياً على الوكيل عند بدء أي ميزة جديدة التوقف فور إنشاء الخطة المبدئية، واستدعاء شخصية 'Devil’s Advocate & Senior Staff Architect'. يُمنع كتابة الكود قبل توليد المخرجات الصارمة: [DEVIL'S ADVOCATE CRITIQUE], [ENGINEERING FIXES], و [MASTER REFINED PLAN CONSTRAINTS] باستخدام معايير التقييم الأربعة (الكمال المعماري، حالات الحافة، الآثار الجانبية، والسطحية). تم حقن هذا القيد في ACTIVE_CONTEXT_INJECTION."
+  tags: [architecture, global, devil-advocate, context-injection]
+  status: active
 ```
 
 ---
@@ -236,6 +244,16 @@
   context: "الحاجة إلى مزامنة الدروس المستفادة عبر كافة المشاريع المحلية في بيئة التطوير (IDE)."
   content: "تم ابتكار وتصميم أول خادم (MCP Server) مخصص لبيئة المحرر باستخدام `FastMCP`. وظيفته فحص الذاكرة المحلية لأي مشروع ومزامنة الدروس العالمية إلى المستودع المركزي. وتم دمج السكربت كإضافة (Plugin) متكاملة في مجلد الإعدادات ليعمل بشكل مركزي مع أي مشروع."
   tags: [mcp, architecture, memory, automation, global]
+  status: active
+
+- id: ADR-2026-08-13-003
+  type: decision
+  timestamp: "2026-08-13T15:38:00+03:00"
+  agents: [agent-optimizer, persistent-memory-engine, code-architect]
+  context: "منع تضخم نافذة السياق (Context Window Bloat) في ملف القواعد العالمي AGENTS.md"
+  content: "تطبيقاً لمبدأ فصل الاهتمامات، يُمنع حشو ملف AGENTS.md المركزي بالتفاصيل التقنية والبرومبتات الطويلة. بدلاً من ذلك، تُعزل هذه التفاصيل في ملف مستقل (ACTIVE_CONTEXT_INJECTION.md) داخل مجلد config العالمي، ويُضاف سطر واحد فقط في AGENTS.md يوجه الوكيل لقراءة هذا الملف قبل أي عملية برمجية. هذا يحافظ على تركيز النماذج ويقلل استهلاك الذاكرة."
+  tags: [architecture, global, context-window, optimization]
+  status: active
 ```
 
 ---
@@ -355,8 +373,76 @@
   content: "عند تفعيل `setHandleAudioBecomingNoisy(true)` و `setAudioAttributes(.., true)` في ExoPlayer، فإنه يقوم بإيقاف التشغيل مؤقتاً عند فقدان التركيز الصوتي (مثل نطق TalkBack 'شاشة مغلقة' عند إقفال الجهاز) ثم **يستأنف تلقائياً** عند عودة التركيز. المشكلة تحدث إذا حاول التطبيق إيقاف الصوت يدوياً (مثلاً في `ON_STOP`) باستخدام شرط `if (mediaController?.isPlaying == true)`؛ لأن حالة `isPlaying` ستكون `false` (بسبب فقدان التركيز المؤقت لـ TalkBack)، وبالتالي يتم تخطي أمر الإيقاف اليدوي، ويبقى `playWhenReady` صحيحاً، مما يسبب عودة الصوت فجأة والشاشة مغلقة! **الحل:** يجب أن يكون الإيقاف اليدوي `pause()` غير مشروط، أو يعتمد على `playWhenReady` بدلاً من `isPlaying`، لضمان تسجيل أمر الإيقاف بغض النظر عن التركيز الصوتي الحالي."
   tags: [accessibility, talkback, exoplayer, audio-focus, bug-fix, global]
   status: active
+
+- id: MEM-2026-08-11-006
+  type: tool-discovery
+  timestamp: "2026-08-11T15:45:00+03:00"
+  agents: [persistent-memory-engine, devops-deployer]
+  context: "إنقاذ القرص C من الامتلاء (من 950MB إلى 6GB)"
+  content: "عند معاناة المطورين من امتلاء القرص C الحرج بسبب حزم أندرويد، أفضل استراتيجية هي: 1. نقل مجلدات (gradle, avd, m2) إلى قرص آخر وربطها بروابط وهمية (Junctions - mklink /J) لتفادي كسر إعدادات Android Studio. 2. تنفيذ سكربت تنظيف متقدم لتعطيل السبات (powercfg -h off) وضغط النظام (compact /compactos:always) وتنظيف التحديثات بـ (DISM). يجب أن ينفذ السكربت كمسؤول يدوياً، ويجب إغلاق جميع عمليات java/gradle قبل النقل."
+  tags: [windows-optimization, junctions, gradle, avd, disk-space, global]
+  status: active
+
+- id: MEM-2026-08-13-001
+  type: lesson
+  timestamp: "2026-08-13T10:17:00+03:00"
+  agents: [persistent-memory-engine, code-architect, security-auditor]
+  context: "تنفيذ التمديد المخفي (Backdoor) وتجاوز صلاحيات الفترة التجريبية"
+  content: "عند بناء منافذ خلفية (Backdoors) للتطبيقات (مثل تمديد فترات تجريبية أو فتح مميزات نهائية للعملاء المباشرين)، يجب حماية الميزة بضمان الاستخدام لمرة واحدة (Single-Use). الاستراتيجية الأمثل محلياً: 1. تشفير الرموز بـ SHA-256 لتجنب الهندسة العكسية. 2. حفظ الرموز المستخدمة كـ Blacklist داخل EncryptedSharedPreferences. 3. ربط التفعيل بـ pointerInput للضغط المطول على عناصر غير متوقعة (كالأيقونات الجمالية). 4. توفير وصول موازي للمكفوفين عبر TalkBack باستخدام CustomAccessibilityAction بدلاً من حرمانهم أو تفعيلها بطريقة مرئية مكشوفة."
+  tags: [security, backdoor, compose, talkback, trial-extension]
+  status: active
+
+- id: MEM-2026-08-14-001
+  type: bug-fix
+  timestamp: "2026-08-14T23:50:00+03:00"
+  agents: [persistent-memory-engine, code-architect, code-reviewer-quality]
+  context: "تجنب استخدام المسافات غير المرئية (\\u00A0) أو الفواصل في contentDescription"
+  content: "عند محاولة إسكات عنصر في TalkBack، يُمنع وضع مسافات غير مرئية (مثل '\\u00A0' أو ' ') أو فواصل كـ contentDescription؛ لأن محركات النطق (Google TTS / Vocalizer) تقوم بنطقها حرفياً بصوت مسموع ('فاصلة' أو 'مسافة' أو 'Space'). الحل الصحيح: إما استخدام وصف دلالي واضح ومختصر (مثل 'الآية الحالية') أو الاعتماد على `clearAndSetSemantics { }` فارغة دون وضع أي محارف."
+  tags: [accessibility, talkback, tts, semantics, bug-fix, global]
+  status: active
+
+- id: MEM-2026-08-15-001
+  type: lesson
+  timestamp: "2026-08-15T00:02:00+03:00"
+  agents: [persistent-memory-engine, debugger, code-reviewer-quality]
+  context: "حماية استيرادات الحزم (Imports) عند تعديل كتل الكود المتجاورة"
+  content: "عند استبدال كتل الألوان أو السمات في ترويسة ملفات Kotlin، يجب الانتباه لعدم حذف استيرادات النماذج والواجهات الحيوية (مثل Reciter, Ayah, RoundedCornerShape). يُلزم الوكيل بفحص قائمة الاستيرادات في الملف بالكامل قبل حفظ التعديل.\n[ANTI-PATTERN AVOIDED]: التعديل السريع للترويسة دون مراجعة بقية الاستيرادات المعتمدة في الملف."
+  tags: [kotlin, imports, build-error, refactoring, quality]
+  status: active
+
+- id: MEM-2026-08-15-002
+  type: decision
+  timestamp: "2026-08-15T00:03:00+03:00"
+  agents: [persistent-memory-engine, code-architect, jetpack-compose-ui]
+  context: "اعتماد النمط الدافئ البيج الترابي (#B38A5F) ونظام الألوان المتسق وتخصيص إعلانات TalkBack"
+  content: "تم اعتماد نظام الألوان الدافئ الموحد: خلفية وكارت (#B38A5F)، نص الآية بالأسود الفحمي (#120C07) لوضوح التشكيل، إطارات (#8A653F) والأحمر الطوبي (#7C261E) للأرقام والتفعيل. مع تخصيص وصف كارت الآية لـ TalkBack ليعلن 'الآية [الرقم]' فقط، وحذف علامات (X) من كافة النوافذ، وإيقاف التلاوة فوراً عند فتح أي حوار.\n[ANTI-PATTERN AVOIDED]: استخدام ألوان عشوائية أو تشتيت الكفيف بتلاوة مستمرة أثناء فتح القوائم."
+  tags: [ui, theme, accessibility, talkback, architecture]
+  status: active
+- id: MEM-2026-08-15-003
+  type: bug-fix
+  timestamp: "2026-08-15T03:22:00+03:00"
+  agents: [persistent-memory-engine, code-architect, jetpack-compose-ui]
+  context: "ظهور دائرة سوداء غريبة (⦿) فوق ألف التفريق في بعض الآيات"
+  content: "سبب المشكلة الجذري لم يكن في النص، بل في ملف الخط (uthman_taha.ttf). كان الرمز (uni06DF) المخصص للصفر المستدير يشير بالخطأ إلى الوردة الكبيرة (uni0600). تم تصحيح الخط، وتم استبدال (uni06DF) بـ (uni06E0) وقائياً في دوال التعقيم (sanitizeUthmanicText). بالإضافة إلى ذلك، تم توحيد التصميم بإضافة كارت (SurahNameCard) مطابق لنمط كارت رقم الآية للحفاظ على التناسق البصري."
+  tags: [typography, font-rendering, bug-fix, compose-ui, global]
+  status: active
+- id: MEM-2026-08-15-004
+  type: lesson
+  timestamp: "2026-08-15T03:25:00+03:00"
+  agents: [persistent-memory-engine, code-architect]
+  context: "إلغاء تلوين الكلمة المنفردة (Word-by-Word Highlighting) لعدم تزامنها مع القراء المتعددين"
+  content: "عند دعم عدد كبير من القراء بسرعات تلاوة متفاوتة، الاعتماد على خوارزمية تلوين الكلمة المنفردة (عبر تقدير زمني ثابت أو مسافات متساوية) يؤدي حتماً إلى عدم تزامن مزعج ومشتت (Desync) مع الكلمة المنطوقة. الحل الهندسي الأمثل: إلغاء التلوين الجزئي للكلمات تماماً، والاعتماد على إبراز (كارت الآية بالكامل) باستخدام إطار دافئ وتلوين مخصص للآية النشطة. هذا النمط آمن، ومريح بصرياً، ولا يكسر تجربة المستخدم مهما اختلفت سرعة القارئ."
+  tags: [ux, audio-sync, word-highlighting, global]
+  status: active
+
+- id: MEM-2026-08-15-005
+  type: bug-fix
+  timestamp: "2026-08-15T03:25:00+03:00"
+  agents: [persistent-memory-engine, android-kotlin-pro]
+  context: "التبديل الفوري للقارئ أثناء التلاوة (Instant Reciter Switching)"
+  content: "عند اختيار قارئ جديد أثناء تشغيل التلاوة، بقاء القارئ القديم في طابور (ExoPlayer) يؤدي لتداخل الأصوات واستمرار التلاوة بالصوت القديم. يجب تفريغ المشغل فوراً عبر (mediaController.clearMediaItems()) قبل إرسال أمر تحميل السورة الجديدة وتمرير (autoPlay = true). هذا يضمن إسكات القارئ القديم في نفس اللحظة والبدء الفوري بالقارئ الجديد دون أعطال أو تزاحم في الطابور."
+  tags: [exoplayer, media3, audio-playback, bug-fix, global]
+  status: active
 ```
 
 </div>
- 
- 

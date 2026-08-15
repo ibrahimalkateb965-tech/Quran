@@ -28,10 +28,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.AccessibleGold
-import com.example.ui.theme.DarkImmersiveBg
-import com.example.ui.theme.DarkImmersiveCard
-import com.example.ui.theme.TextPrimaryWhite
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.ui.theme.WarmAccentTerracotta
+import com.example.ui.theme.WarmCardActive
+import com.example.ui.theme.WarmCardBorder
+import com.example.ui.theme.WarmCardLight
+import com.example.ui.theme.WarmTextLight
+import com.example.ui.theme.WarmTextPrimary
+import com.example.ui.theme.WarmTextSecondary
 
 @Composable
 fun VoiceCommandGuideSheet(
@@ -55,7 +60,8 @@ fun VoiceCommandGuideSheet(
         title = "دليل الأوامر الصوتية",
         contentDescriptionText = "دليل الأوامر الصوتية باللغة العربية",
         onDismiss = onDismiss,
-        onAnnounce = onAnnounce
+        onAnnounce = onAnnounce,
+        showCloseButton = false
     ) {
 
             BlindAccessibleButton(
@@ -66,11 +72,11 @@ fun VoiceCommandGuideSheet(
                     .height(56.dp)
                     .padding(vertical = 4.dp)
                     .testTag("speak_guide_button"),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = AccessibleGold)
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = WarmCardActive)
             ) {
-                Icon(Icons.Default.Mic, contentDescription = null, tint = DarkImmersiveBg)
+                Icon(Icons.Default.Mic, contentDescription = null, tint = WarmTextLight)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("قراءة الدليل صوتياً", color = DarkImmersiveBg, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("قراءة الدليل صوتياً", color = WarmTextLight, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -90,20 +96,22 @@ fun VoiceCommandGuideSheet(
                                 onClick = { onAnnounce("هذا التطبيق يدعم الأوامر الصوتية...") }
                             )
                             .semantics { contentDescription = "الأمر: $cmd. $example" },
-                        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DarkImmersiveCard)
+                        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = WarmCardLight),
+                        border = BorderStroke(1.dp, WarmCardBorder),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = cmd,
                                 style = MaterialTheme.typography.headlineMedium,
-                                color = AccessibleGold,
+                                color = WarmTextPrimary,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = example,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = TextPrimaryWhite
+                                color = WarmTextSecondary
                             )
                         }
                     }

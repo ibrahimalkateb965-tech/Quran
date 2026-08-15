@@ -10,6 +10,7 @@ import androidx.security.crypto.MasterKey
 import com.example.util.SntpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 
 /**
  * مدير آمن للفترة التجريبية.
@@ -35,6 +36,10 @@ class TrialManager private constructor(context: Context) {
      * يحاول الحصول على الوقت من SNTP أولاً، وإن فشل يستخدم elapsedRealtime مع كشف التراجع.
      */
     suspend fun isTrialExpired(): Boolean = withContext(Dispatchers.IO) {
+        if (prefs.getBoolean(KEY_IS_PERMANENTLY_UNLOCKED, false)) {
+            return@withContext false
+        }
+
         val installWallTime = prefs.getLong(KEY_INSTALL_WALL_TIME, 0L)
         val installElapsed = prefs.getLong(KEY_INSTALL_ELAPSED_REALTIME, 0L)
 
@@ -59,17 +64,61 @@ class TrialManager private constructor(context: Context) {
      * يُرجع عدد الأيام المتبقية (0 إذا انتهت).
      */
     suspend fun getDaysRemaining(): Int = withContext(Dispatchers.IO) {
+        if (prefs.getBoolean(KEY_IS_PERMANENTLY_UNLOCKED, false)) {
+            return@withContext Int.MAX_VALUE
+        }
+
         val installWallTime = prefs.getLong(KEY_INSTALL_WALL_TIME, 0L)
         val installElapsed = prefs.getLong(KEY_INSTALL_ELAPSED_REALTIME, 0L)
 
         if (installWallTime == 0L || installElapsed == 0L) {
-            return@withContext 7
+            return@withContext 30
         }
 
         val nowWallTime = resolveTrustedWallTime(installWallTime, installElapsed) ?: return@withContext 0
         val remaining = TRIAL_DURATION_MILLIS - (nowWallTime - installWallTime)
         val days = (remaining / (24 * 60 * 60 * 1000L)).toInt().coerceAtLeast(0)
         days
+    }
+
+    /**
+     * يتحقق من الرمز السري ويقوم بالتمديد إذا كان صحيحاً وغير مستخدم من قبل.
+     */
+    fun submitUnlockPin(pin: String): Boolean {
+        val usedPins = prefs.getStringSet(KEY_USED_PINS, emptySet()) ?: emptySet()
+        if (usedPins.contains(pin)) {
+            Log.w(TAG, "هذا الرمز تم استخدامه مسبقاً.")
+            return false
+        }
+
+        val hashedPin = hashPin(pin)
+
+        return when {
+            VALID_PERMANENT_PINS.contains(hashedPin) -> {
+                unlockPermanently()
+                prefs.edit { putStringSet(KEY_USED_PINS, usedPins + pin) }
+                true
+            }
+            VALID_EXTENSION_PINS.contains(hashedPin) -> {
+                extendTrial(7)
+                prefs.edit { putStringSet(KEY_USED_PINS, usedPins + pin) }
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun extendTrial(daysToAdd: Int) {
+        val currentInstallWallTime = prefs.getLong(KEY_INSTALL_WALL_TIME, System.currentTimeMillis())
+        val addedMillis = daysToAdd * 24 * 60 * 60 * 1000L
+        // تحريك وقت التثبيت للأمام لإعطاء أيام إضافية
+        prefs.edit { putLong(KEY_INSTALL_WALL_TIME, currentInstallWallTime + addedMillis) }
+        Log.i(TAG, "تم تمديد الفترة التجريبية بمقدار $daysToAdd أيام.")
+    }
+
+    private fun unlockPermanently() {
+        prefs.edit { putBoolean(KEY_IS_PERMANENTLY_UNLOCKED, true) }
+        Log.i(TAG, "تم فتح التطبيق بالكامل بشكل دائم.")
     }
 
     /**
@@ -182,9 +231,22 @@ class TrialManager private constructor(context: Context) {
         private const val KEY_FIRST_SNTP_TIME = "first_sntp_time_millis"
         private const val KEY_LAST_KNOWN_WALL_TIME = "last_known_wall_time_millis"
         private const val KEY_LAST_KNOWN_ELAPSED_REALTIME = "last_known_elapsed_realtime_millis"
+        private const val KEY_IS_PERMANENTLY_UNLOCKED = "is_permanently_unlocked"
+        private const val KEY_USED_PINS = "used_pins_set"
 
-        private const val TRIAL_DURATION_MILLIS = 7L * 24 * 60 * 60 * 1000
+        private const val TRIAL_DURATION_MILLIS = 30L * 24 * 60 * 60 * 1000
         private const val ROLLBACK_TOLERANCE_MILLIS = 5L * 60 * 1000 // 5 دقائق
+
+        private fun hashPin(pin: String): String {
+            val bytes = MessageDigest.getInstance("SHA-256").digest(pin.toByteArray())
+            return bytes.joinToString("") { "%02x".format(it) }
+        }
+
+        // SHA-256 Hashes
+        // "112233" -> e8b2b73bbdb0985208f7dbb25ccdbf0f35368a3faeaeb906cf6d426a84ebfaed
+        // "998877" -> d1630cb9ebfde375bc9df9468926010d72023583da70fc28892f3f1e9447eec6
+        val VALID_EXTENSION_PINS = setOf("e8b2b73bbdb0985208f7dbb25ccdbf0f35368a3faeaeb906cf6d426a84ebfaed")
+        val VALID_PERMANENT_PINS = setOf("d1630cb9ebfde375bc9df9468926010d72023583da70fc28892f3f1e9447eec6")
 
         @Volatile
         private var INSTANCE: TrialManager? = null

@@ -19,8 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.ui.theme.AccessibleGold
-import com.example.ui.theme.AccessibleGoldVariant
+import com.example.ui.theme.WarmAccentTerracotta
+import com.example.ui.theme.WarmAccentTerracottaBright
 
 @Composable
 fun AudioEqualizerBars(isPlaying: Boolean) {
@@ -51,7 +51,7 @@ fun AudioEqualizerBars(isPlaying: Boolean) {
                     .width(5.dp)
                     .height((24 * scale).dp)
                     .background(
-                        color = if (index % 2 == 0) AccessibleGold else AccessibleGoldVariant,
+                        color = if (index % 2 == 0) WarmAccentTerracotta else WarmAccentTerracottaBright,
                         shape = RoundedCornerShape(2.dp)
                     )
             )

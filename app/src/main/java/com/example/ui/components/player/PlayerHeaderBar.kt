@@ -2,37 +2,31 @@ package com.example.ui.components.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.ui.components.BlindAccessibleIconButton
-import com.example.ui.theme.AccessibleGold
-import com.example.ui.theme.DarkImmersiveBg
-import com.example.ui.theme.DarkImmersiveBorder
-import com.example.ui.theme.DarkImmersiveCard
+import com.example.ui.theme.WarmAccentTerracotta
+import com.example.ui.theme.WarmAccentTerracottaBright
+import com.example.ui.theme.WarmCardBorder
+import com.example.ui.theme.WarmCardLight
+import com.example.ui.theme.WarmTextLight
 
 @Composable
 fun HeaderBar(
@@ -47,7 +41,6 @@ fun HeaderBar(
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Icons (Circular)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -88,23 +81,27 @@ fun HeaderAccessibleButton(
     onClick: () -> Unit,
     onClickLabel: String,
     testTag: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     contentDescription: String,
     isActive: Boolean = false
 ) {
+    val bgColor = if (isActive) WarmAccentTerracotta else WarmCardLight
+    val borderColor = if (isActive) WarmAccentTerracottaBright else WarmCardBorder
+    val iconTint = if (isActive) WarmTextLight else WarmAccentTerracotta
+
     BlindAccessibleIconButton(
         onClick = onClick,
         onClickLabel = onClickLabel,
         modifier = Modifier
             .size(62.dp)
-            .background(if (isActive) AccessibleGold else DarkImmersiveCard, CircleShape)
-            .border(1.dp, if (isActive) AccessibleGold else DarkImmersiveBorder, CircleShape)
+            .background(bgColor, CircleShape)
+            .border(1.dp, borderColor, CircleShape)
             .testTag(testTag)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (isActive) DarkImmersiveBg else AccessibleGold,
+            tint = iconTint,
             modifier = Modifier.size(31.dp)
         )
     }

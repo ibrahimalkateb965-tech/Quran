@@ -50,7 +50,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Icon
 import com.example.ui.components.BlindAccessibleIconButton
 import com.example.ui.components.BlindAccessibleButton
 import androidx.compose.material3.IconButton
@@ -61,6 +60,7 @@ import com.example.ui.components.player.AudioEqualizerBars
 import com.example.ui.components.player.AyahCard
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.components.player.AyahNumberCard
+import com.example.ui.components.player.SurahNameCard
 import com.example.ui.components.player.BigVoiceMicrophoneButton
 import com.example.ui.components.player.ControlPanel
 import com.example.ui.components.player.GestureHintChip
@@ -111,12 +111,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.accessibility.LocalTalkBackEnabled
 import com.example.accessibility.announceForAccessibility
 import com.example.ui.components.ReciterSelectorSheet
 import com.example.ui.components.SurahIndexSheet
 import com.example.ui.components.BookmarksSheet
-import com.example.ui.components.VoiceCommandGuideSheet
 import com.example.ui.components.blindAccessibleClickable
 import androidx.compose.ui.graphics.Brush
 import com.example.ui.theme.AccessibleGold
@@ -130,7 +128,12 @@ import com.example.ui.theme.TextMutedZinc
 import com.example.ui.theme.TextPrimaryWhite
 import com.example.ui.viewmodel.QuranViewModel
 import com.example.data.model.Ayah
+import com.example.data.model.Reciter
 import com.example.ui.viewmodel.ScreenModeUiState
+
+import com.example.ui.theme.WarmAccentTerracotta
+import com.example.ui.theme.WarmEarthBg
+import com.example.ui.theme.WarmTextSecondary
 
 @Composable
 fun QuranPlayerScreen(
@@ -168,23 +171,13 @@ fun QuranPlayerScreen(
 
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = DarkImmersiveBg
+            color = WarmEarthBg
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag("quran_player_root")
-                    // Ambient Subtle Gold Glow Canvas Effect
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                AccessibleGold.copy(alpha = 0.08f),
-                                Color.Transparent
-                            ),
-                            radius = 1200f
-                        )
-                    )
-                    ) {
+            ) {
                 // Main Accessible Content
                 Column(
                     modifier = Modifier
@@ -202,40 +195,15 @@ fun QuranPlayerScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Dynamic TalkBack Live Announcement & Voice Feedback
-                    val talkBackDescription = buildPlayerStatusDescription(
-                        surahName = activeSurah?.nameArabic,
-                        ayahNumber = currentAyah?.numberInSurah ?: 1,
-                        ayahCount = activeSurah?.ayahCount,
-                        isPlaying = isPlaying,
-                        isRepeatModeActive = settingsUiState.tarkizRepeatMode > 1,
-                        isTalkBackEnabled = isTalkBackEnabled
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics {
-                                liveRegion = LiveRegionMode.Polite
-                                contentDescription = talkBackDescription
-                            }
-                    )
-
-                    // Voice commands are disabled as per client request
-
                     // Surah Info & Ayah Number Header
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "سورة ${activeSurah?.nameArabic ?: ""}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = AccessibleGold,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .semantics { contentDescription = "سورة ${activeSurah?.nameArabic}" }
+                        SurahNameCard(
+                            name = activeSurah?.nameArabic ?: "",
+                            onClick = { viewModel.announce("سورة ${activeSurah?.nameArabic ?: ""}") }
                         )
                         if (currentAyah != null) {
                             Spacer(modifier = Modifier.width(16.dp))
@@ -254,7 +222,7 @@ fun QuranPlayerScreen(
                                 .fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = AccessibleGold)
+                            CircularProgressIndicator(color = WarmAccentTerracotta)
                         }
                     } else {
                         // HorizontalPager for Ayahs
@@ -291,7 +259,6 @@ fun QuranPlayerScreen(
                                 }
                         }
 
-
                         // Standard Pager for all users (sighted and blind)
                         // Stealth Box: Wraps the pager to obliterate its native semantics when TalkBack is ON.
                         Box(
@@ -301,9 +268,7 @@ fun QuranPlayerScreen(
                                 .then(
                                     if (isTalkBackEnabled) {
                                         Modifier.clearAndSetSemantics {
-                                            contentDescription = "\u00A0" // صمت تام
-                                            
-                                            // 1. Play/Pause (كانت على الكارت)
+                                            // 1. Play / Pause Toggle
                                             onClick(label = "") {
                                                 viewModel.togglePlayback()
                                                 true
@@ -351,12 +316,12 @@ fun QuranPlayerScreen(
                                             isCurrentProvider = { page == currentAyahIndex },
                                             isPlayingProvider = { page == currentAyahIndex && isPlaying },
                                             isScreenOffModeProvider = { screenModeUiState.isScreenOffMode },
+                                            progressProvider = { playbackUiState.playbackProgress },
                                             onClick = { viewModel.togglePlayback() },
                                             onDoubleTap = { viewModel.replayCurrentAyah() },
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-
                                         )
                                     }
                                 }
@@ -364,40 +329,22 @@ fun QuranPlayerScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Gesture Hint Quick Chips (Immersive UI Style)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val gestureHints = playerGestureHints(isTalkBackEnabled)
-                        GestureHintChip(label = gestureHints.playPauseHint)
-                        GestureHintChip(label = gestureHints.navigationHint)
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Spacer(modifier = Modifier.height(10.dp))                    // Bottom Reciter & Mode Bar Readout
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "القارئ: ${settingsUiState.selectedReciter.nameArabic}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMutedZinc
-                        )
-                        Text(
-                            text = if (isTalkBackEnabled) "الوضع: مكفوفين • قارئ الشاشة مفعّل" else "الوضع: مبصرين • قارئ الشاشة غير مفعّل",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isTalkBackEnabled) AccessibleGreenAccent else TextMutedZinc
-                        )
+                    // Bottom readout for blind users only
+                    if (isTalkBackEnabled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "نقرتين للتكرار",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = WarmTextSecondary
+                            )
+                        }
                     }
                 }
 

@@ -9,28 +9,23 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.lifecycleScope
-import com.example.security.TrialManager
+import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.screens.QuranPlayerScreen
 import com.example.ui.screens.TrialExpiredScreen
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.viewmodel.QuranViewModel
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.Modifier
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import android.view.ViewConfiguration
+
 class MainActivity : ComponentActivity() {
 
     private val viewModel: QuranViewModel by viewModels()
@@ -61,7 +56,6 @@ class MainActivity : ComponentActivity() {
             QuranBlindTheme {
                 val trialExpired by viewModel.isTrialExpired.collectAsState(initial = null)
                 val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
-                val context = LocalContext.current
 
                 val lifecycleOwner = LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
@@ -79,29 +73,28 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                    CompositionLocalProvider(
-                        com.example.accessibility.LocalTalkBackEnabled provides isTalkBackEnabled
+                CompositionLocalProvider(
+                    LocalTalkBackEnabled provides isTalkBackEnabled
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                        ) {
-                            when (trialExpired) {
-                                null -> {
-                                    // Loading state while checking trial
-                                }
-                                true -> {
-                                    TrialExpiredScreen(
-                                        isTalkBackEnabled = isTalkBackEnabled,
-                                        onAnnounce = { msg -> viewModel.announce(msg) }
-                                    )
-                                }
-                                false -> {
-                                    QuranPlayerScreen(viewModel = viewModel)
-                                }
+                        when (trialExpired) {
+                            null -> {
+                                // Loading state while checking trial
+                            }
+                            true -> {
+                                TrialExpiredScreen(
+                                    isTalkBackEnabled = isTalkBackEnabled,
+                                    onAnnounce = { msg -> viewModel.announce(msg) }
+                                )
+                            }
+                            false -> {
+                                QuranPlayerScreen(viewModel = viewModel)
                             }
                         }
                     }
+                }
             }
         }
     }

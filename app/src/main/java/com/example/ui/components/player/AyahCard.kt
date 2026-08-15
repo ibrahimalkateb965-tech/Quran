@@ -1,50 +1,43 @@
 package com.example.ui.components.player
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.Ayah
-import com.example.ui.theme.AccessibleGold
-import com.example.ui.theme.DarkImmersiveBorder
-import com.example.ui.theme.DarkImmersiveCard
-import com.example.ui.theme.DarkImmersiveSurface
-import com.example.ui.theme.TextMutedZinc
-import com.example.ui.theme.TextPrimaryWhite
-
-
-import com.example.ui.components.blindAccessibleClickable
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.invisibleToUser
-import androidx.compose.foundation.ExperimentalFoundationApi
 import com.example.accessibility.LocalTalkBackEnabled
+import com.example.data.model.Ayah
+import com.example.ui.theme.UthmanTahaFont
+import com.example.ui.theme.WarmAccentTerracotta
+import com.example.ui.theme.WarmCardActive
+import com.example.ui.theme.WarmCardBorder
+import com.example.ui.theme.WarmCardLight
+import com.example.ui.theme.WarmEarthBg
+import com.example.ui.theme.WarmTextAyah
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -53,6 +46,7 @@ fun AyahCard(
     isCurrentProvider: () -> Boolean,
     isPlayingProvider: () -> Boolean = { false },
     isScreenOffModeProvider: () -> Boolean = { false },
+    progressProvider: () -> Float = { 0f },
     onClick: () -> Unit,
     onDoubleTap: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -61,19 +55,24 @@ fun AyahCard(
     val isPlaying = isPlayingProvider()
     val isScreenOffMode = isScreenOffModeProvider()
     
-    val borderColor = if (isCurrent) AccessibleGold else DarkImmersiveBorder
-    val bgColor = if (isCurrent) DarkImmersiveSurface else DarkImmersiveCard
-    val elevation = if (isCurrent) 8.dp else 2.dp
+    val borderColor = if (isCurrent) WarmCardActive else WarmCardBorder
+    val bgColor = WarmEarthBg
+    val elevation = if (isCurrent) 4.dp else 1.dp
     val isTalkBackEnabled = LocalTalkBackEnabled.current
     
     val semanticsModifier = if (isTalkBackEnabled) {
-        Modifier.clearAndSetSemantics { 
-            // إدراج مسافة غير مرئية (Non-breaking space) لمنع النطق تماماً
-            contentDescription = "\u00A0"
-            stateDescription = ""
-        }
+        Modifier.clearAndSetSemantics { }
     } else {
         Modifier
+    }
+
+    val scrollState = rememberScrollState()
+    LaunchedEffect(ayah.numberInSurah) {
+        scrollState.scrollTo(0)
+    }
+
+    val cleanText = remember(ayah.textArabic) {
+        sanitizeUthmanicText(ayah.textArabic)
     }
     
     Card(
@@ -92,29 +91,35 @@ fun AyahCard(
         border = BorderStroke(if (isCurrent) 2.dp else 1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Text(
-                text = ayah.textArabic,
-                style = MaterialTheme.typography.headlineLarge,
-                color = if (isCurrent) TextPrimaryWhite else TextMutedZinc,
-                textAlign = TextAlign.Center,
-                lineHeight = 44.sp
-            )
-            
-            if (isCurrent && isPlaying && !isScreenOffMode) {
-                Spacer(modifier = Modifier.height(12.dp))
-                AudioEqualizerBars(isPlaying = true)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = cleanText,
+                    fontFamily = UthmanTahaFont,
+                    color = if (isCurrent) WarmTextAyah else WarmTextAyah.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontSize = 28.sp,
+                        lineHeight = 64.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Normal
+                )
+                
+                if (isCurrent && isPlaying && !isScreenOffMode) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    AudioEqualizerBars(isPlaying = true)
+                }
             }
-            
-            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
@@ -126,8 +131,8 @@ fun AyahNumberCard(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkImmersiveCard),
-        border = BorderStroke(1.dp, DarkImmersiveBorder),
+        colors = CardDefaults.cardColors(containerColor = WarmCardLight),
+        border = BorderStroke(1.dp, WarmCardBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.clickable { onClick() }
     ) {
@@ -138,9 +143,49 @@ fun AyahNumberCard(
             Text(
                 text = "الآية $number",
                 style = MaterialTheme.typography.titleLarge,
-                color = AccessibleGold,
+                color = WarmAccentTerracotta,
                 fontWeight = FontWeight.Bold
             )
         }
     }
+}
+
+@Composable
+fun SurahNameCard(
+    name: String,
+    onClick: () -> Unit = {}
+) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = WarmCardLight),
+        border = BorderStroke(1.dp, WarmCardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "سورة $name",
+                style = MaterialTheme.typography.titleLarge,
+                color = WarmAccentTerracotta,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+private val bareNoonNextLetters = "[يرملونصذثكجشقسدطزفتضظب]"
+private val noonSukoonPattern = Regex("(ن)[\\u0652\\u06DF\\u06E0\\u06E1](?=\\s*$bareNoonNextLetters)")
+
+private fun sanitizeUthmanicText(text: String): String {
+    return text.replace(noonSukoonPattern, "$1")
+        .replace('\u06DF', '\u06E0')
+        .replace('\u06E4', '\u0653')
+        .replace("\u0600", "")
+        .replace("\u06DD", "")
+        .replace("\uFEFF", "")
+        .replace("\u200A", "")
+        .replace("\u2060", "")
 }

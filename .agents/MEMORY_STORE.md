@@ -443,6 +443,57 @@
   content: "عند اختيار قارئ جديد أثناء تشغيل التلاوة، بقاء القارئ القديم في طابور (ExoPlayer) يؤدي لتداخل الأصوات واستمرار التلاوة بالصوت القديم. يجب تفريغ المشغل فوراً عبر (mediaController.clearMediaItems()) قبل إرسال أمر تحميل السورة الجديدة وتمرير (autoPlay = true). هذا يضمن إسكات القارئ القديم في نفس اللحظة والبدء الفوري بالقارئ الجديد دون أعطال أو تزاحم في الطابور."
   tags: [exoplayer, media3, audio-playback, bug-fix, global]
   status: active
+
+- id: MEM-2026-08-15-006
+  type: bug-fix
+  timestamp: "2026-08-15T23:05:00+03:00"
+  agents: [persistent-memory-engine, code-architect, android-kotlin-pro]
+  context: "منع الاستئناف التلقائي للصوت بعد انتهاء المكالمات الهاتفية أو عند توقف التطبيق في الخلفية"
+  content: "عندما يفقد المشغل التركيز الصوتي مؤقتاً أثناء مكالمة هاتفية، أو عندما يرسل نظام الاتصال/البلوتوث حدث media button بعد إنهاء المكالمة، فإن مشغل ExoPlayer و MediaSession قد يستأنفان التشغيل تلقائياً. الحل المعماري الجذري: 1. إضافة مستمع لدورة حياة المشغل واستدعاء abandonAudioFocus صراحة عند توقف التشغيل (!playWhenReady). 2. تخصيص MediaSession.Callback لاعتراض أحداث أزرار الوسائط واستهلاكها بأمان دون تشغيل إذا كان المشغل متوقفاً عمداً.\n[ANTI-PATTERN AVOIDED]: الاكتفاء بـ pause() السطحي دون التخلي الصريح عن التركيز الصوتي مما يترك طابور النظام يعيد التشغيل عند إشعار AUDIOFOCUS_GAIN."
+  tags: [exoplayer, audio-focus, phone-calls, media3, accessibility, bug-fix, global]
+  status: active
+
+- id: MEM-2026-08-15-007
+  type: decision
+  timestamp: "2026-08-15T23:05:00+03:00"
+  agents: [persistent-memory-engine, jetpack-compose-ui, code-architect]
+  context: "توحيد لون الكروت النشطة في شاشات السور والقراء مع فصيلة الخلفية الترابية (#B38A5F)"
+  content: "تم إلغاء تحول الكروت النشطة إلى اللون الأسود (#201610)، واعتماد اللون الترابي الدافئ (#A27448) من نفس فصيلة الخلفية مع إطار أحمر طوبي دافئ (#7C261E) ونصوص عالية التباين، مما يوفر تجربة بصرية مريحة ومتناسقة مع الحفاظ على وضوح التحديد، وتعديل العبارة السفلية إلى 'انقر للتكرار' بحجم خط bodyMedium وإعلان 'اختيار الآية' فور فتح قائمة الآيات.\n[ANTI-PATTERN AVOIDED]: استخدام اللون الأسود الداكن كعنصر تحديد مما يكسر تناسق الهوية البصرية الترابية الدافئة."
+  tags: [ui, theme, accessibility, talkback, warm-earth-theme, global]
+  status: active
+- id: MEM-2026-08-15-008
+  type: bug-fix
+  timestamp: "2026-08-15T23:55:00+03:00"
+  agents: [persistent-memory-engine, debugger, code-reviewer-quality]
+  context: "ظهور خطأ Unresolved reference 'unaryPlus' for operator '+' أثناء تجميع كود Kotlin"
+  content: "عند استخدام الدالة الشرطية if/else في Kotlin لتعيين قيمة متغير (مثل الألوان في Jetpack Compose)، فإن وجود علامة زائد (+) بالخطأ قبل المتغير (مثل: +WarmAccentTerracotta) يجعل المترجم يبحث عن دالة unaryPlus() للمتغير. الحل: مراجعة دقيقة لعلامات الترقيم في التعبيرات الشرطية وإزالة علامة الزائد العشوائية التي قد تنتج أثناء تعديلات الكود السريعة.\n[ANTI-PATTERN AVOIDED]: تجاهل مراجعة دلالات (Syntax) السطور المعدلة يدوياً وترك رموز زائدة تسبب فشل بناء كامل للمشروع."
+  tags: [kotlin, compose, syntax-error, debugging, global]
+  status: active
+
+- id: MEM-2026-08-15-009
+  type: lesson
+  timestamp: "2026-08-15T23:55:00+03:00"
+  agents: [persistent-memory-engine, devops-deployer]
+  context: "تشخيص وحل مشكلة عدم تعرف Android Studio على جهاز الهاتف (No Devices)"
+  content: "عند ظهور رسالة 'No Devices' بجوار زر التشغيل رغم توصيل الهاتف، المشكلة عادة تنحصر في: 1. عدم قبول إذن (السماح بتصحيح أخطاء USB من هذا الكمبيوتر). 2. كابل الشحن لا ينقل البيانات. 3. تعليق خادم ADB. الحل الجذري الأسرع: تفعيل (Wireless Debugging) وإقران الجهاز عبر QR Code من داخل Android Studio لتجاوز جميع مشاكل الكابلات والتعريفات (Drivers).\n[ANTI-PATTERN AVOIDED]: إضاعة الوقت في إعادة تثبيت تعريفات الويندوز أو تغيير الكابلات قبل تجربة إعادة تشغيل خادم ADB أو الاتصال اللاسلكي السريع."
+  tags: [android-studio, adb, wireless-debugging, hardware-connection, global]
+  status: active
+- id: MEM-2026-08-16-001
+  type: design-decision
+  timestamp: "2026-08-16T00:10:00+03:00"
+  agents: [persistent-memory-engine, ui-ux-design-lead, taste-design-critic]
+  context: "تنعيم التباين הלوني لإطار تحديد الكروت النشطة (Border Color)"
+  content: "تم استبدال لون الإطار الأحمر الطوبي (WarmAccentTerracotta) حول الكروت النشطة بلون بني ترابي داكن (WarmCardActiveBorder - #6B4A2D) ليتناسب أكثر مع لون الكارت (WarmCardActive) والخلفية (WarmEarthBg). \n[ANTI-PATTERN AVOIDED]: استخدام ألوان حادة للتباين (مثل الأحمر) في مساحات واسعة حول الكروت مما قد يزعج العين أو يكسر تناغم الهوية البصرية الترابية الهادئة، وتم حصر الألوان الحادة (Accent) للأيقونات أو الأزرار الصغيرة."
+  tags: [ui, theme, accessibility, warm-earth-theme, global]
+  status: active
+- id: MEM-2026-08-17-001
+  type: design-decision
+  timestamp: "2026-08-17T19:25:00+03:00"
+  agents: [persistent-memory-engine, jetpack-compose-ui, android-kotlin-pro]
+  context: "إتاحة تكرار الآية للمبصرين والمكفوفين وتكبير حجم الخط القرآني"
+  content: "1. إظهار عبارة 'انقر للتكرار' في أسفل واجهة المشغل لجميع المستخدمين (المبصرين والمكفوفين معاً) بإلغاء شرط الحصر الخاص بـ TalkBack، مع ربطها بـ clickable لتفعيل إعادة تلاوة الآية الحالية مباشرة عند النقر عليها.\n2. زيادة حجم خط النص القرآني في AyahCard بمقدار درجتين (من 28sp إلى 32sp) وضبط تباعد الأسطر (lineHeight = 68sp) لأقصى وضوح للتشكيل وعلامات الضبط القرآني."
+  tags: [ui, typography, compose, dual-mode, accessibility, ayah-card, global]
+  status: active
 ```
 
 </div>

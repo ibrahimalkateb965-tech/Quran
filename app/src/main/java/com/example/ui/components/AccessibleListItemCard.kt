@@ -26,8 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.BorderStroke
+import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmCardActive
 import com.example.ui.theme.WarmCardBorder
+import com.example.ui.theme.WarmCardActiveBorder
 import com.example.ui.theme.WarmCardLight
 import com.example.ui.theme.WarmTextLight
 import com.example.ui.theme.WarmTextPrimary
@@ -49,10 +51,11 @@ fun AccessibleListItemCard(
     leadingContent: @Composable (RowScope.() -> Unit)? = null,
     trailingContent: @Composable (RowScope.() -> Unit)? = null
 ) {
-    val resolvedTitleColor = titleColor ?: if (isSelected) WarmTextLight else WarmTextPrimary
-    val resolvedSubtitleColor = subtitleColor ?: if (isSelected) WarmTextLight.copy(alpha = 0.8f) else WarmTextSecondary
+    val resolvedTitleColor = titleColor ?: if (isSelected) WarmTextPrimary else WarmTextPrimary
+    val resolvedSubtitleColor = subtitleColor ?: if (isSelected) WarmTextSecondary else WarmTextSecondary
     val containerColor = if (isSelected) WarmCardActive else WarmCardLight
-    val borderColor = if (isSelected) WarmCardActive else WarmCardBorder
+    val borderColor = if (isSelected) WarmCardActiveBorder else WarmCardBorder
+    val borderWidth = if (isSelected) 1.5.dp else 1.dp
 
     Card(
         modifier = modifier
@@ -68,7 +71,7 @@ fun AccessibleListItemCard(
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, borderColor)
+        border = BorderStroke(borderWidth, borderColor)
     ) {
         Row(
             modifier = Modifier

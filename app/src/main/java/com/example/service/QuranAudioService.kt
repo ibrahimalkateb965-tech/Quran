@@ -4,6 +4,8 @@ import android.app.PendingIntent
 import android.app.TaskStackBuilder
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.view.KeyEvent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -24,10 +26,13 @@ class QuranAudioService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private lateinit var player: ExoPlayer
     private lateinit var cache: SimpleCache
+    private var audioManager: AudioManager? = null
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
+
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
@@ -49,14 +54,65 @@ class QuranAudioService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady) {
+                    abandonSystemAudioFocus()
+                }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_IDLE || playbackState == Player.STATE_ENDED) {
+                    abandonSystemAudioFocus()
+                }
+            }
+        })
+
         val sessionActivityPendingIntent = TaskStackBuilder.create(this).run {
             addNextIntent(Intent(this@QuranAudioService, MainActivity::class.java))
             getPendingIntent(0, PendingIntent.FLAG_IMMUTABLE)
         }
 
+        val sessionCallback = object : MediaSession.Callback {
+            override fun onMediaButtonEvent(
+                session: MediaSession,
+                controllerInfo: MediaSession.ControllerInfo,
+                intent: Intent
+            ): Boolean {
+                val keyEvent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
+                }
+
+                if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                    val keyCode = keyEvent.keyCode
+                    if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+                        keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
+                        keyCode == KeyEvent.KEYCODE_HEADSETHOOK) {
+                        // If player is explicitly paused/stopped, prevent unsolicited background resume (e.g. from telecom/headset disconnect)
+                        if (!player.playWhenReady) {
+                            return true // Consume event safely without starting playback
+                        }
+                    }
+                }
+                return super.onMediaButtonEvent(session, controllerInfo, intent)
+            }
+        }
+
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivityPendingIntent)
+            .setCallback(sessionCallback)
             .build()
+    }
+
+    private fun abandonSystemAudioFocus() {
+        try {
+            audioManager?.abandonAudioFocus(null)
+        } catch (_: Exception) {
+            // Safe fallback
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

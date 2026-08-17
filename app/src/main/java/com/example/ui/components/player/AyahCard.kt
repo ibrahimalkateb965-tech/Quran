@@ -34,6 +34,7 @@ import com.example.data.model.Ayah
 import com.example.ui.theme.UthmanTahaFont
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmCardActive
+import com.example.ui.theme.WarmCardActiveBorder
 import com.example.ui.theme.WarmCardBorder
 import com.example.ui.theme.WarmCardLight
 import com.example.ui.theme.WarmEarthBg
@@ -55,7 +56,7 @@ fun AyahCard(
     val isPlaying = isPlayingProvider()
     val isScreenOffMode = isScreenOffModeProvider()
     
-    val borderColor = if (isCurrent) WarmCardActive else WarmCardBorder
+    val borderColor = if (isCurrent) WarmCardActiveBorder else WarmCardBorder
     val bgColor = WarmEarthBg
     val elevation = if (isCurrent) 4.dp else 1.dp
     val isTalkBackEnabled = LocalTalkBackEnabled.current
@@ -108,8 +109,8 @@ fun AyahCard(
                     fontFamily = UthmanTahaFont,
                     color = if (isCurrent) WarmTextAyah else WarmTextAyah.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.headlineLarge.copy(
-                        fontSize = 28.sp,
-                        lineHeight = 64.sp
+                        fontSize = 32.sp,
+                        lineHeight = 68.sp
                     ),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Normal

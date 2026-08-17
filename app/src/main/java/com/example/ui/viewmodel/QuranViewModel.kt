@@ -413,6 +413,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pausePlayback() {
         mediaController?.pause()
+        _playbackUiState.update { it.copy(isPlaying = false) }
     }
 
 

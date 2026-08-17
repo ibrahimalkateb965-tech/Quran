@@ -329,22 +329,21 @@ fun QuranPlayerScreen(
                         }
                     }
 
-                    // Bottom readout for blind users only
-                    if (isTalkBackEnabled) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "نقرتين للتكرار",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = WarmTextSecondary
-                            )
-                        }
+                    // Bottom action hint for both sighted and blind users
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "انقر للتكرار",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = WarmTextSecondary,
+                            modifier = Modifier.clickable { viewModel.replayCurrentAyah() }
+                        )
                     }
                 }
 

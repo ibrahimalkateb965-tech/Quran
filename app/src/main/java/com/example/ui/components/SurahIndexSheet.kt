@@ -52,6 +52,7 @@ import androidx.compose.ui.text.SpanStyle
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmAccentTerracottaBright
 import com.example.ui.theme.WarmCardActive
+import com.example.ui.theme.WarmCardBorder
 import com.example.ui.theme.WarmCardLight
 import com.example.ui.theme.WarmTextLight
 import com.example.ui.theme.WarmTextPrimary
@@ -104,14 +105,14 @@ fun SurahIndexSheet(
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics {
-                contentDescription = if (currentSurah != null) "قائمة آيات سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة"
+                contentDescription = if (currentSurah != null) "اختيار الآية. سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة"
             }
         )
     }
 
     AccessibleBottomSheet(
-        title = if (currentSurah != null) "سورة ${currentSurah.nameArabic} ( اختيار الآية )" else "اختيار السورة (114 سورة)",
-        contentDescriptionText = if (currentSurah != null) "قائمة آيات سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
+        title = if (currentSurah != null) "اختيار الآية - سورة ${currentSurah.nameArabic}" else "اختيار السورة (114 سورة)",
+        contentDescriptionText = if (currentSurah != null) "اختيار الآية. سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
         headerContent = null,
@@ -127,6 +128,7 @@ fun SurahIndexSheet(
 
             LaunchedEffect(currentSurah) {
                 if (currentSurah != null) {
+                    onAnnounce("اختيار الآية")
                     if (currentSurah.id == currentSurahId && currentAyahIndex > 0) {
                         ayahListState.scrollToItem(currentAyahIndex)
                     } else {
@@ -180,7 +182,7 @@ fun SurahIndexSheet(
                                         .height(44.dp)
                                         .width(44.dp)
                                         .background(
-                                            if (isSelected) WarmAccentTerracotta else WarmCardActive,
+                                            if (isSelected) WarmAccentTerracotta else WarmCardBorder,
                                             shape = RoundedCornerShape(22.dp)
                                         ),
                                     contentAlignment = Alignment.Center
@@ -197,7 +199,7 @@ fun SurahIndexSheet(
                                 if (isSelected) {
                                     Text(
                                         text = "مفتوحة الآن",
-                                        color = WarmAccentTerracottaBright,
+                                        color = WarmAccentTerracotta,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Reciter
 import com.example.ui.theme.WarmAccentGold
+import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmAccentTerracottaBright
 import com.example.ui.theme.WarmTextLight
 import com.example.ui.theme.WarmTextPrimary
@@ -73,8 +74,8 @@ fun ReciterSelectorSheet(
                     AccessibleListItemCard(
                         title = reciter.nameArabic,
                         subtitle = reciter.nameEnglish,
-                        titleColor = if (isSelected) WarmAccentTerracottaBright else WarmTextPrimary,
-                        subtitleColor = if (isSelected) WarmTextLight.copy(alpha = 0.75f) else WarmTextSecondary,
+                        titleColor = if (isSelected) WarmAccentTerracotta else WarmTextPrimary,
+                        subtitleColor = WarmTextSecondary,
                         isSelected = isSelected,
                         onClickLabel = "اختيار القارئ ${reciter.nameArabic}",
                         contentDescriptionText = "${reciter.nameArabic}. ${if (isSelected) "مختار حالياً" else "انقر مرتين لاختياره"}",
@@ -85,7 +86,7 @@ fun ReciterSelectorSheet(
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = "محدد",
-                                    tint = WarmAccentGold,
+                                    tint = WarmAccentTerracotta,
                                     modifier = Modifier
                                         .height(32.dp)
                                         .width(32.dp)

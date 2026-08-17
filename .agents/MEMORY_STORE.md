@@ -500,6 +500,13 @@
   context: "بناء نسخة الويب والآيفون التقدمية (Mueen Web iOS PWA) في مجلد معزول"
   content: "تم بناء نسخة ويب تقدمية كاملة ومستقلة في مجلد `web_ios/` للعمل على الآيفون ومتصفح Safari مع الحفاظ المطلق على كود الأندرويد في `app/`. ركائز الإنجاز:\n1. كائن صوتي أحادي مع فتح قفل الصوت في Safari (Audio Unlock Priming) والربط الكامل بـ navigator.mediaSession.\n2. معمارية ثنائية الوضع تدعم قارئ الشاشة VoiceOver عبر وسوم WAI-ARIA وأزرار دلالية مخفية وإعلانات Live Region.\n3. مطابقة الهوية البصرية الترابية الدافئة (#B38A5F)، الخط العثماني، الـ 114 سورة، الـ 20 قارئاً، وزر 'انقر للتكرار'.\n4. PWA Manifest و Service Worker للتشغيل بدون إنترنت والتثبيت كأيقونة مستقلة على الآيفون."
   tags: [pwa, ios, safari, voiceover, accessibility, web-app, global]
+- id: MEM-2026-08-17-003
+  type: deployment-decision
+  timestamp: "2026-08-17T21:12:00+03:00"
+  agents: [persistent-memory-engine, devops-deployer]
+  context: "نشر نسخة الآيفون عبر GitHub Pages وإعادة تسمية المستودع إلى Quran"
+  content: "1. تهيئة مجلد `docs/` المتضمن لملف `.nojekyll` لنشر التطبيق مجاناً عبر GitHub Pages على الرابط: `https://ibrahimalkateb965-tech.github.io/Quran/`.\n2. ضبط اسم الأيقونة في iOS وشاشات الآيفون إلى 'القرآن' عبر `apple-mobile-web-app-title` و `manifest.json`.\n3. تحديث مسار المستودع البعيد git remote إلى `https://github.com/ibrahimalkateb965-tech/Quran.git` والتأكد من ضبط `http.postBuffer` لتفادي أخطاء المهلة عند رفع حزم البيانات."
+  tags: [github-pages, deployment, ios-pwa, git-remote, global]
   status: active
 ```
 

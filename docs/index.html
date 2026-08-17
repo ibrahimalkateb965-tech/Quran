@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#B38A5F">
+  <meta name="description" content="تطبيق معين للقرآن الكريم للمبصرين والمكفوفين">
+
+  <!-- Apple iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="القرآن">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+
+  <!-- Preload Custom Uthmanic Font (Anti-FOUT) -->
+  <link rel="preload" href="assets/fonts/uthman_taha.ttf" as="font" type="font/ttf" crossorigin>
+
+  <title>القرآن الكريم</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- VoiceOver Live Announcement Region -->
+  <div id="voiceover-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Screen Reader Direct Navigation Shortcuts (VoiceOver Dual-Mode) -->
+  <div class="sr-only" aria-label="أوامر التنقل السريع لقارئ الشاشة">
+    <button type="button" class="sr-only sr-only-focusable" onclick="AudioPlayer.previousAyah()">الانتقال إلى الآية السابقة</button>
+    <button type="button" class="sr-only sr-only-focusable" onclick="AudioPlayer.nextAyah()">الانتقال إلى الآية التالية</button>
+    <button type="button" class="sr-only sr-only-focusable" onclick="AudioPlayer.replayCurrentAyah()">إعادة تلاوة الآية الحالية</button>
+    <button type="button" class="sr-only sr-only-focusable" onclick="AudioPlayer.togglePlayPause()">تشغيل أو إيقاف التلاوة</button>
+  </div>
+
+  <!-- Main App Shell -->
+  <main class="app-container" role="region" aria-label="مشغل القرآن الكريم">
+
+    <!-- 1. Header Bar -->
+    <header class="header-bar">
+      <!-- Continuous Play Toggle -->
+      <button type="button" class="header-btn" id="btn-continuous-play" aria-label="تبديل التلاوة المتواصلة">
+        <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+        <span>متواصل</span>
+      </button>
+
+      <!-- Surah Index Button -->
+      <button type="button" class="header-btn" id="btn-surahs" aria-label="فتح فهرس السور">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+        <span>السور</span>
+      </button>
+
+      <!-- Reciter Selector Button -->
+      <button type="button" class="header-btn" id="btn-reciters" aria-label="اختيار القارئ">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        <span>القراء</span>
+      </button>
+    </header>
+
+    <!-- 2. Surah & Ayah Pills Row -->
+    <section class="info-row" aria-label="معلومات السورة والآية الحالية">
+      <button type="button" class="info-pill" id="surah-name-pill" aria-label="اسم السورة الحالية، انقر لتغيير السورة">
+        سورة الفاتحة
+      </button>
+      <button type="button" class="info-pill" id="ayah-number-pill" aria-label="رقم الآية الحالية">
+        الآية 1
+      </button>
+    </section>
+
+    <!-- 3. Central Quran Ayah Card -->
+    <section class="ayah-carousel-wrapper" aria-label="نص الآية الشريفة">
+      
+      <!-- Previous Edge Arrow -->
+      <button type="button" class="nav-edge-btn prev" id="btn-edge-prev" aria-label="الآية السابقة">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+      </button>
+
+      <!-- Main Ayah Card Component -->
+      <div class="ayah-card" id="main-ayah-card" role="button" tabindex="0" aria-label="كارت الآية القرآني، انقر للتشغيل والإيقاف المؤقت، واسحب للتنقل بين الآيات">
+        <div class="ayah-text-container">
+          <div class="ayah-arabic-text" id="ayah-text-content">
+            بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
+          </div>
+          
+          <!-- Animated Equalizer Bars -->
+          <div class="equalizer-container" id="equalizer-bars" style="display: none;" aria-hidden="true">
+            <div class="equalizer-bar"></div>
+            <div class="equalizer-bar"></div>
+            <div class="equalizer-bar"></div>
+            <div class="equalizer-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Next Edge Arrow -->
+      <button type="button" class="nav-edge-btn next" id="btn-edge-next" aria-label="الآية التالية">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L10.83 12l4.58 4.59L14 18l-6-6 6-6 1.41 1.41z"/></svg>
+      </button>
+
+    </section>
+
+    <!-- 4. Bottom Action Hint (انقر للتكرار) -->
+    <footer class="bottom-action-container">
+      <button type="button" class="repeat-hint-btn" id="repeat-hint-action" aria-label="انقر لإعادة تلاوة الآية الحالية">
+        <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        <span>انقر للتكرار</span>
+      </button>
+    </footer>
+
+  </main>
+
+  <!-- ==========================================================================
+       Modals (فهرس السور واختيار القراء)
+       ========================================================================== -->
+
+  <!-- Surah Index Modal -->
+  <div class="modal-overlay" id="surah-index-modal" role="dialog" aria-modal="true" aria-labelledby="surah-modal-title">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h2 class="modal-title" id="surah-modal-title">فهرس السور</h2>
+        <button type="button" class="modal-close-btn" aria-label="إغلاق الفهرس">&times;</button>
+      </div>
+      <div class="search-input-wrapper">
+        <input type="search" class="search-input" id="surah-search-input" placeholder="ابحث باسم السورة أو رقمها..." aria-label="بحث في السور">
+      </div>
+      <div class="modal-list" id="surah-list-container" role="list"></div>
+    </div>
+  </div>
+
+  <!-- Reciter Selector Modal -->
+  <div class="modal-overlay" id="reciter-selector-modal" role="dialog" aria-modal="true" aria-labelledby="reciter-modal-title">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h2 class="modal-title" id="reciter-modal-title">اختيار القارئ</h2>
+        <button type="button" class="modal-close-btn" aria-label="إغلاق قائمة القراء">&times;</button>
+      </div>
+      <div class="search-input-wrapper">
+        <input type="search" class="search-input" id="reciter-search-input" placeholder="ابحث باسم القارئ..." aria-label="بحث في القراء">
+      </div>
+      <div class="modal-list" id="reciter-list-container" role="list"></div>
+    </div>
+  </div>
+
+  <!-- Single Core Audio Instance for iOS & Web -->
+  <audio id="quran-audio-core" preload="auto" playsinline></audio>
+
+  <!-- Application Scripts -->
+  <script src="js/storage.js"></script>
+  <script src="js/quran-data.js"></script>
+  <script src="js/audio-player.js"></script>
+  <script src="js/accessibility.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

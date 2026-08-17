@@ -493,6 +493,13 @@
   context: "إتاحة تكرار الآية للمبصرين والمكفوفين وتكبير حجم الخط القرآني"
   content: "1. إظهار عبارة 'انقر للتكرار' في أسفل واجهة المشغل لجميع المستخدمين (المبصرين والمكفوفين معاً) بإلغاء شرط الحصر الخاص بـ TalkBack، مع ربطها بـ clickable لتفعيل إعادة تلاوة الآية الحالية مباشرة عند النقر عليها.\n2. زيادة حجم خط النص القرآني في AyahCard بمقدار درجتين (من 28sp إلى 32sp) وضبط تباعد الأسطر (lineHeight = 68sp) لأقصى وضوح للتشكيل وعلامات الضبط القرآني."
   tags: [ui, typography, compose, dual-mode, accessibility, ayah-card, global]
+- id: MEM-2026-08-17-002
+  type: architecture-decision
+  timestamp: "2026-08-17T20:12:00+03:00"
+  agents: [persistent-memory-engine, code-architect, frontend-design-builder]
+  context: "بناء نسخة الويب والآيفون التقدمية (Mueen Web iOS PWA) في مجلد معزول"
+  content: "تم بناء نسخة ويب تقدمية كاملة ومستقلة في مجلد `web_ios/` للعمل على الآيفون ومتصفح Safari مع الحفاظ المطلق على كود الأندرويد في `app/`. ركائز الإنجاز:\n1. كائن صوتي أحادي مع فتح قفل الصوت في Safari (Audio Unlock Priming) والربط الكامل بـ navigator.mediaSession.\n2. معمارية ثنائية الوضع تدعم قارئ الشاشة VoiceOver عبر وسوم WAI-ARIA وأزرار دلالية مخفية وإعلانات Live Region.\n3. مطابقة الهوية البصرية الترابية الدافئة (#B38A5F)، الخط العثماني، الـ 114 سورة، الـ 20 قارئاً، وزر 'انقر للتكرار'.\n4. PWA Manifest و Service Worker للتشغيل بدون إنترنت والتثبيت كأيقونة مستقلة على الآيفون."
+  tags: [pwa, ios, safari, voiceover, accessibility, web-app, global]
   status: active
 ```
 

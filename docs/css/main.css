@@ -1,0 +1,491 @@
+/* ==========================================================================
+   تطبيق معين للقرآن الكريم - الأنماط الرئيسية لنظام iOS والويب
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  min-height: -webkit-fill-available;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  direction: rtl;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Accessibility Focus Styles */
+:focus-visible {
+  outline: 3px solid var(--accent-terracotta);
+  outline-offset: 2px;
+}
+
+/* Screen-Reader Only Actions (VoiceOver) */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  clip: auto !important;
+  white-space: normal !important;
+  padding: 8px 16px !important;
+  background: var(--card-active-bg);
+  color: var(--text-light);
+  border-radius: var(--radius-md);
+}
+
+/* Main App Container */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom)) 16px;
+  position: relative;
+}
+
+/* ==========================================================================
+   1. Header Bar (شريط التحكم العلوي)
+   ========================================================================== */
+.header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: var(--card-light-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.header-btn:active {
+  transform: scale(0.96);
+  background-color: var(--card-active-bg);
+  color: var(--text-light);
+}
+
+.header-btn.active {
+  background-color: var(--accent-terracotta);
+  border-color: var(--accent-terracotta-dark);
+  color: var(--text-light);
+}
+
+.header-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* ==========================================================================
+   2. Surah & Ayah Info Badges (كارت السورة وكارت رقم الآية)
+   ========================================================================== */
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.info-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--card-light-bg);
+  border: 1px solid var(--card-border);
+  color: var(--accent-terracotta);
+  border-radius: var(--radius-md);
+  padding: 8px 20px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.info-pill:active {
+  transform: scale(0.96);
+  background-color: var(--card-inner-bg);
+}
+
+/* ==========================================================================
+   3. Ayah Card & Carousel (كارت الآية القرآني الرئيسي)
+   ========================================================================== */
+.ayah-carousel-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.ayah-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--card-bg);
+  border: 2px solid var(--card-active-border);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  cursor: pointer;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+  text-align: center;
+}
+
+.ayah-card.playing {
+  border-color: var(--accent-terracotta);
+  box-shadow: 0 0 0 1px var(--accent-terracotta), var(--shadow-md);
+}
+
+.ayah-text-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: auto 0;
+}
+
+.ayah-arabic-text {
+  font-family: var(--font-quran);
+  font-size: 2.15rem; /* حجم الخط مكبّر درجتين لمطابقة 32sp */
+  line-height: 2.3;
+  color: var(--text-ayah);
+  text-align: center;
+  direction: rtl;
+  word-spacing: 2px;
+  padding: 8px 4px;
+}
+
+/* Equalizer Bars */
+.equalizer-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  margin-top: 14px;
+}
+
+.equalizer-bar {
+  width: 4px;
+  background-color: var(--accent-terracotta);
+  border-radius: 2px;
+  animation: equalizer-bounce 0.8s ease-in-out infinite alternate;
+}
+
+.equalizer-bar:nth-child(1) { animation-delay: 0.1s; height: 10px; }
+.equalizer-bar:nth-child(2) { animation-delay: 0.3s; height: 22px; }
+.equalizer-bar:nth-child(3) { animation-delay: 0.2s; height: 16px; }
+.equalizer-bar:nth-child(4) { animation-delay: 0.4s; height: 26px; }
+
+/* Navigation Edge Arrows (for sighted mouse/touch users) */
+.nav-edge-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: rgba(196, 158, 116, 0.75);
+  border: 1px solid var(--card-border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all var(--transition-fast);
+  z-index: 5;
+}
+
+.nav-edge-btn:active {
+  transform: translateY(-50%) scale(0.9);
+  background: var(--card-active-bg);
+  color: var(--text-light);
+}
+
+.nav-edge-btn.prev { right: 8px; }
+.nav-edge-btn.next { left: 8px; }
+
+.nav-edge-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* ==========================================================================
+   4. Bottom Repeat Action Hint (زر انقر للتكرار)
+   ========================================================================== */
+.bottom-action-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.repeat-hint-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  transition: all var(--transition-fast);
+}
+
+.repeat-hint-btn:active {
+  background-color: rgba(74, 53, 37, 0.15);
+  color: var(--accent-terracotta);
+  transform: scale(0.97);
+}
+
+.repeat-hint-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* ==========================================================================
+   5. Modal Bottom Sheets (فهرس السور، اختيار القراء، والإشارات)
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(18, 12, 7, 0.65);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-sheet {
+  background-color: var(--bg-color);
+  border-top: 2px solid var(--card-border);
+  border-radius: 24px 24px 0 0;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  max-height: 82dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom)) 16px;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(100%);
+  transition: transform var(--transition-smooth);
+}
+
+.modal-overlay.open .modal-sheet {
+  transform: translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 12px;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-terracotta);
+}
+
+.modal-close-btn {
+  background: var(--card-light-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-pill);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.modal-close-btn:active {
+  background: var(--card-active-bg);
+  color: var(--text-light);
+}
+
+/* Search Bar */
+.search-input-wrapper {
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  background-color: var(--card-light-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  direction: rtl;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent-terracotta);
+}
+
+/* List Items Container */
+.modal-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.list-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--card-light-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.list-item-card:active {
+  background-color: var(--card-inner-bg);
+}
+
+.list-item-card.active {
+  background-color: var(--card-active-bg);
+  border: 2px solid var(--accent-terracotta);
+  color: var(--text-light);
+}
+
+.list-item-card.active .item-number,
+.list-item-card.active .item-subtitle {
+  color: rgba(251, 248, 245, 0.85);
+}
+
+.item-main-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-number {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent-terracotta);
+  min-width: 32px;
+}
+
+.item-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.item-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Loading Overlay */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--accent-terracotta);
+  font-weight: 700;
+  margin: auto;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--card-border);
+  border-top-color: var(--accent-terracotta);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

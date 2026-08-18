@@ -1,10 +1,12 @@
 /**
  * مشغل الصوتيات المركزي المتوافق مع متصفح Safari و iOS MediaSession
+ * يدعم محرك التحميل المسبق (Gapless Audio Prefetch Buffer) لإلغاء أي تأخير بين الآيات
  */
 
 class AudioPlayerEngine {
   constructor() {
     this.audioElement = null;
+    this.prefetchAudioElement = null;
     this.isUnlocked = false;
     this.currentSurahId = 1;
     this.currentAyahIndex = 0;
@@ -28,6 +30,12 @@ class AudioPlayerEngine {
       this.audioElement.playsInline = true;
       document.body.appendChild(this.audioElement);
     }
+
+    // Prefetch audio element for gapless continuous playback
+    this.prefetchAudioElement = document.createElement('audio');
+    this.prefetchAudioElement.preload = 'auto';
+    this.prefetchAudioElement.muted = true;
+    this.prefetchAudioElement.playsInline = true;
 
     this.bindEvents();
     this.setupMediaSession();
@@ -76,6 +84,13 @@ class AudioPlayerEngine {
       this.isPlaying = false;
       if (this.onStateChange) this.onStateChange(false);
     });
+
+    // Handle iOS page visibility transitions smoothly
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.isPlaying) {
+        this.updateMediaSession();
+      }
+    });
   }
 
   setupMediaSession() {
@@ -84,8 +99,8 @@ class AudioPlayerEngine {
     try {
       navigator.mediaSession.setActionHandler('play', () => this.play());
       navigator.mediaSession.setActionHandler('pause', () => this.pause());
-      navigator.mediaSession.setActionHandler('previoustrack', () => this.previousAyah());
-      navigator.mediaSession.setActionHandler('nexttrack', () => this.nextAyah());
+      navigator.mediaSession.setActionHandler('previoustrack', () => this.previousAyah(true));
+      navigator.mediaSession.setActionHandler('nexttrack', () => this.nextAyah(true));
     } catch (err) {
       console.warn('MediaSession handler setup failed:', err);
     }
@@ -107,6 +122,8 @@ class AudioPlayerEngine {
         { src: 'assets/icons/icon-512.png', sizes: '512x512', type: 'image/png' }
       ]
     });
+
+    navigator.mediaSession.playbackState = this.isPlaying ? 'playing' : 'paused';
   }
 
   setContext(surahId, ayahsList, startIndex = 0, autoPlay = false) {
@@ -143,7 +160,6 @@ class AudioPlayerEngine {
     if (playPromise !== undefined) {
       playPromise.catch(err => {
         console.warn('Playback play() was rejected by browser:', err);
-        // Try reloading src if stalled
         this.loadAndPlayCurrentAyah();
       });
     }
@@ -184,6 +200,9 @@ class AudioPlayerEngine {
         this.isPlaying = true;
         if (this.onStateChange) this.onStateChange(true);
         this.updateMediaSession();
+
+        // Prefetch upcoming track in buffer to avoid network silence
+        this.prefetchNextTrack();
       }).catch(err => {
         if (this.playbackSessionId === sessionId) {
           console.warn('Audio play() failed for URL:', audioUrl, err);
@@ -196,6 +215,32 @@ class AudioPlayerEngine {
     if (this.onAyahChange) {
       this.onAyahChange(this.currentSurahId, this.currentAyahIndex);
     }
+  }
+
+  prefetchNextTrack() {
+    if (!this.isContinuousPlayEnabled || !this.prefetchAudioElement) return;
+
+    let nextSurahId = this.currentSurahId;
+    let nextAyahNum = 1;
+
+    if (this.currentAyahIndex < this.currentAyahsList.length - 1) {
+      const nextAyah = this.currentAyahsList[this.currentAyahIndex + 1];
+      nextAyahNum = nextAyah ? nextAyah.numberInSurah : (this.currentAyahIndex + 2);
+    } else if (this.currentSurahId < 114) {
+      nextSurahId = this.currentSurahId + 1;
+      nextAyahNum = 1;
+    } else {
+      return;
+    }
+
+    const nextAudioUrl = QuranDataManager.getAudioUrl(
+      this.selectedReciter.serverIdentifier,
+      nextSurahId,
+      nextAyahNum
+    );
+
+    this.prefetchAudioElement.src = nextAudioUrl;
+    this.prefetchAudioElement.load();
   }
 
   goToAyah(index, autoPlay = true) {
@@ -236,7 +281,7 @@ class AudioPlayerEngine {
 
   handleTrackEnded() {
     if (this.isContinuousPlayEnabled) {
-      // Browser automatically pauses on ended, so force autoPlay = true to continue playback
+      // Browser automatically pauses on ended, so force autoPlay = true to continue playback immediately
       this.nextAyah(true);
     } else {
       this.isPlaying = false;

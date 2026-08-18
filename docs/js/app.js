@@ -1,5 +1,6 @@
 /**
  * منسق واجهة المستخدم والتفاعل الرئيسي لتطبيق معين على الويب والآيفون
+ * يلتزم بمعايير الأداء الصارمة (Zero DOM Thrashing) والتوافق مع لوحة مفاتيح iOS (VisualViewport)
  */
 
 class MueenApp {
@@ -25,6 +26,10 @@ class MueenApp {
     this.surahModal = null;
     this.reciterModal = null;
 
+    // Pre-built DOM Nodes Cache
+    this.surahCardElements = [];
+    this.reciterCardElements = [];
+
     // Touch Swipe Tracking
     this.touchStartX = 0;
     this.touchStartY = 0;
@@ -37,17 +42,22 @@ class MueenApp {
     this.cacheElements();
     this.bindUIEvents();
     this.setupTouchGestures();
+    this.setupVisualViewport();
 
     // 1. Initialize Subsystems
     AccessibilityManager.init();
     await QuranDataManager.init();
     AudioPlayer.init();
 
-    // 2. Setup Audio Player Callbacks
+    // 2. Pre-build DOM Lists (Critical Performance Mandate: Build Once)
+    this.buildSurahListDOM();
+    this.buildReciterListDOM();
+
+    // 3. Setup Audio Player Callbacks
     AudioPlayer.onStateChange = (isPlaying) => this.handlePlayStateChange(isPlaying);
     AudioPlayer.onAyahChange = (surahId, ayahIndex) => this.handleAyahChange(surahId, ayahIndex);
 
-    // 3. Load Saved Session
+    // 4. Load Saved Session
     const session = StorageManager.loadSession();
     this.isContinuousPlay = StorageManager.loadContinuousPlay();
     AudioPlayer.isContinuousPlayEnabled = this.isContinuousPlay;
@@ -56,11 +66,12 @@ class MueenApp {
     const reciter = QuranDataManager.getReciterById(session.reciterId);
     this.selectedReciter = reciter;
     AudioPlayer.selectedReciter = reciter;
+    this.updateActiveReciterItem();
 
-    // 4. Load Initial Surah
+    // 5. Load Initial Surah
     await this.loadSurah(session.surahId || 1, session.ayahIndex || 0, false);
 
-    // 5. Register PWA Service Worker
+    // 6. Register PWA Service Worker
     this.registerServiceWorker();
   }
 
@@ -79,11 +90,25 @@ class MueenApp {
     this.reciterModal = document.getElementById('reciter-selector-modal');
   }
 
+  setupVisualViewport() {
+    if (!window.visualViewport) return;
+
+    const handleViewport = () => {
+      const activeModal = document.querySelector('.modal-overlay.open .modal-sheet');
+      if (activeModal) {
+        const availableHeight = window.visualViewport.height;
+        activeModal.style.maxHeight = `${Math.min(availableHeight * 0.88, 650)}px`;
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleViewport);
+    window.visualViewport.addEventListener('scroll', handleViewport);
+  }
+
   bindUIEvents() {
     // Single Click on Ayah Card: Toggle Play/Pause
     if (this.ayahCard) {
       this.ayahCard.addEventListener('click', (e) => {
-        // Prevent toggle if clicking on edge navigation buttons
         if (e.target.closest('.nav-edge-btn')) return;
         AudioPlayer.togglePlayPause();
       });
@@ -146,6 +171,24 @@ class MueenApp {
     if (reciterSearchInput) {
       reciterSearchInput.addEventListener('input', (e) => this.filterReciterList(e.target.value));
     }
+
+    // Keyboard Shortcuts (Space: Play/Pause, Left: Next, Right: Prev)
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        AudioPlayer.togglePlayPause();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        AudioPlayer.nextAyah();
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        AudioPlayer.previousAyah();
+      } else if (e.key === 'r' || e.key === 'ق') {
+        e.preventDefault();
+        AudioPlayer.replayCurrentAyah();
+      }
+    });
   }
 
   setupTouchGestures() {
@@ -167,13 +210,12 @@ class MueenApp {
     const diffX = this.touchEndX - this.touchStartX;
     const diffY = this.touchEndY - this.touchStartY;
 
-    // Only process horizontal swipes
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > this.minSwipeDistance) {
       if (diffX > 0) {
-        // Swiped Right -> In RTL, this is Previous Ayah
+        // Swiped Right -> In RTL, Previous Ayah
         AudioPlayer.previousAyah();
       } else {
-        // Swiped Left -> In RTL, this is Next Ayah
+        // Swiped Left -> In RTL, Next Ayah
         AudioPlayer.nextAyah();
       }
     }
@@ -194,6 +236,7 @@ class MueenApp {
 
     AudioPlayer.setContext(surahId, this.currentAyahs, this.currentAyahIndex, autoPlay);
     this.renderCurrentAyah();
+    this.updateActiveSurahItem();
 
     StorageManager.saveSession(this.currentSurahId, this.currentAyahIndex, this.selectedReciter.id);
   }
@@ -201,6 +244,11 @@ class MueenApp {
   renderCurrentAyah() {
     const currentAyah = this.currentAyahs[this.currentAyahIndex];
     if (!currentAyah) return;
+
+    // Reset scroll position on Ayah change for long ayahs
+    if (this.ayahCard) {
+      this.ayahCard.scrollTop = 0;
+    }
 
     // Update Ayah Text
     if (this.ayahTextElement) {
@@ -262,25 +310,17 @@ class MueenApp {
   }
 
   // ==========================================
-  // Modal Sheet Handlers
+  // Pre-built DOM Optimization (Zero Layout Thrashing)
   // ==========================================
-  openSurahIndex() {
-    AudioPlayer.pause();
-    this.populateSurahList(SURAH_LIST);
-    if (this.surahModal) {
-      this.surahModal.classList.add('open');
-      const search = document.getElementById('surah-search-input');
-      if (search) { search.value = ''; search.focus(); }
-    }
-    AccessibilityManager.announce('فهرس سور القرآن الكريم');
-  }
-
-  populateSurahList(list) {
+  buildSurahListDOM() {
     const container = document.getElementById('surah-list-container');
     if (!container) return;
     container.innerHTML = '';
+    this.surahCardElements = [];
 
-    list.forEach(surah => {
+    const fragment = document.createDocumentFragment();
+
+    SURAH_LIST.forEach(surah => {
       const card = document.createElement('div');
       card.className = `list-item-card ${surah.id === this.currentSurahId ? 'active' : ''}`;
       card.setAttribute('role', 'button');
@@ -303,41 +343,28 @@ class MueenApp {
         this.closeAllModals();
       });
 
-      container.appendChild(card);
+      card._searchMetadata = {
+        nameArabic: surah.nameArabic,
+        nameEnglish: surah.nameEnglish.toLowerCase(),
+        id: surah.id.toString()
+      };
+
+      this.surahCardElements.push({ id: surah.id, element: card, meta: card._searchMetadata });
+      fragment.appendChild(card);
     });
+
+    container.appendChild(fragment);
   }
 
-  filterSurahList(query) {
-    const cleanQuery = query.trim().toLowerCase();
-    if (!cleanQuery) {
-      this.populateSurahList(SURAH_LIST);
-      return;
-    }
-    const filtered = SURAH_LIST.filter(s =>
-      s.nameArabic.includes(cleanQuery) ||
-      s.nameEnglish.toLowerCase().includes(cleanQuery) ||
-      s.id.toString() === cleanQuery
-    );
-    this.populateSurahList(filtered);
-  }
-
-  openReciterSelector() {
-    AudioPlayer.pause();
-    this.populateReciterList(RECITERS_LIST);
-    if (this.reciterModal) {
-      this.reciterModal.classList.add('open');
-      const search = document.getElementById('reciter-search-input');
-      if (search) { search.value = ''; search.focus(); }
-    }
-    AccessibilityManager.announce('قائمة القراء');
-  }
-
-  populateReciterList(list) {
+  buildReciterListDOM() {
     const container = document.getElementById('reciter-list-container');
     if (!container) return;
     container.innerHTML = '';
+    this.reciterCardElements = [];
 
-    list.forEach((reciter, idx) => {
+    const fragment = document.createDocumentFragment();
+
+    RECITERS_LIST.forEach((reciter, idx) => {
       const isSelected = reciter.id === this.selectedReciter.id;
       const card = document.createElement('div');
       card.className = `list-item-card ${isSelected ? 'active' : ''}`;
@@ -358,25 +385,103 @@ class MueenApp {
       card.addEventListener('click', () => {
         this.selectedReciter = reciter;
         AudioPlayer.setReciter(reciter, true);
+        this.updateActiveReciterItem();
         StorageManager.saveSession(this.currentSurahId, this.currentAyahIndex, reciter.id);
         this.closeAllModals();
       });
 
-      container.appendChild(card);
+      card._searchMetadata = {
+        nameArabic: reciter.nameArabic,
+        nameEnglish: reciter.nameEnglish.toLowerCase(),
+        id: (idx + 1).toString()
+      };
+
+      this.reciterCardElements.push({ id: reciter.id, element: card, meta: card._searchMetadata });
+      fragment.appendChild(card);
     });
+
+    container.appendChild(fragment);
+  }
+
+  updateActiveSurahItem() {
+    this.surahCardElements.forEach(item => {
+      if (item.id === this.currentSurahId) {
+        item.element.classList.add('active');
+      } else {
+        item.element.classList.remove('active');
+      }
+    });
+  }
+
+  updateActiveReciterItem() {
+    this.reciterCardElements.forEach(item => {
+      if (item.id === this.selectedReciter.id) {
+        item.element.classList.add('active');
+      } else {
+        item.element.classList.remove('active');
+      }
+    });
+  }
+
+  // ==========================================
+  // Modal Sheet Handlers
+  // ==========================================
+  openSurahIndex() {
+    AudioPlayer.pause();
+    this.updateActiveSurahItem();
+    this.filterSurahList(''); // Reset visibility
+    if (this.surahModal) {
+      this.surahModal.classList.add('open');
+      const search = document.getElementById('surah-search-input');
+      if (search) {
+        search.value = '';
+        setTimeout(() => search.focus(), 80);
+      }
+    }
+    AccessibilityManager.announce('فهرس سور القرآن الكريم');
+  }
+
+  filterSurahList(query) {
+    const cleanQuery = query.trim().toLowerCase();
+    this.surahCardElements.forEach(({ element, meta }) => {
+      if (!cleanQuery) {
+        element.style.display = 'flex';
+      } else {
+        const match = meta.nameArabic.includes(cleanQuery) ||
+                      meta.nameEnglish.includes(cleanQuery) ||
+                      meta.id === cleanQuery;
+        element.style.display = match ? 'flex' : 'none';
+      }
+    });
+  }
+
+  openReciterSelector() {
+    AudioPlayer.pause();
+    this.updateActiveReciterItem();
+    this.filterReciterList(''); // Reset visibility
+    if (this.reciterModal) {
+      this.reciterModal.classList.add('open');
+      const search = document.getElementById('reciter-search-input');
+      if (search) {
+        search.value = '';
+        setTimeout(() => search.focus(), 80);
+      }
+    }
+    AccessibilityManager.announce('قائمة القراء');
   }
 
   filterReciterList(query) {
     const cleanQuery = query.trim().toLowerCase();
-    if (!cleanQuery) {
-      this.populateReciterList(RECITERS_LIST);
-      return;
-    }
-    const filtered = RECITERS_LIST.filter(r =>
-      r.nameArabic.includes(cleanQuery) ||
-      r.nameEnglish.toLowerCase().includes(cleanQuery)
-    );
-    this.populateReciterList(filtered);
+    this.reciterCardElements.forEach(({ element, meta }) => {
+      if (!cleanQuery) {
+        element.style.display = 'flex';
+      } else {
+        const match = meta.nameArabic.includes(cleanQuery) ||
+                      meta.nameEnglish.includes(cleanQuery) ||
+                      meta.id === cleanQuery;
+        element.style.display = match ? 'flex' : 'none';
+      }
+    });
   }
 
   closeAllModals() {

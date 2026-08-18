@@ -508,6 +508,59 @@
   content: "1. تهيئة مجلد `docs/` المتضمن لملف `.nojekyll` لنشر التطبيق مجاناً عبر GitHub Pages على الرابط: `https://ibrahimalkateb965-tech.github.io/Quran/`.\n2. ضبط اسم الأيقونة في iOS وشاشات الآيفون إلى 'القرآن' عبر `apple-mobile-web-app-title` و `manifest.json`.\n3. تحديث مسار المستودع البعيد git remote إلى `https://github.com/ibrahimalkateb965-tech/Quran.git` والتأكد من ضبط `http.postBuffer` لتفادي أخطاء المهلة عند رفع حزم البيانات."
   tags: [github-pages, deployment, ios-pwa, git-remote, global]
   status: active
+- id: MEM-2026-08-18-001
+  type: architecture-decision
+  timestamp: "2026-08-18T14:30:00+03:00"
+  agents: [persistent-memory-engine, code-reviewer-quality, test-automator, documentation-expert]
+  context: "دمج بوابات الحراسة الثلاث وإنشاء الخطاف رقم 18 لتدقيق الجودة"
+  content: "تم دمج بوابات الحراسة الثلاث في خطوط الإنتاج والصيانة:\n1. حارس الكود النظيف (`clean-code-guard`): يحظر 14 خطأً معمارياً (ابتلاع الاستثناءات، تضخم الدوال، انتهاك DRY).\n2. حارس الاختبارات (`test-guard`): يفرض اختبار السلوك الفعلي والمخرجات القابلة للملاحظة ويمنع الـ Mocks المفرطة.\n3. حارس التوثيق (`docs-guard`): يطابق الرموز البرمجية لمنع اختلاق وتناقض التوثيق.\n4. إنشاء الخطاف 18 لتشغيل الحراس الثلاثة بطلب واحد (`تدقيق الجودة`).\n[ANTI-PATTERN AVOIDED]: قبول التعديلات البرمجية دون فحص جودة الاختبارات ومطابقة التوثيق المحدث."
+  tags: [guards, clean-code, testing, documentation, hook-18, global]
+  status: active
+
+- id: MEM-2026-08-18-002
+  type: feature-decision
+  timestamp: "2026-08-18T15:20:00+03:00"
+  agents: [persistent-memory-engine, resource-scout-integrator, github-talent-scout, skill-forge-builder]
+  context: "إنشاء وكيل استكشاف وتكامل الموارد الخارجية وتفعيل الخطاف 19"
+  content: "تم بناء الوكيل `resource-scout-integrator` وإنشاء الخطاف 19 لاستكشاف وتحليل أي مستودع مفتوح المصدر على GitHub، استخراج وتكييف المهارات البرمجية آلياً بصيغة `SKILL.md`، نشرها عالمياً في `~/.gemini/config/skills/`، وتحديث ملفات الخطافات والإكسيل وتطبيق مكتبة الأوامر HTML ومزامنة المستودع العام.\n[ANTI-PATTERN AVOIDED]: الاستيراد العشوائي للمكتبات دون فحص أمني وهيكلي وتوحيد الترويسات."
+  tags: [scout, external-repo, skill-integration, hook-19, global]
+  status: active
+
+- id: MEM-2026-08-18-003
+  type: skill-architecture
+  timestamp: "2026-08-18T16:30:00+03:00"
+  agents: [persistent-memory-engine, skill-forge-builder, writing-skills]
+  context: "اعتماد مهارة skill-creator الرسمية من Anthropic ودمج find-skills (90k+)"
+  content: "تمت إعادة هندسة مسار بناء المهارات الجديدة ليمر بـ:\n1. البحث الذكي أولاً في مخزن الـ 90,000+ مهارة عبر `find-skills` لتجنب إعادة اختراع العجلة.\n2. التوليد والهندسة الآلية عبر `skill-creator` و `writing-skills` بالترويسة القياسية وقيود التفعيل القاطعة (Pushy Description) ودورة الاختبار السلوكي المقارن (With vs Without Skill).\n[ANTI-PATTERN AVOIDED]: كتابة مهارات يدوياً بدون ترويسة قياسية أو بدون اختبار التزام النماذج بها."
+  tags: [skill-creator, find-skills, prompt-engineering, anthropic, global]
+  status: active
+
+- id: MEM-2026-08-18-004
+  type: model-routing
+  timestamp: "2026-08-18T16:40:00+03:00"
+  agents: [persistent-memory-engine, agent-optimizer]
+  context: "معايرة مصفوفة النماذج من واقع Antigravity IDE والأتمتة عبر الإنترنت"
+  content: "1. ضبط النماذج المقترحة لكل خطاف من واقع قائمة محرّر Antigravity IDE الفعلية (`Claude Sonnet 4.6 Thinking`, `Gemini 3.7 Flash High`, `Claude Opus 4.6 Thinking`, `Gemini 3.6 Flash`).\n2. إنشاء محرك المعايرة `update_models_matrix.py` وإدراج مصادر الاستعلام الرسمية (`antigravity.google`, `google.dev`) في الخطاف 8 تحت محفز `تحديث النماذج` لتحديثها أونلاين دون لقطات شاشة.\n[ANTI-PATTERN AVOIDED]: اقتراح نماذج غير موجودة في قائمة المحرر الفعالة أو الاعتماد على التحديث اليدوي المجهد."
+  tags: [model-matrix, antigravity-ide, gemini-3.7-flash, claude-sonnet-thinking, hook-8, global]
+  status: active
+
+- id: MEM-2026-08-18-005
+  type: pipeline-governance
+  timestamp: "2026-08-18T16:45:00+03:00"
+  agents: [persistent-memory-engine, docs-guard, git-github-manager]
+  context: "صياغة الدليل الزمني لإدارة خط الإنتاج وإلزام تحديثه المستمر"
+  content: "1. صياغة وثيقة `hooks_user_guide.md` لتقديم مسار زمني صارم من 4 مراحل يغطي كافة الخطافات من 1 إلى 20.\n2. إلزام كافة الخطافات التشغيلية (8، 12، 19، 20) بتحديث وتدقيق هذا الملف بعد كل تعديل لضمان الاتساق الدائم."
+  tags: [pipeline-guide, hooks-user-guide, chronological-order, governance, global]
+  status: active
+
+- id: MEM-2026-08-18-006
+  type: cloud-parity-sync
+  timestamp: "2026-08-18T16:58:00+03:00"
+  agents: [persistent-memory-engine, git-github-manager, devops-deployer]
+  context: "تفعيل الخطاف 20 والمزامنة الكاملة 100% مع مستودع Claude-Antigravity-Workspace"
+  content: "تم إنشاء وتفعيل الخطاف 20 (`مزامنة المنظومة`) لمطابقة ومزامنة كافة الإضافات (Plugins)، المراجع وبذور المشاريع (References & Seeds)، إعدادات البيئة و MCP، المهارات (80+) والوكلاء (25+)، وتحديث ملفات الإكسيل وتطبيق مكتبة الأوامر HTML، ودفعها بنقرة واحدة إلى مستودع `https://github.com/ibrahimalkateb965-tech/Claude-Antigravity-Workspace.git` بضمان تطابق كامل 100%."
+  tags: [hook-20, cloud-sync, full-parity, plugins, mcp, claude-antigravity-workspace, global]
+  status: active
 ```
 
 </div>

@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import glob
 
 SOURCE_BLIND_AGENTS = r"f:\AI PROJECTS\Blind App\.agents"
 SOURCE_GLOBAL_SKILLS = r"C:\Users\Kt\.gemini\config\skills"
@@ -14,7 +13,18 @@ TARGET_SUBAGENTS = os.path.join(TARGET_AGENTS, "Sub_Agent")
 os.makedirs(TARGET_SKILLS, exist_ok=True)
 os.makedirs(TARGET_SUBAGENTS, exist_ok=True)
 
-print(">>> 1. Syncing Global & Local Skills to Claude-Antigravity-Workspace...")
+print(">>> 1. Updating Excel & Prompt Library Application...")
+# 1. Update Excel
+conv_script = os.path.join(SOURCE_BLIND_AGENTS, "convert_hooks_to_sheets.py")
+if os.path.exists(conv_script):
+    subprocess.run(["python", conv_script], cwd=SOURCE_BLIND_AGENTS, check=False)
+
+# 2. Update Prompt Library HTML
+html_script = os.path.join(SOURCE_BLIND_AGENTS, "update_html.py")
+if os.path.exists(html_script):
+    subprocess.run(["python", html_script], cwd=SOURCE_BLIND_AGENTS, check=False)
+
+print(">>> 2. Syncing Global & Local Skills to Claude-Antigravity-Workspace...")
 # Copy from global skills
 if os.path.exists(SOURCE_GLOBAL_SKILLS):
     for item in os.listdir(SOURCE_GLOBAL_SKILLS):
@@ -36,7 +46,7 @@ if os.path.exists(local_skills):
         else:
             shutil.copy2(s_path, d_path)
 
-print(">>> 2. Syncing Sub-Agents...")
+print(">>> 3. Syncing Sub-Agents...")
 if os.path.exists(os.path.join(SOURCE_BLIND_AGENTS, "Sub_Agent")):
     for item in os.listdir(os.path.join(SOURCE_BLIND_AGENTS, "Sub_Agent")):
         s_path = os.path.join(SOURCE_BLIND_AGENTS, "Sub_Agent", item)
@@ -46,12 +56,14 @@ if os.path.exists(os.path.join(SOURCE_BLIND_AGENTS, "Sub_Agent")):
         else:
             shutil.copy2(s_path, d_path)
 
-print(">>> 3. Syncing Core Guides & Scripts...")
+print(">>> 4. Syncing Core Guides & Scripts...")
 core_files = [
     "AGENTS.md",
     "HOOKS_GUIDE.md",
     "HOOKS_GUIDE.xlsx",
     "convert_hooks_to_sheets.py",
+    "update_html.py",
+    "sync_global_ecosystem.py",
     "ACTIVE_CONTEXT_INJECTION.md",
     "MEMORY_EXPORT_PROTOCOL.md"
 ]
@@ -61,10 +73,10 @@ for f in core_files:
     if os.path.exists(src):
         dst = os.path.join(TARGET_AGENTS, f)
         shutil.copy2(src, dst)
-        print(f"  Copied {f} to {dst}")
 
 # Also copy AGENTS.md and HOOKS_GUIDE.xlsx to root of TARGET_WORKSPACE for direct accessibility
 shutil.copy2(os.path.join(SOURCE_BLIND_AGENTS, "AGENTS.md"), os.path.join(TARGET_WORKSPACE, "AGENTS.md"))
 shutil.copy2(os.path.join(SOURCE_BLIND_AGENTS, "HOOKS_GUIDE.xlsx"), os.path.join(TARGET_WORKSPACE, "HOOKS_GUIDE.xlsx"))
+shutil.copy2(os.path.join(SOURCE_BLIND_AGENTS, "sync_global_ecosystem.py"), os.path.join(TARGET_WORKSPACE, "sync_global_ecosystem.py"))
 
-print(">>> 4. Ecosystem Sync Completed Successfully!")
+print(">>> 5. Ecosystem Sync Completed Successfully!")

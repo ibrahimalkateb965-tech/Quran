@@ -38,8 +38,15 @@ class AudioPlayerEngine {
     const unlockHandler = () => {
       if (this.isUnlocked) return;
       this.isUnlocked = true;
-      // Safari Audio Unlock Trick: load silent stub to enable background media
-      this.audioElement.load();
+      // Safari Audio Unlock: play & pause to grant uninterrupted background playback
+      const playPromise = this.audioElement.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          this.audioElement.pause();
+        }).catch(() => {
+          this.audioElement.load();
+        });
+      }
       window.removeEventListener('touchstart', unlockHandler, true);
       window.removeEventListener('click', unlockHandler, true);
     };
@@ -203,31 +210,34 @@ class AudioPlayerEngine {
     }
   }
 
-  nextAyah() {
+  nextAyah(forceAutoPlay = null) {
+    const shouldPlay = forceAutoPlay !== null ? forceAutoPlay : this.isPlaying;
     if (this.currentAyahIndex < this.currentAyahsList.length - 1) {
-      this.goToAyah(this.currentAyahIndex + 1, this.isPlaying);
+      this.goToAyah(this.currentAyahIndex + 1, shouldPlay);
     } else if (this.isContinuousPlayEnabled && this.currentSurahId < 114) {
       // Advance to next Surah
       if (window.App) {
-        window.App.loadSurah(this.currentSurahId + 1, 0, this.isPlaying);
+        window.App.loadSurah(this.currentSurahId + 1, 0, shouldPlay);
       }
     }
   }
 
-  previousAyah() {
+  previousAyah(forceAutoPlay = null) {
+    const shouldPlay = forceAutoPlay !== null ? forceAutoPlay : this.isPlaying;
     if (this.currentAyahIndex > 0) {
-      this.goToAyah(this.currentAyahIndex - 1, this.isPlaying);
+      this.goToAyah(this.currentAyahIndex - 1, shouldPlay);
     } else if (this.isContinuousPlayEnabled && this.currentSurahId > 1) {
       // Go to previous Surah
       if (window.App) {
-        window.App.loadSurah(this.currentSurahId - 1, 0, this.isPlaying);
+        window.App.loadSurah(this.currentSurahId - 1, 0, shouldPlay);
       }
     }
   }
 
   handleTrackEnded() {
     if (this.isContinuousPlayEnabled) {
-      this.nextAyah();
+      // Browser automatically pauses on ended, so force autoPlay = true to continue playback
+      this.nextAyah(true);
     } else {
       this.isPlaying = false;
       if (this.onStateChange) this.onStateChange(false);

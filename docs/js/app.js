@@ -24,7 +24,6 @@ class MueenApp {
     // Modals
     this.surahModal = null;
     this.reciterModal = null;
-    this.bookmarksModal = null;
 
     // Touch Swipe Tracking
     this.touchStartX = 0;
@@ -78,7 +77,6 @@ class MueenApp {
 
     this.surahModal = document.getElementById('surah-index-modal');
     this.reciterModal = document.getElementById('reciter-selector-modal');
-    this.bookmarksModal = document.getElementById('bookmarks-modal');
   }
 
   bindUIEvents() {
@@ -214,6 +212,11 @@ class MueenApp {
       this.ayahNumberBtn.textContent = `الآية ${currentAyah.numberInSurah}`;
     }
 
+    // Update Ayah Card Accessibility Label
+    if (this.ayahCard) {
+      this.ayahCard.setAttribute('aria-label', `الآية ${currentAyah.numberInSurah}`);
+    }
+
     // Accessibility Announcement
     const surah = QuranDataManager.getSurahById(this.currentSurahId);
     AccessibilityManager.announce(`سورة ${surah.nameArabic}، الآية ${currentAyah.numberInSurah}`);
@@ -248,6 +251,9 @@ class MueenApp {
 
   updateContinuousPlayUI() {
     if (!this.continuousPlayBtn) return;
+    const label = `الاستماع المتواصل. حالياً ${this.isContinuousPlay ? 'مفعل' : 'معطل'}`;
+    this.continuousPlayBtn.setAttribute('aria-label', label);
+    this.continuousPlayBtn.setAttribute('title', label);
     if (this.isContinuousPlay) {
       this.continuousPlayBtn.classList.add('active');
     } else {

@@ -1,6 +1,6 @@
 /**
  * منسق واجهة المستخدم والتفاعل الرئيسي لتطبيق معين على الويب والآيفون
- * يلتزم بمعايير الأداء الصارمة (Zero DOM Thrashing) والتوافق مع لوحة مفاتيح iOS (VisualViewport)
+ * يدعم التشغيل الفوري للسور (Zero-Delay) وفهرس الآيات (Ayah Index Sheet)
  */
 
 class MueenApp {
@@ -24,11 +24,13 @@ class MueenApp {
 
     // Modals
     this.surahModal = null;
+    this.ayahModal = null;
     this.reciterModal = null;
 
     // Pre-built DOM Nodes Cache
     this.surahCardElements = [];
     this.reciterCardElements = [];
+    this.ayahCardElements = [];
 
     // Touch Swipe Tracking
     this.touchStartX = 0;
@@ -44,12 +46,12 @@ class MueenApp {
     this.setupTouchGestures();
     this.setupVisualViewport();
 
-    // 1. Initialize Subsystems
+    // 1. Initialize Subsystems (Eager loading)
     AccessibilityManager.init();
-    await QuranDataManager.init();
+    QuranDataManager.init();
     AudioPlayer.init();
 
-    // 2. Pre-build DOM Lists (Critical Performance Mandate: Build Once)
+    // 2. Pre-build Static DOM Lists (Zero Layout Thrashing)
     this.buildSurahListDOM();
     this.buildReciterListDOM();
 
@@ -87,6 +89,7 @@ class MueenApp {
     this.surahsBtn = document.getElementById('btn-surahs');
 
     this.surahModal = document.getElementById('surah-index-modal');
+    this.ayahModal = document.getElementById('ayah-index-modal');
     this.reciterModal = document.getElementById('reciter-selector-modal');
   }
 
@@ -133,12 +136,7 @@ class MueenApp {
       this.surahNameBtn.addEventListener('click', () => this.openSurahIndex());
     }
     if (this.ayahNumberBtn) {
-      this.ayahNumberBtn.addEventListener('click', () => {
-        const surah = QuranDataManager.getSurahById(this.currentSurahId);
-        const ayah = this.currentAyahs[this.currentAyahIndex];
-        const num = ayah ? ayah.numberInSurah : 1;
-        AccessibilityManager.announce(`سورة ${surah.nameArabic}، الآية ${num} من أصل ${surah.ayahCount}`);
-      });
+      this.ayahNumberBtn.addEventListener('click', () => this.openAyahIndex());
     }
     if (this.surahsBtn) {
       this.surahsBtn.addEventListener('click', () => this.openSurahIndex());
@@ -167,12 +165,17 @@ class MueenApp {
       surahSearchInput.addEventListener('input', (e) => this.filterSurahList(e.target.value));
     }
 
+    const ayahSearchInput = document.getElementById('ayah-search-input');
+    if (ayahSearchInput) {
+      ayahSearchInput.addEventListener('input', (e) => this.filterAyahList(e.target.value));
+    }
+
     const reciterSearchInput = document.getElementById('reciter-search-input');
     if (reciterSearchInput) {
       reciterSearchInput.addEventListener('input', (e) => this.filterReciterList(e.target.value));
     }
 
-    // Keyboard Shortcuts (Space: Play/Pause, Left: Next, Right: Prev)
+    // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
       if (e.code === 'Space') {
@@ -212,10 +215,10 @@ class MueenApp {
 
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > this.minSwipeDistance) {
       if (diffX > 0) {
-        // Swiped Right -> In RTL, Previous Ayah
+        // Swiped Right -> Previous Ayah
         AudioPlayer.previousAyah();
       } else {
-        // Swiped Left -> In RTL, Next Ayah
+        // Swiped Left -> Next Ayah
         AudioPlayer.nextAyah();
       }
     }
@@ -225,16 +228,21 @@ class MueenApp {
     this.currentSurahId = surahId;
     const surah = QuranDataManager.getSurahById(surahId);
 
-    // Update Surah Pill
+    // Update Surah Pill immediately
     if (this.surahNameBtn) {
       this.surahNameBtn.textContent = `سورة ${surah.nameArabic}`;
     }
 
-    // Fetch Ayahs
+    // Zero-Delay Kickoff: Play audio immediately on user tap before waiting for full json fetch
+    if (autoPlay) {
+      AudioPlayer.playSurahAyahImmediate(surahId, targetAyahIndex + 1, this.currentAyahs);
+    }
+
+    // Fetch / Resolve Ayahs list
     this.currentAyahs = await QuranDataManager.getAyahsForSurah(surahId);
     this.currentAyahIndex = Math.max(0, Math.min(targetAyahIndex, this.currentAyahs.length - 1));
 
-    AudioPlayer.setContext(surahId, this.currentAyahs, this.currentAyahIndex, autoPlay);
+    AudioPlayer.setContext(surahId, this.currentAyahs, this.currentAyahIndex, false);
     this.renderCurrentAyah();
     this.updateActiveSurahItem();
 
@@ -245,27 +253,22 @@ class MueenApp {
     const currentAyah = this.currentAyahs[this.currentAyahIndex];
     if (!currentAyah) return;
 
-    // Reset scroll position on Ayah change for long ayahs
     if (this.ayahCard) {
       this.ayahCard.scrollTop = 0;
     }
 
-    // Update Ayah Text
     if (this.ayahTextElement) {
       this.ayahTextElement.textContent = currentAyah.textArabic;
     }
 
-    // Update Ayah Pill
     if (this.ayahNumberBtn) {
       this.ayahNumberBtn.textContent = `الآية ${currentAyah.numberInSurah}`;
     }
 
-    // Update Ayah Card Accessibility Label
     if (this.ayahCard) {
       this.ayahCard.setAttribute('aria-label', `الآية ${currentAyah.numberInSurah}`);
     }
 
-    // Accessibility Announcement
     const surah = QuranDataManager.getSurahById(this.currentSurahId);
     AccessibilityManager.announce(`سورة ${surah.nameArabic}، الآية ${currentAyah.numberInSurah}`);
   }
@@ -310,7 +313,7 @@ class MueenApp {
   }
 
   // ==========================================
-  // Pre-built DOM Optimization (Zero Layout Thrashing)
+  // Pre-built DOM Optimization
   // ==========================================
   buildSurahListDOM() {
     const container = document.getElementById('surah-list-container');
@@ -403,6 +406,52 @@ class MueenApp {
     container.appendChild(fragment);
   }
 
+  populateAyahList() {
+    const container = document.getElementById('ayah-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+    this.ayahCardElements = [];
+
+    const fragment = document.createDocumentFragment();
+    const currentAyahs = this.currentAyahs;
+
+    currentAyahs.forEach((ayah, idx) => {
+      const isSelected = idx === this.currentAyahIndex;
+      const card = document.createElement('div');
+      card.className = `list-item-card ${isSelected ? 'active' : ''}`;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', `الآية ${ayah.numberInSurah}`);
+
+      const textSnippet = ayah.textArabic.length > 55 ? ayah.textArabic.substring(0, 55) + '...' : ayah.textArabic;
+
+      card.innerHTML = `
+        <div class="item-main-info">
+          <span class="item-number">${ayah.numberInSurah}</span>
+          <div>
+            <div class="item-title">الآية ${ayah.numberInSurah}</div>
+            <div class="item-subtitle">${textSnippet}</div>
+          </div>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        AudioPlayer.goToAyah(idx, true);
+        this.closeAllModals();
+      });
+
+      const meta = {
+        number: ayah.numberInSurah.toString(),
+        text: ayah.textArabic
+      };
+
+      this.ayahCardElements.push({ index: idx, element: card, meta });
+      fragment.appendChild(card);
+    });
+
+    container.appendChild(fragment);
+  }
+
   updateActiveSurahItem() {
     this.surahCardElements.forEach(item => {
       if (item.id === this.currentSurahId) {
@@ -429,7 +478,7 @@ class MueenApp {
   openSurahIndex() {
     AudioPlayer.pause();
     this.updateActiveSurahItem();
-    this.filterSurahList(''); // Reset visibility
+    this.filterSurahList('');
     if (this.surahModal) {
       this.surahModal.classList.add('open');
       const search = document.getElementById('surah-search-input');
@@ -455,10 +504,37 @@ class MueenApp {
     });
   }
 
+  openAyahIndex() {
+    AudioPlayer.pause();
+    this.populateAyahList();
+    if (this.ayahModal) {
+      this.ayahModal.classList.add('open');
+      const search = document.getElementById('ayah-search-input');
+      if (search) {
+        search.value = '';
+        setTimeout(() => search.focus(), 80);
+      }
+    }
+    const surah = QuranDataManager.getSurahById(this.currentSurahId);
+    AccessibilityManager.announce(`فهرس آيات سورة ${surah.nameArabic}`);
+  }
+
+  filterAyahList(query) {
+    const cleanQuery = query.trim().toLowerCase();
+    this.ayahCardElements.forEach(({ element, meta }) => {
+      if (!cleanQuery) {
+        element.style.display = 'flex';
+      } else {
+        const match = meta.number === cleanQuery || meta.text.includes(cleanQuery);
+        element.style.display = match ? 'flex' : 'none';
+      }
+    });
+  }
+
   openReciterSelector() {
     AudioPlayer.pause();
     this.updateActiveReciterItem();
-    this.filterReciterList(''); // Reset visibility
+    this.filterReciterList('');
     if (this.reciterModal) {
       this.reciterModal.classList.add('open');
       const search = document.getElementById('reciter-search-input');

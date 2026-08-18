@@ -173,6 +173,7 @@ function sanitizeUthmanicText(text) {
 const QuranDataManager = {
   rawQuranJson: null,
   cachedSurahs: new Map(),
+  loadPromise: null,
 
   async init() {
     // Populate Fatihah in cache immediately
@@ -181,14 +182,23 @@ const QuranDataManager = {
       textArabic: sanitizeUthmanicText(a.textArabic)
     })));
 
-    try {
-      const response = await fetch('assets/data/quran.json');
-      if (response.ok) {
-        this.rawQuranJson = await response.json();
-      }
-    } catch (err) {
-      console.warn('Could not fetch full quran.json eagerly:', err);
+    if (!this.loadPromise) {
+      this.loadPromise = fetch('assets/data/quran.json')
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          this.rawQuranJson = data;
+          return data;
+        })
+        .catch(err => {
+          console.warn('Could not fetch full quran.json eagerly:', err);
+          return null;
+        });
     }
+
+    return this.loadPromise;
   },
 
   getSurahById(id) {
@@ -205,16 +215,18 @@ const QuranDataManager = {
     }
 
     if (!this.rawQuranJson) {
-      try {
-        const response = await fetch('assets/data/quran.json');
-        this.rawQuranJson = await response.json();
-      } catch (e) {
-        console.error('Error fetching quran.json:', e);
-        return surahId === 1 ? this.cachedSurahs.get(1) : [];
+      if (this.loadPromise) {
+        await this.loadPromise;
+      } else {
+        await this.init();
       }
     }
 
-    const rawList = this.rawQuranJson[surahId.toString()] || [];
+    const rawList = (this.rawQuranJson && this.rawQuranJson[surahId.toString()]) || [];
+    if (rawList.length === 0 && surahId === 1) {
+      return this.cachedSurahs.get(1);
+    }
+
     const sanitizedList = rawList.map(item => ({
       numberInSurah: item.numberInSurah,
       globalNumber: item.globalNumber,
@@ -223,7 +235,9 @@ const QuranDataManager = {
       juz: item.juz || 1
     }));
 
-    this.cachedSurahs.set(surahId, sanitizedList);
+    if (sanitizedList.length > 0) {
+      this.cachedSurahs.set(surahId, sanitizedList);
+    }
     return sanitizedList;
   },
 

@@ -1,6 +1,6 @@
 /**
  * مشغل الصوتيات المركزي المتوافق مع متصفح Safari و iOS MediaSession
- * يدعم محرك التحميل المسبق (Gapless Audio Prefetch Buffer) لإلغاء أي تأخير بين الآيات
+ * يدعم محرك التحميل المسبق (Gapless Audio Prefetch Buffer) والتشغيل الفوري (Zero-Delay Instant Play)
  */
 
 class AudioPlayerEngine {
@@ -175,15 +175,57 @@ class AudioPlayerEngine {
     this.loadAndPlayCurrentAyah();
   }
 
+  playSurahAyahImmediate(surahId, ayahNumber = 1, ayahsList = []) {
+    this.currentSurahId = surahId;
+    this.currentAyahIndex = Math.max(0, ayahNumber - 1);
+    if (ayahsList && ayahsList.length > 0) {
+      this.currentAyahsList = ayahsList;
+    }
+
+    const audioUrl = QuranDataManager.getAudioUrl(
+      this.selectedReciter.serverIdentifier,
+      surahId,
+      ayahNumber
+    );
+
+    const sessionId = ++this.playbackSessionId;
+    this.audioElement.src = audioUrl;
+    this.audioElement.load();
+
+    const playPromise = this.audioElement.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        if (this.playbackSessionId !== sessionId) {
+          this.audioElement.pause();
+          return;
+        }
+        this.isPlaying = true;
+        if (this.onStateChange) this.onStateChange(true);
+        this.updateMediaSession();
+        this.prefetchNextTrack();
+      }).catch(err => {
+        if (this.playbackSessionId === sessionId) {
+          console.warn('Immediate audio play() failed for URL:', audioUrl, err);
+          this.isPlaying = false;
+          if (this.onStateChange) this.onStateChange(false);
+        }
+      });
+    }
+
+    if (this.onAyahChange) {
+      this.onAyahChange(this.currentSurahId, this.currentAyahIndex);
+    }
+  }
+
   loadAndPlayCurrentAyah() {
     const sessionId = ++this.playbackSessionId;
     const currentAyah = this.currentAyahsList[this.currentAyahIndex];
-    if (!currentAyah) return;
+    const ayahNumber = currentAyah ? currentAyah.numberInSurah : (this.currentAyahIndex + 1);
 
     const audioUrl = QuranDataManager.getAudioUrl(
       this.selectedReciter.serverIdentifier,
       this.currentSurahId,
-      currentAyah.numberInSurah
+      ayahNumber
     );
 
     this.audioElement.src = audioUrl;
@@ -244,7 +286,7 @@ class AudioPlayerEngine {
   }
 
   goToAyah(index, autoPlay = true) {
-    if (index < 0 || index >= this.currentAyahsList.length) return;
+    if (index < 0 || (this.currentAyahsList.length > 0 && index >= this.currentAyahsList.length)) return;
     this.currentAyahIndex = index;
     if (autoPlay) {
       this.loadAndPlayCurrentAyah();

@@ -1,21 +1,49 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ProGuard & R8 Optimization Rules for Quran Blind App
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# 1. General Android & Line Numbers preservation for Crash Reports
+-keepattributes SourceFile,LineNumberTable,Signature,InnerClasses,EnclosingMethod,*Annotation*
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# 2. Kotlin Coroutines & Flow
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+-keep class kotlinx.coroutines.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# 3. AndroidX Media3 (ExoPlayer & MediaSession)
+-keep class androidx.media3.** { *; }
+-keepclassmembers class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+-keep class com.example.service.QuranAudioService { *; }
+
+# 4. Room Database & SQLite
+-keep class androidx.room.** { *; }
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao class * { *; }
+-dontwarn androidx.room.paging.**
+
+# 5. Moshi & Retrofit Serialization
+-keepclasseswithmembers class * {
+    @com.squareup.moshi.* <methods>;
+}
+-keepclasseswithmembers class * {
+    @com.squareup.moshi.* <fields>;
+}
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keep class com.squareup.moshi.** { *; }
+-keep class retrofit2.** { *; }
+-keepclassmembers,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+# 6. Models & Data Transfer Objects (Keep all data classes)
+-keep class com.example.model.** { *; }
+-keep class com.example.data.** { *; }
+
+# 7. AndroidX Security Crypto & SharedPreferences
+-keep class androidx.security.crypto.** { *; }
+
+# 8. Compose UI & Runtime
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }

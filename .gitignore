@@ -23,3 +23,6 @@ old_screen.txt
 feature_auto_scroll_plan.md
 implementation_plan*.md
 WhatsApp Image*
+*.jks
+*.keystore
+key.properties

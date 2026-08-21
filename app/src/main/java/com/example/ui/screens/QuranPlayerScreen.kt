@@ -231,30 +231,48 @@ fun QuranPlayerScreen(
                             pageCount = { ayahs.size }
                         )
                         var isProgrammaticScroll by remember { mutableStateOf(false) }
+                        var userScrolled by remember { mutableStateOf(false) }
 
-                        // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah)
+                        // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah or on resume)
                         LaunchedEffect(currentAyahIndex) {
                             val target = currentAyahIndex
                             if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
                                 isProgrammaticScroll = true
                                 try {
-                                    pagerState.animateScrollToPage(target)
+                                    if (kotlin.math.abs(target - pagerState.currentPage) > 1) {
+                                        pagerState.scrollToPage(target)
+                                    } else {
+                                        pagerState.animateScrollToPage(target)
+                                    }
                                 } finally {
                                     isProgrammaticScroll = false
                                 }
                             }
                         }
 
-                        // Sync Pager state to ViewModel (when user swipes)
+                        // Track user-initiated manual scrolling
                         LaunchedEffect(pagerState) {
-                            snapshotFlow { pagerState.currentPage }
+                            snapshotFlow { pagerState.isScrollInProgress }
+                                .collect { isScrolling ->
+                                    if (isScrolling && !isProgrammaticScroll) {
+                                        userScrolled = true
+                                    }
+                                }
+                        }
+
+                        // Sync Pager state to ViewModel ONLY when user manually swipes
+                        LaunchedEffect(pagerState) {
+                            snapshotFlow { pagerState.settledPage }
                                 .distinctUntilChanged()
                                 .collect { page ->
                                     if (isProgrammaticScroll) return@collect
-                                    val currentState = viewModel.playbackUiState.value
-                                    val currentIndex = currentState.currentAyahIndex
-                                    if (page != currentIndex && page in currentState.currentAyahs.indices) {
-                                        viewModel.goToAyah(page, autoPlay = true)
+                                    if (userScrolled) {
+                                        userScrolled = false
+                                        val currentState = viewModel.playbackUiState.value
+                                        val currentIndex = currentState.currentAyahIndex
+                                        if (page != currentIndex && page in currentState.currentAyahs.indices) {
+                                            viewModel.goToAyah(page, autoPlay = true, isManual = true)
+                                        }
                                     }
                                 }
                         }
@@ -287,8 +305,10 @@ fun QuranPlayerScreen(
                                                 action = { x: Float, y: Float ->
                                                     scope.launch {
                                                         if (x > 0f && pagerState.currentPage > 0) {
+                                                            userScrolled = true
                                                             pagerState.animateScrollToPage(pagerState.currentPage - 1)
                                                         } else if (x < 0f && pagerState.currentPage < ayahs.size - 1) {
+                                                            userScrolled = true
                                                             pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                                         }
                                                     }

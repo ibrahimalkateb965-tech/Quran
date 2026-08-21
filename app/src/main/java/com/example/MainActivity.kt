@@ -62,7 +62,9 @@ class MainActivity : ComponentActivity() {
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
                             Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
-                                viewModel.pausePlayback()
+                                if (!viewModel.settingsUiState.value.isContinuousPlayEnabled) {
+                                    viewModel.pausePlayback()
+                                }
                             }
                             else -> {}
                         }

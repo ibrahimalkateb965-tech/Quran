@@ -74,6 +74,22 @@ class QuranAudioService : MediaSessionService() {
         }
 
         val sessionCallback = object : MediaSession.Callback {
+            override fun onConnect(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo
+            ): MediaSession.ConnectionResult {
+                val isSelf = controller.packageName == packageName
+                val isSystemOrTrusted = controller.packageName == "com.android.systemui" ||
+                        controller.packageName == "com.google.android.projection.gearhead" ||
+                        controller.packageName == "com.google.android.googlequicksearchbox" ||
+                        session.isMediaNotificationController(controller)
+
+                if (isSelf || isSystemOrTrusted) {
+                    return super.onConnect(session, controller)
+                }
+                return MediaSession.ConnectionResult.reject()
+            }
+
             override fun onMediaButtonEvent(
                 session: MediaSession,
                 controllerInfo: MediaSession.ControllerInfo,

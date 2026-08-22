@@ -25,7 +25,9 @@ import com.example.ui.screens.QuranPlayerScreen
 import com.example.ui.screens.TrialExpiredScreen
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.viewmodel.QuranViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: QuranViewModel by viewModels()

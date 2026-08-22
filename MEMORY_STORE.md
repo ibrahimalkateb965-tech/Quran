@@ -192,6 +192,25 @@
 - **الوكلاء المساهمون:** `[persistent-memory-engine]`, `[agent-optimizer]`
 - **المشكلة:** قام وكيل البرمجة بتكرار خطأ مسجل مسبقاً في الذاكرة (استخدام Fully Qualified Names لدوال الامتداد في Kotlin)، مما أدى لانهيار البناء مرة أخرى.
 - **السبب:** مجرد "تسجيل" الذكريات لا يكفي. وكيل البرمجة حاول اختصار الوقت (Shortcut Anti-Pattern) ولم يقم بمراجعة القواعد المحفوظة في `MEMORY_STORE.md` بشكل نشط قبل كتابة الكود.
-- **الحل المعتمد:** تفعيل آلية **"حقن السياق الإجباري"**. يجب على أي وكيل يكتب الكود أن يتلقى ملخصاً بالدروس المستفادة والأخطاء الشائعة ضمن مطالبته (Prompt) الأولية أو أن يقوم بقراءتها ذاتياً قبل توليد أي كود، لمنع تجاوز القيود المعروفة.
+- **الحل المعتمد:** تفعيل آلية **"حقن السياق الإجباري"**. يجب على أي وكيل يكتب الكود أن يتلقى ملخصاً بالدروس المستفادة والأخطاء الشائعة ضمن مطالبته (Prompt) الأولية أو أن يقوم بقراءتها ذاتياً قبل توليد أي كود، لمنع تجاوز القيود المعروفة.## [decision] تأمين حواجب الإطلاق وتفعيل R8 والتخزين المشفر
+- **التاريخ:** 2026-08-21
+- **الوكلاء المساهمون:** `[security-auditor]`, `[code-architect]`, `[devops-deployer]`
+- **التحدي:** اكتشاف 4 ثغرات أمنية حرجة وحواجب إطلاق في تطبيق Blind App: (1) كلمات مرور Keystore مكشوفة في build.gradle.kts، (2) غياب التعتيم isMinifyEnabled = false في الـ Release، (3) كشف رموز PIN والتجزئة بلا ملح، (4) تلف مفاتيح Keystore عند استعادة النسخ الاحتياطي التلقائي للأندرويد.
+- **الحل المعتمد:**
+  1. **حذف كلمات المرور الصريحة:** قراءة المفاتيح حصرياً من متغيرات البيئة أو key.properties المستثنى.
+  2. **تفعيل R8 ProGuard:** تفعيل `isMinifyEnabled = true` وضبط قواعد الحماية لـ Media3 و Room و Security Crypto في `proguard-rules.pro`.
+  3. **تأمين PIN بالـ Salt:** تطبيق Salt خاص بالمشروع على دالة `hashPin` لمنع كسر التجزئات عبر جداول قوس قزح، وحذف التعليقات الكاشفة.
+  4. **حماية التخزين المشفر:** استثناء `mueen_trial_secure_prefs.xml` و `mueen_session_prefs.xml` في `backup_rules.xml` و `data_extraction_rules.xml`.
+  5. **حراسة خدمة الوسائط والشبكة:** تقييد `onConnect` لـ `QuranAudioService` بالتحقق من الحزم الموثوقة، وحصر `HttpLoggingInterceptor` في وضع `BuildConfig.DEBUG` فقط.
 
+## [decision] التطبيق الكامل لـ Dagger Hilt و Clean Architecture
+- **التاريخ:** 2026-08-22
+- **الوكلاء المساهمون:** `[code-architect]`, `[android-kotlin-pro]`, `[jetpack-compose-ui]`, `[performance-optimizer]`
+- **التحدي:** كان المشروع يعتمد على Singletons يدوية ونمط God ViewModel مع انعدام طبقة Domain، مما يمنع إنشاء واختبار الـ ViewModel في بيئة Unit Tests.
+- **الحل المعتمد:**
+  1. **تثبيت Dagger Hilt:** إضافة الإضافات والتبعيات في `libs.versions.toml` وإنشاء `QuranBlindApp` بـ `@HiltAndroidApp` وتعيين `MainActivity` كـ `@AndroidEntryPoint`.
+  2. **بناء طبقة الـ Domain:** عزل `interface QuranRepository` وتوفير الاعتماديات عبر `AppModule` و `RepositoryModule`.
+  3. **إعادة هيكلة ViewModel:** تحويل `QuranViewModel` لـ `@HiltViewModel` وحقن الاعتماديات بدلاً من إنشائها يدوياً.
+  4. **تحسين الأداء والبطارية:** عزل `playbackProgress` كـ StateFlow مستقل لمنع Recomposition لـ 114 سورة 17 مرة في الثانية، وتخزين أصول القرآن في الذاكرة (In-Memory JSON Caching)، وترتيب مصفوفة القراء مسبقاً.
+  5. **هرم الاختبارات:** بناء اختبارات وحدة حقيقية لـ `TrialManagerTest` و `QuranRepositoryTest`.
 

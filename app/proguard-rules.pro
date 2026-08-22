@@ -47,3 +47,8 @@
 # 8. Compose UI & Runtime
 -keep class androidx.compose.runtime.** { *; }
 -keep class androidx.compose.ui.** { *; }
+
+# 9. Security & Licensing
+-keep class com.example.security.** { *; }
+-keepclassmembers class com.example.security.** { *; }
+

@@ -32,7 +32,7 @@ class TrialManager private constructor(context: Context) {
     }
 
     /**
-     * يُرجع true إذا انتهت الفترة التجريبية (7 أيام).
+     * يُرجع true إذا انتهت الفترة التجريبية (30 يوماً).
      * يحاول الحصول على الوقت من SNTP أولاً، وإن فشل يستخدم elapsedRealtime مع كشف التراجع.
      */
     suspend fun isTrialExpired(): Boolean = withContext(Dispatchers.IO) {
@@ -237,16 +237,16 @@ class TrialManager private constructor(context: Context) {
         private const val TRIAL_DURATION_MILLIS = 30L * 24 * 60 * 60 * 1000
         private const val ROLLBACK_TOLERANCE_MILLIS = 5L * 60 * 1000 // 5 دقائق
 
+        private const val PIN_SALT = "mueen_quran_secure_salt_2026_"
+
         private fun hashPin(pin: String): String {
-            val bytes = MessageDigest.getInstance("SHA-256").digest(pin.toByteArray())
+            val saltedPin = PIN_SALT + pin.trim()
+            val bytes = MessageDigest.getInstance("SHA-256").digest(saltedPin.toByteArray(Charsets.UTF_8))
             return bytes.joinToString("") { "%02x".format(it) }
         }
 
-        // SHA-256 Hashes
-        // "112233" -> e8b2b73bbdb0985208f7dbb25ccdbf0f35368a3faeaeb906cf6d426a84ebfaed
-        // "998877" -> d1630cb9ebfde375bc9df9468926010d72023583da70fc28892f3f1e9447eec6
-        val VALID_EXTENSION_PINS = setOf("e8b2b73bbdb0985208f7dbb25ccdbf0f35368a3faeaeb906cf6d426a84ebfaed")
-        val VALID_PERMANENT_PINS = setOf("d1630cb9ebfde375bc9df9468926010d72023583da70fc28892f3f1e9447eec6")
+        val VALID_EXTENSION_PINS = setOf("ed517fee81146b87d0e913e7e44e914aca65911c3ec3e9421f975b4a9451e21b")
+        val VALID_PERMANENT_PINS = setOf("bc85a02e0ec24a6c59fb58bba9698d012c7fc8b241c8e925ce048bcd22600ef0")
 
         @Volatile
         private var INSTANCE: TrialManager? = null

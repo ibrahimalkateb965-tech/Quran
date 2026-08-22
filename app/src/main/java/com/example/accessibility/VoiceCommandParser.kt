@@ -1,7 +1,7 @@
 package com.example.accessibility
 
 import com.example.data.model.Reciter
-import com.example.data.repository.QuranRepository
+import com.example.domain.repository.QuranRepository
 
 /**
  * محلل الأوامر الصوتية المُحسّن.

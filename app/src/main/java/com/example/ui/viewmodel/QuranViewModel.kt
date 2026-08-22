@@ -20,7 +20,10 @@ import com.example.data.local.BookmarkEntity
 import com.example.data.model.Ayah
 import com.example.data.model.Reciter
 import com.example.data.model.Surah
-import com.example.data.repository.QuranRepository
+import com.example.domain.repository.QuranRepository
+import com.example.data.local.SessionPreferences
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -73,12 +76,16 @@ data class ScreenModeUiState(
     val isScreenOffMode: Boolean = false
 )
 
-class QuranViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = QuranRepository(application)
-    val haptic = HapticFeedbackManager(application)
-    val speechManager = SpeechManager(application)
-    private val voiceManager = VoiceCommandManager(application)
-    private val sessionPrefs = com.example.data.local.SessionPreferences.getInstance(application)
+@HiltViewModel
+class QuranViewModel @Inject constructor(
+    application: Application,
+    private val repository: QuranRepository,
+    val haptic: HapticFeedbackManager,
+    val speechManager: SpeechManager,
+    private val voiceManager: VoiceCommandManager,
+    private val sessionPrefs: SessionPreferences,
+    private val trialManager: TrialManager
+) : AndroidViewModel(application) {
 
     private var mediaController: MediaController? = null
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
@@ -121,20 +128,28 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
+    private val _playbackProgress = MutableStateFlow(0f)
+    val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
+
     private var progressJob: kotlinx.coroutines.Job? = null
 
     private fun startProgressTracking() {
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
             while (true) {
+                if (_screenModeUiState.value.isScreenOffMode) {
+                    delay(500L)
+                    continue
+                }
                 val controller = mediaController
                 if (controller != null && controller.isPlaying) {
                     val currentPos = controller.currentPosition
                     val dur = controller.duration
                     val prog = if (dur > 0L) (currentPos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
+                    _playbackProgress.value = prog
                     _playbackUiState.update { it.copy(playbackProgress = prog) }
                 }
-                delay(60L)
+                delay(250L)
             }
         }
     }
@@ -143,13 +158,14 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         progressJob?.cancel()
         progressJob = null
         if (resetProgress) {
+            _playbackProgress.value = 0f
             _playbackUiState.update { it.copy(playbackProgress = 0f) }
         }
     }
 
     init {
         viewModelScope.launch {
-            _isTrialExpired.value = TrialManager.getInstance(application).isTrialExpired()
+            _isTrialExpired.value = trialManager.isTrialExpired()
         }
 
         val sessionToken = SessionToken(application, ComponentName(application, QuranAudioService::class.java))

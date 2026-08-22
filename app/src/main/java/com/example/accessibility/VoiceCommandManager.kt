@@ -11,7 +11,7 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import com.example.data.repository.QuranRepository
+import com.example.domain.repository.QuranRepository
 
 sealed class VoiceCommandResult {
     data class PlaySurahByName(val surahName: String) : VoiceCommandResult()
@@ -31,10 +31,19 @@ sealed class VoiceCommandResult {
     data class Error(val message: String) : VoiceCommandResult()
 }
 
-class VoiceCommandManager(context: Context) {
+class VoiceCommandManager(
+    context: Context,
+    quranRepository: QuranRepository? = null
+) {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val parser = VoiceCommandParser(QuranRepository(appContext))
+    private val parser = VoiceCommandParser(
+        quranRepository ?: com.example.data.repository.QuranRepositoryImpl(
+            appContext,
+            com.example.data.local.QuranDatabase.getDatabase(appContext).bookmarkDao(),
+            com.example.data.local.QuranDatabase.getDatabase(appContext).ayahDao()
+        )
+    )
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
 
     private var speechRecognizer: SpeechRecognizer? = null

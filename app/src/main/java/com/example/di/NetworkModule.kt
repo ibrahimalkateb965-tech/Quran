@@ -11,7 +11,11 @@ import java.util.concurrent.TimeUnit
 
 object NetworkModule {
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (com.example.BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BODY
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
     }
 
     private val retryInterceptor = okhttp3.Interceptor { chain ->

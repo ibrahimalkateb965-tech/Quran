@@ -9,6 +9,7 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
+  alias(libs.plugins.hilt)
 }
 
 android {
@@ -41,13 +42,13 @@ android {
       storeFile = file(keystorePath)
       storePassword = System.getenv("STORE_PASSWORD")
         ?: keystoreProperties.getProperty("storePassword")
-        ?: "QuranBlind2026@"
+        ?: ""
       keyAlias = System.getenv("KEY_ALIAS")
         ?: keystoreProperties.getProperty("keyAlias")
         ?: "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
         ?: keystoreProperties.getProperty("keyPassword")
-        ?: "QuranBlind2026@"
+        ?: ""
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -60,7 +61,7 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -78,7 +79,7 @@ android {
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   lint {
-    checkReleaseBuilds = false
+    checkReleaseBuilds = true
     abortOnError = false
     disable += listOf("InvalidFragmentVersionForActivityResult")
   }
@@ -161,6 +162,8 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  implementation(libs.hilt.android)
+  "ksp"(libs.hilt.compiler)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }

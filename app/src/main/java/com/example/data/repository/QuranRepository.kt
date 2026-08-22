@@ -5,24 +5,32 @@ import com.example.data.local.AyahDao
 import com.example.data.local.AyahEntity
 import com.example.data.local.BookmarkDao
 import com.example.data.local.BookmarkEntity
-import com.example.data.local.QuranDatabase
 import com.example.data.model.Ayah
 import com.example.data.model.Surah
 import com.example.data.model.SurahData
+import com.example.domain.repository.QuranRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import org.json.JSONObject
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class QuranRepository(private val context: Context) {
-    private val database = QuranDatabase.getDatabase(context)
-    private val bookmarkDao: BookmarkDao = database.bookmarkDao()
-    private val ayahDao: AyahDao = database.ayahDao()
+@Singleton
+class QuranRepositoryImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val bookmarkDao: BookmarkDao,
+    private val ayahDao: AyahDao
+) : QuranRepository {
 
-    val allBookmarks: Flow<List<BookmarkEntity>> = bookmarkDao.getAllBookmarks()
+    override val allBookmarks: Flow<List<BookmarkEntity>> = bookmarkDao.getAllBookmarks()
 
-    suspend fun toggleBookmark(surahId: Int, surahNameAr: String, ayahNumber: Int): Boolean {
+    @Volatile
+    private var cachedQuranJson: JSONObject? = null
+
+    override suspend fun toggleBookmark(surahId: Int, surahNameAr: String, ayahNumber: Int): Boolean {
         val isBookmarked = bookmarkDao.isBookmarked(surahId, ayahNumber)
         if (isBookmarked) {
             bookmarkDao.deleteBySurahAndAyah(surahId, ayahNumber)
@@ -39,19 +47,19 @@ class QuranRepository(private val context: Context) {
         }
     }
 
-    suspend fun isBookmarked(surahId: Int, ayahNumber: Int): Boolean {
+    override suspend fun isBookmarked(surahId: Int, ayahNumber: Int): Boolean {
         return bookmarkDao.isBookmarked(surahId, ayahNumber)
     }
 
-    fun getAllSurahs(): List<Surah> {
+    override fun getAllSurahs(): List<Surah> {
         return SurahData.SURAH_LIST
     }
 
-    fun getSurahById(id: Int): Surah? {
+    override fun getSurahById(id: Int): Surah? {
         return SurahData.SURAH_LIST.find { it.id == id }
     }
 
-    fun findSurahByName(query: String): Surah? {
+    override fun findSurahByName(query: String): Surah? {
         val cleanQuery = normalizeArabicText(query)
         return SurahData.SURAH_LIST.find { surah ->
             val cleanSurahName = normalizeArabicText(surah.nameArabic)
@@ -68,9 +76,9 @@ class QuranRepository(private val context: Context) {
             .trim()
     }
 
-    fun getAyahs(
+    override fun getAyahs(
         surahId: Int,
-        reciterIdentifier: String = "ar.alafasy"
+        reciterIdentifier: String
     ): Flow<List<Ayah>> = flow {
         val surah = getSurahById(surahId)
         if (surah == null) {
@@ -93,10 +101,22 @@ class QuranRepository(private val context: Context) {
         }
     }.flowOn(Dispatchers.IO)
 
+    private fun getOrLoadQuranJson(): JSONObject? {
+        cachedQuranJson?.let { return it }
+        return synchronized(this) {
+            cachedQuranJson ?: try {
+                val jsonString = context.assets.open("quran/quran_uthmani_tanzil.json").bufferedReader().use { it.readText() }
+                JSONObject(jsonString).also { cachedQuranJson = it }
+            } catch (e: Exception) {
+                android.util.Log.e("QuranRepository", "Error reading Quran assets JSON", e)
+                null
+            }
+        }
+    }
+
     private fun loadSurahFromAssets(surahId: Int, reciterIdentifier: String): List<Ayah> {
         return try {
-            val jsonString = context.assets.open("quran/quran_uthmani_tanzil.json").bufferedReader().use { it.readText() }
-            val jsonObject = JSONObject(jsonString)
+            val jsonObject = getOrLoadQuranJson() ?: return emptyList()
             val ayahsArray = jsonObject.optJSONArray(surahId.toString()) ?: return emptyList()
             val list = mutableListOf<Ayah>()
             val entities = mutableListOf<AyahEntity>()
@@ -129,12 +149,12 @@ class QuranRepository(private val context: Context) {
             }
             list
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("QuranRepository", "Error parsing Ayahs for Surah $surahId", e)
             emptyList()
         }
     }
 
-    fun sanitizeUthmanicText(text: String): String {
+    override fun sanitizeUthmanicText(text: String): String {
         val bareNoonNextLetters = "[يرملونصذثكجشقسدطزفتضظب]"
         val pattern = Regex("(ن)[\\u0652\\u06DF\\u06E0\\u06E1](?=\\s*$bareNoonNextLetters)")
         return text.replace(pattern, "$1")

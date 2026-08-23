@@ -10,17 +10,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.ui.components.BlindAccessibleIconButton
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmAccentTerracottaBright
@@ -38,13 +37,13 @@ fun HeaderBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -52,7 +51,7 @@ fun HeaderBar(
                 onClick = onToggleContinuousPlay,
                 onClickLabel = if (isContinuousPlayEnabled) "إيقاف الاستماع المتواصل" else "تفعيل الاستماع المتواصل",
                 testTag = "continuous_play_button",
-                icon = Icons.Default.Repeat,
+                text = "الاستماع\nالمتواصل",
                 contentDescription = "الاستماع المتواصل. حالياً " + (if (isContinuousPlayEnabled) "مفعل" else "معطل"),
                 isActive = isContinuousPlayEnabled
             )
@@ -61,7 +60,7 @@ fun HeaderBar(
                 onClick = onOpenSurahIndex,
                 onClickLabel = "فتح قائمة السور",
                 testTag = "surah_index_button",
-                icon = Icons.AutoMirrored.Filled.List,
+                text = "اختيار\nالسورة",
                 contentDescription = "اختيار السورة"
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -69,7 +68,7 @@ fun HeaderBar(
                 onClick = onOpenReciters,
                 onClickLabel = "تغيير القارئ",
                 testTag = "reciter_select_button",
-                icon = Icons.Default.Person,
+                text = "اختيار\nالقارئ",
                 contentDescription = "اختيار القارئ"
             )
         }
@@ -81,28 +80,34 @@ fun HeaderAccessibleButton(
     onClick: () -> Unit,
     onClickLabel: String,
     testTag: String,
-    icon: ImageVector,
+    text: String,
     contentDescription: String,
     isActive: Boolean = false
 ) {
     val bgColor = if (isActive) WarmAccentTerracotta else WarmCardLight
     val borderColor = if (isActive) WarmAccentTerracottaBright else WarmCardBorder
-    val iconTint = if (isActive) WarmTextLight else WarmAccentTerracotta
+    val textColor = if (isActive) WarmTextLight else WarmAccentTerracotta
 
     BlindAccessibleIconButton(
         onClick = onClick,
         onClickLabel = onClickLabel,
         modifier = Modifier
-            .size(62.dp)
+            .size(76.dp)
             .background(bgColor, CircleShape)
-            .border(1.dp, borderColor, CircleShape)
+            .border(1.5.dp, borderColor, CircleShape)
             .testTag(testTag)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = iconTint,
-            modifier = Modifier.size(31.dp)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = textColor,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 4.dp)
         )
     }
 }
+

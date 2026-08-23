@@ -72,6 +72,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -226,10 +227,15 @@ fun QuranPlayerScreen(
                         }
                     } else {
                         // HorizontalPager for Ayahs
-                        val pagerState = rememberPagerState(
-                            initialPage = currentAyahIndex,
-                            pageCount = { ayahs.size }
-                        )
+                        // Keyed on activeSurah?.id so the pager fully resets (instead of reusing a
+                        // stale currentPage clamped to the previous Surah's ayah count) whenever the
+                        // user jumps to a different Surah from the index sheet.
+                        val pagerState = key(activeSurah?.id) {
+                            rememberPagerState(
+                                initialPage = currentAyahIndex,
+                                pageCount = { ayahs.size }
+                            )
+                        }
                         var isProgrammaticScroll by remember { mutableStateOf(false) }
                         var userScrolled by remember { mutableStateOf(false) }
 

@@ -10,6 +10,24 @@
 ## سجل الدروس المستفادة (Lessons Learned)
 
 ```yaml
+- id: MEM-2026-08-23-001
+  type: lesson
+  timestamp: "2026-08-23T09:46:00+03:00"
+  agents: [jetpack-compose-ui, code-architect, persistent-memory-engine]
+  context: "تحويل رسومات الأزرار العلوية لنصوص صريحة وتوحيد الخط والألوان مع الثيم العام"
+  content: "عند استبدال الأيقونات الرمزية بنصوص عربية داخل الأزرار العلوية ('الاستماع المتواصل'، 'اختيار السورة'، 'اختيار القارئ')، تم تكبير القطر من 62.dp إلى 76.dp لاستيعاب سطرين بأريحية، مع توحيد لون النص إلى WarmAccentTerracotta (#7C261E) ونمط الخط إلى MaterialTheme.typography.titleMedium (Tajawal Bold) ليتطابق بصرياً مع كروت السورة ورقم الآية، مع الحفاظ الصارم على دلالات TalkBack (BlindAccessibleIconButton و onClickLabel)."
+  tags: [ui, compose, buttons, a11y, talkback, typography, warm-earth-theme]
+  status: active
+
+- id: MEM-2026-08-23-002
+  type: lesson
+  timestamp: "2026-08-23T09:46:00+03:00"
+  agents: [brand-kit-keeper, devops-deployer, persistent-memory-engine]
+  context: "أتمتة توليد كافة مقاسات أيقونات التطبيق والمتجر من الصورة المعتمدة 124864.jpg.jpeg"
+  content: "تم اعتماد الصورة 124864.jpg.jpeg وتوليد كافة كثافات شاشات أندرويد (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi) للأيقونات العادية والدائرية ومقدمة الـ Adaptive Icons، مع توليد أيقونة متجر Google Play الرسمية بدقة 512x512 PNG وأيقونة الويب 192x192، وضمان بناء حزم الإنتاج APK و AAB الموقعة بنجاح."
+  tags: [icon, branding, playstore, mipmap, release-build]
+  status: active
+
 - id: MEM-2026-08-21-001
   type: lesson
   timestamp: "2026-08-21T09:58:00+03:00"
@@ -194,6 +212,15 @@
   context: "تخصيص أعمدة لوحة القيادة (Dashboard Columns)"
   content: "لتفعيل دورة إضافات لتطبيق الويب، يجب الالتزام الصارم بتخصيص العمود الثالث ليكون (المحفزات - Triggers فقط) لضمان أن زر النسخ في التطبيق ينسخ المحفز فقط لتشغيل الوكيل، بينما يتم عزل (الوصف والتفاصيل) في عمود مستقل (الأخير) ليتم عرضه للمستخدم كمعلومات دون أن يتداخل مع النص المنسوخ."
   tags: [excel-export, ui-preference, prompt-library, copy-action]
+  status: active
+
+- id: ADR-2026-08-23-001
+  type: decision
+  timestamp: "2026-08-23T07:14:00+03:00"
+  agents: [brand-kit-keeper, code-architect, persistent-memory-engine]
+  context: "اعتماد الصورة الحصرية لأيقونة التطبيق والهوية البصرية"
+  content: "الصورة المعتمدة الوحيدة والنهائية لكافة أيقونات التطبيق، المتجر، الويب، وبطاقة Google Play هي: `124864.jpg.jpeg`. تم توليد كافة المقاسات (Mipmap densities: mdpi إلى xxxhdpi، وأيقونة المتجر 512×512) منها مباشرة."
+  tags: [visual-identity, icon, branding, rule]
   status: active
 
 - id: ADR-2026-08-09-002

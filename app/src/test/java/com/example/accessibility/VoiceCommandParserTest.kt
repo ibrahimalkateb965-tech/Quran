@@ -1,7 +1,7 @@
 package com.example.accessibility
 
 import com.example.data.model.Surah
-import com.example.data.repository.QuranRepository
+import com.example.domain.repository.QuranRepository
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals

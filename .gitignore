@@ -16,7 +16,7 @@
 local.properties
 .env
 debug.keystore
-. k i m i - k e y  
+.kimi-key
 old_screen.txt
 *.tmp
 .plan_review_tmp.md

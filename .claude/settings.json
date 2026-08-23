@@ -1,4 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "includeCoAuthoredBy": false
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew build *)",
+      "Bash(./gradlew.bat :app:compileDebugKotlin)",
+      "Bash(./gradlew.bat bundleRelease)",
+      "Bash(wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /Value)",
+      "Bash(powershell -Command \"Get-CimInstance Win32_OperatingSystem | Select-Object FreePhysicalMemory,TotalVisibleMemorySize\")",
+      "Bash(./gradlew.bat --stop)",
+      "Bash(command -v magick)",
+      "Bash(magick -version)",
+      "Bash(command -v python)",
+      "Bash(python -c \"import PIL; print\\('PIL', PIL.__version__\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python \"C:/Users/Kt/AppData/Local/Temp/claude/f--AI-PROJECTS-Blind-App/6d18476f-3004-4843-b2a6-635394bd4183/scratchpad/gen_icons.py\")",
+      "Bash(./gradlew.bat :app:processDebugResources)"
+    ]
+  }
 }

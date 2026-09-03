@@ -48,7 +48,7 @@ data class PlaybackUiState(
 )
 
 data class SettingsUiState(
-    val selectedReciter: Reciter = Reciter.DEFAULT_RECITERS.first(),
+    val selectedReciter: Reciter = Reciter.DEFAULT_RECITER,
     val tarkizRepeatMode: Int = 1,
     val isContinuousPlayEnabled: Boolean = false
 )
@@ -245,7 +245,7 @@ class QuranViewModel @Inject constructor(
 
         val savedSession = sessionPrefs.getSession()
         if (savedSession != null) {
-            val reciter = Reciter.DEFAULT_RECITERS.find { it.serverIdentifier == savedSession.reciterId } ?: Reciter.DEFAULT_RECITERS.first()
+            val reciter = Reciter.DEFAULT_RECITERS.find { it.serverIdentifier == savedSession.reciterId } ?: Reciter.DEFAULT_RECITER
             _settingsUiState.update { it.copy(selectedReciter = reciter) }
             closeStartupDialogs()
             loadSurah(savedSession.surahId, savedSession.ayahIndex, autoPlay = true)
@@ -257,7 +257,7 @@ class QuranViewModel @Inject constructor(
             }
         } else {
             // First launch fallback: Al-Fatihah, Ayah 1
-            val defaultReciter = Reciter.DEFAULT_RECITERS.first()
+            val defaultReciter = Reciter.DEFAULT_RECITER
             _settingsUiState.update { it.copy(selectedReciter = defaultReciter) }
             closeStartupDialogs()
             loadSurah(surahId = 1, targetAyahIndex = 0, autoPlay = false)

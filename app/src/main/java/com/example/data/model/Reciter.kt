@@ -31,5 +31,8 @@ data class Reciter(
             Reciter("albanna", "محمود علي البنا", "Mahmoud Ali Al-Banna", "${BASE_URL}mahmoud_ali_al_banna_32kbps/"),
             Reciter("salamah", "ياسر سلامة", "Yaser Salamah", "${BASE_URL}Yaser_Salamah_128kbps/")
         )
+
+        val DEFAULT_RECITER: Reciter
+            get() = DEFAULT_RECITERS.first { it.id == "husary_mujawwad" }
     }
 }

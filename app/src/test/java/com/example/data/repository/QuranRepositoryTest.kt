@@ -36,7 +36,7 @@ class QuranRepositoryTest {
         val fatiha = repository.getSurahById(1)
         assertNotNull(fatiha)
         assertEquals("الفاتحة", fatiha?.nameArabic)
-        assertEquals("Al-Faatiha", fatiha?.nameEnglish)
+        assertEquals("Al-Fatihah", fatiha?.nameEnglish)
     }
 
     @Test

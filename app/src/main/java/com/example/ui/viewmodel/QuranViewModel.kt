@@ -10,7 +10,6 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import android.content.ComponentName
 import androidx.core.content.ContextCompat
-import com.example.security.TrialManager
 import com.example.service.QuranAudioService
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
@@ -83,8 +82,7 @@ class QuranViewModel @Inject constructor(
     val haptic: HapticFeedbackManager,
     val speechManager: SpeechManager,
     private val voiceManager: VoiceCommandManager,
-    private val sessionPrefs: SessionPreferences,
-    private val trialManager: TrialManager
+    private val sessionPrefs: SessionPreferences
 ) : AndroidViewModel(application) {
 
     private var mediaController: MediaController? = null
@@ -115,9 +113,6 @@ class QuranViewModel @Inject constructor(
 
     private val _screenModeUiState = MutableStateFlow(ScreenModeUiState())
     val screenModeUiState: StateFlow<ScreenModeUiState> = _screenModeUiState.asStateFlow()
-
-    private val _isTrialExpired = MutableStateFlow<Boolean?>(null)
-    val isTrialExpired: StateFlow<Boolean?> = _isTrialExpired.asStateFlow()
 
     private val _announcementEvent = Channel<String>(Channel.BUFFERED)
     val announcementEvent = _announcementEvent.receiveAsFlow()
@@ -164,10 +159,6 @@ class QuranViewModel @Inject constructor(
     }
 
     init {
-        viewModelScope.launch {
-            _isTrialExpired.value = trialManager.isTrialExpired()
-        }
-
         val sessionToken = SessionToken(application, ComponentName(application, QuranAudioService::class.java))
         controllerFuture = MediaController.Builder(application, sessionToken).buildAsync()
         

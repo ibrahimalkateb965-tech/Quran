@@ -93,6 +93,9 @@ class VoiceCommandParserTest {
         assertTrue(parse("القارئ محمود خليل الحصري مجود") is VoiceCommandResult.ChangeReciter)
         assertEquals("husary_mujawwad", (parse("القارئ محمود خليل الحصري مجود") as VoiceCommandResult.ChangeReciter).reciterId)
 
+        assertTrue(parse("شغل محمود خليل الحصري مجود") is VoiceCommandResult.ChangeReciter)
+        assertEquals("husary_mujawwad", (parse("شغل محمود خليل الحصري مجود") as VoiceCommandResult.ChangeReciter).reciterId)
+
         assertTrue(parse("الحصري تجويد") is VoiceCommandResult.ChangeReciter)
         assertEquals("husary_mujawwad", (parse("الحصري تجويد") as VoiceCommandResult.ChangeReciter).reciterId)
 

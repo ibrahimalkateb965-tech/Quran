@@ -10,7 +10,6 @@ import com.example.data.local.QuranDatabase
 import com.example.data.local.SessionPreferences
 import com.example.data.repository.QuranRepositoryImpl
 import com.example.domain.repository.QuranRepository
-import com.example.security.TrialManager
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -45,12 +44,6 @@ object AppModule {
     @Singleton
     fun provideSessionPreferences(@ApplicationContext context: Context): SessionPreferences {
         return SessionPreferences.getInstance(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideTrialManager(@ApplicationContext context: Context): TrialManager {
-        return TrialManager.getInstance(context)
     }
 
     @Provides

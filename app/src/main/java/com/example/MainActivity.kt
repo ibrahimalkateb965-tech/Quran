@@ -22,7 +22,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.screens.QuranPlayerScreen
-import com.example.ui.screens.TrialExpiredScreen
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.viewmodel.QuranViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -56,7 +55,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             QuranBlindTheme {
-                val trialExpired by viewModel.isTrialExpired.collectAsState(initial = null)
                 val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
 
                 val lifecycleOwner = LocalLifecycleOwner.current
@@ -83,20 +81,7 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        when (trialExpired) {
-                            null -> {
-                                // Loading state while checking trial
-                            }
-                            true -> {
-                                TrialExpiredScreen(
-                                    isTalkBackEnabled = isTalkBackEnabled,
-                                    onAnnounce = { msg -> viewModel.announce(msg) }
-                                )
-                            }
-                            false -> {
-                                QuranPlayerScreen(viewModel = viewModel)
-                            }
-                        }
+                        QuranPlayerScreen(viewModel = viewModel)
                     }
                 }
             }

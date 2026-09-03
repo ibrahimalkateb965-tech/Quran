@@ -86,6 +86,34 @@ class VoiceCommandParserTest {
         assertTrue(parse("صوت الحصري") is VoiceCommandResult.ChangeReciter)
         assertEquals("husary", (parse("صوت الحصري") as VoiceCommandResult.ChangeReciter).reciterId)
 
+        // Husary Mujawwad & Muallim variants
+        assertTrue(parse("صوت الحصري مجود") is VoiceCommandResult.ChangeReciter)
+        assertEquals("husary_mujawwad", (parse("صوت الحصري مجود") as VoiceCommandResult.ChangeReciter).reciterId)
+
+        assertTrue(parse("القارئ محمود خليل الحصري مجود") is VoiceCommandResult.ChangeReciter)
+        assertEquals("husary_mujawwad", (parse("القارئ محمود خليل الحصري مجود") as VoiceCommandResult.ChangeReciter).reciterId)
+
+        assertTrue(parse("الحصري تجويد") is VoiceCommandResult.ChangeReciter)
+        assertEquals("husary_mujawwad", (parse("الحصري تجويد") as VoiceCommandResult.ChangeReciter).reciterId)
+
+        assertTrue(parse("الحصري معلم") is VoiceCommandResult.ChangeReciter)
+        assertEquals("husary_muallim", (parse("الحصري معلم") as VoiceCommandResult.ChangeReciter).reciterId)
+
+        // Minshawi & Abdulbasit variants
+        assertEquals("minshawi_mujawwad", (parse("المنشاوي مجود") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("minshawi", (parse("المنشاوي") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("abdulbasit_mujawwad", (parse("عبد الباسط مجود") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("abdulbasit_warsh", (parse("عبد الباسط ورش") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("abdulbasit", (parse("عبد الباسط") as VoiceCommandResult.ChangeReciter).reciterId)
+
+        // Other reciters from DEFAULT_RECITERS
+        assertEquals("akhdar", (parse("ابراهيم الاخضر") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("aldosary", (parse("الدوسري") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("tablaway", (parse("الطبلاوي") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("ayyoub", (parse("محمد ايوب") as VoiceCommandResult.ChangeReciter).reciterId)
+        assertEquals("salamah", (parse("ياسر سلامة") as VoiceCommandResult.ChangeReciter).reciterId)
+
+        // Aliases / Fallbacks
         assertTrue(parse("الشيخ العفاسي") is VoiceCommandResult.ChangeReciter)
         assertEquals("afasy", (parse("الشيخ العفاسي") as VoiceCommandResult.ChangeReciter).reciterId)
     }

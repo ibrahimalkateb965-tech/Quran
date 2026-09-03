@@ -84,13 +84,47 @@ class VoiceCommandParser(private val quranRepository: QuranRepository) {
     }
 
     private fun extractReciter(text: String): String? {
+        val hasHusary = text.contains("حصري") || text.contains("الحصري")
+        val hasMinshawi = text.contains("منشاوي") || text.contains("المنشاوي")
+        val hasAbdulbasit = text.contains("عبد الباسط") || text.contains("عبدالباسط") || text.contains("عبد الباسط عبد الصمد")
+        val isMujawwad = text.contains("مجود") || text.contains("تجويد")
+        val isMuallim = text.contains("معلم") || text.contains("تعليم")
+        val isWarsh = text.contains("ورش")
+
         return when {
-            text.contains("الحصري") -> "husary"
-            text.contains("العفاسي") || text.contains("مشاري") -> "afasy"
-            text.contains("المنشاوي") -> "minshawi"
-            text.contains("عبد الباسط") -> "abdulbasit"
+            // Husary variants (Specific first)
+            hasHusary && isMujawwad -> "husary_mujawwad"
+            hasHusary && isMuallim -> "husary_muallim"
+            hasHusary -> "husary"
+
+            // Minshawi variants
+            hasMinshawi && isMujawwad -> "minshawi_mujawwad"
+            hasMinshawi -> "minshawi"
+
+            // Abdulbasit variants
+            hasAbdulbasit && isMujawwad -> "abdulbasit_mujawwad"
+            hasAbdulbasit && isWarsh -> "abdulbasit_warsh"
+            hasAbdulbasit -> "abdulbasit"
+
+            // Other reciters from DEFAULT_RECITERS
+            text.contains("اخضر") || text.contains("الاخضر") -> "akhdar"
+            text.contains("دوسري") || text.contains("الدوسري") -> "aldosary"
+            text.contains("نعينع") -> "neana"
+            text.contains("شاهين") -> "shaheen"
+            text.contains("علقمي") || text.contains("العلقمي") -> "alaqimy"
+            text.contains("طنيجي") || text.contains("الطنيجي") -> "tunaiji"
+            text.contains("حذيفي") || text.contains("الحذيفي") -> "hudhaify"
+            text.contains("ايوب") -> "ayyoub"
+            text.contains("جبريل") -> "jibreel"
+            text.contains("طبلاوي") || text.contains("الطبلاوي") -> "tablaway"
+            text.contains("بنا") || text.contains("البنا") -> "albanna"
+            text.contains("سلامه") || text.contains("سلامة") -> "salamah"
+
+            // Aliases / Fallbacks (compatible with legacy tests)
+            text.contains("عفاسي") || text.contains("العفاسي") || text.contains("مشاري") -> "afasy"
             text.contains("ماهر") || text.contains("المعيقلي") -> "maher"
             text.contains("صوفي") -> "sufi"
+
             else -> null
         }
     }

@@ -10,6 +10,15 @@
 ## سجل الدروس المستفادة (Lessons Learned)
 
 ```yaml
+- id: MEM-2026-09-02-001
+  type: lesson
+  timestamp: "2026-09-02T14:45:00+03:00"
+  agents: [android-kotlin-pro, code-reviewer-quality, test-automator, code-architect]
+  context: "معالجة عدم استجابة الأوامر الصوتية للقارئ محمود خليل الحصري مجود وتغطية الـ 20 قارئاً"
+  content: "عند مطابقة أسماء القراء في VoiceCommandParser، يجب تطبيق قاعدة المطابقة من الأكثر تخصيصاً إلى الأقل تخصيصاً (Specific-First). مطابقة 'الحصري' ككلمة عامة قبل فحص 'مجود' أو 'معلم' كان يبتلع الأمر ويعيد 'husary' (المرتل) دائماً ويحرم الكفيف من التلاوة المجودة. تم إعادة هيكلة extractReciter لتطابق الأنماط المركبة أولاً مع شمولية كافة القراء الـ 20 في DEFAULT_RECITERS."
+  tags: [voice-commands, reciters, husary-mujawwad, accessibility, blind-app, bug-fix]
+  status: active
+
 - id: MEM-2026-08-23-001
   type: lesson
   timestamp: "2026-08-23T09:46:00+03:00"

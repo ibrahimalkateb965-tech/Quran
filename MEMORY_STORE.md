@@ -221,3 +221,12 @@
   4. **تحسين الأداء والبطارية:** عزل `playbackProgress` كـ StateFlow مستقل لمنع Recomposition لـ 114 سورة 17 مرة في الثانية، وتخزين أصول القرآن في الذاكرة (In-Memory JSON Caching)، وترتيب مصفوفة القراء مسبقاً.
   5. **هرم الاختبارات:** بناء اختبارات وحدة حقيقية لـ `TrialManagerTest` و `QuranRepositoryTest`.
 
+## [milestone] إزالة قفل التجربة 30 يوماً وتصحيح القارئ الافتراضي وتجهيز إصدار Google Play المجاني
+- **التاريخ:** 2026-09-03
+- **الوكلاء المساهمون:** `[code-architect]`, `[android-kotlin-pro]`, `[code-reviewer-quality]`, `[test-automator]`, `[devops-deployer]`
+- **الإنجازات والقرارات المعمارية:**
+  1. **حذف قيود التجربة 30 يوماً ورمز PIN (`ddc824c`):** حذف كامل لمنظومة `TrialManager` و `TrialExpiredScreen` و `SntpClient` وربط Hilt المتعلق بها للامتثال لسياسات مدفوعات Google Play وضمان تجربة مجانية ونظيفة تفتح مباشرة على المشغل.
+  2. **تصحيح القارئ الافتراضي (`8bca415`):** استبدال `DEFAULT_RECITERS.first()` (الذي كان يعيد إبراهيم الأخضر بصمت عند أي fallback) بربط صريح بالمعرف عبر `Reciter.DEFAULT_RECITER` لاستعادة الشيخ محمود خليل الحصري (مجود).
+  3. **تنظيف حزم Firebase غير المستخدمة (`625b7c6`):** إزالة مكتبات Firebase و AppCheck للامتثال الصارم لإقرار "No data collected" في Data Safety.
+  4. **إصلاح توكيد الاختبار القديم (`410615e`):** تصحيح اسم السورة في `QuranRepositoryTest` ليتطابق مع `"Al-Fatihah"`.
+  5. **التحقق الشامل وجاهزية الإنتاج:** اجتياز كامل اختبارات الوحدة (11 classes, 35 tests, 0 failures, 0 errors)، ونجاح `bundleRelease` و `lintVitalRelease`، وبناء حزمة AAB موقعة واختبارها بنجاح على هاتف Galaxy S25 Ultra مع سلامة قواعد R8/Moshi.

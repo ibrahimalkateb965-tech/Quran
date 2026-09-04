@@ -628,6 +628,23 @@
   content: "تم إنشاء وتفعيل الخطاف 20 (`مزامنة المنظومة`) لمطابقة ومزامنة كافة الإضافات (Plugins)، المراجع وبذور المشاريع (References & Seeds)، إعدادات البيئة و MCP، المهارات (80+) والوكلاء (25+)، وتحديث ملفات الإكسيل وتطبيق مكتبة الأوامر HTML، ودفعها بنقرة واحدة إلى مستودع `https://github.com/ibrahimalkateb965-tech/Claude-Antigravity-Workspace.git` بضمان تطابق كامل 100%."
   tags: [hook-20, cloud-sync, full-parity, plugins, mcp, claude-antigravity-workspace, global]
   status: active
+
+- id: MEM-2026-09-03-001
+  type: milestone
+  timestamp: "2026-09-03T23:45:00+03:00"
+  agents: [code-architect, android-kotlin-pro, code-reviewer-quality, test-automator, devops-deployer]
+  context: "حذف قيود التجربة 30 يوماً وتصحيح القارئ الافتراضي وتجهيز إصدار متجر Google Play المجاني"
+  content: "1. حذف منظومة الـ 30-Day Trial Lock و PIN Unlock كاملة (TrialManager, TrialExpiredScreen, SntpClient) للامتثال لسياسات مدفوعات Google Play وإبقاء التطبيق مجانياً 100% بدون شاشات قفل.\n2. تصحيح القارئ الافتراضي عبر Reciter.DEFAULT_RECITER بدلاً من DEFAULT_RECITERS.first() الذي كان يستبدل القارئ بصمت بـ إبراهيم الأخضر.\n3. إزالة مكتبات Firebase غير المستخدمة للامتثال لإقرار 'No data collected' في Data Safety.\n4. تصحيح توكيد QuranRepositoryTest (Al-Fatihah) واجتياز كافة اختبارات الوحدة (35 tests, 0 failures).\n5. نجاح بناء وتوقيع حزمة bundleRelease واجتياز فحص lintVitalRelease و R8 ProGuard بنجاح على جهاز فيزيائي Galaxy S25 Ultra."
+  tags: [release-readiness, google-play, trial-lock-removal, reciters, husary-mujawwad, firebase-cleanup, tests-green, aab]
+  status: active
+- id: MEM-2026-09-04-001
+  type: milestone
+  timestamp: "2026-09-04T06:16:00+03:00"
+  agents: [devops-deployer, code-architect, android-kotlin-pro, persistent-memory-engine]
+  context: "معالجة التشغيل المفاجئ للصوت بعد إنهاء المكالمات الهاتفية وإرسال أول إصدار للمراجعة على Google Play Console"
+  content: "1. إصلاح استئناف الصوت غير المرغوب بعد المكالمات في QuranAudioService باعتراض واستهلاك أحداث MediaButton (ACTION_DOWN و ACTION_UP) لكافة مفاتيح التشغيل وتجاوز onPlaybackResumption عندما يكون المشغل متوقفاً عمداً.\n2. إنشاء وتوقيع حزمة الإنتاج الرسمية app-release.aab (الإصدار 1.0.0، Target SDK 36، حجم التنزيل 5.99MB).\n3. إكمال 100% من متطلبات Google Play Console (سياسة الخصوصية، تصنيف المحتوى IARC للجميع، استبيان أمان البيانات، الهوية البصرية، صفحة المتجر باللغتين، والتوزيع على 176 دولة).\n4. إنشاء مسار الاختبار المغلق (Closed testing - Alpha) وإضافة 6 مختبرين وإرسال كافة التغييرات الـ 15 رسمياً للمراجعة (In review)."
+  tags: [google-play-console, closed-testing, release-submission, phone-call-resume-fix, aab, production, milestone]
+  status: active
 ```
 
 </div>

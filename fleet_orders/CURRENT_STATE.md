@@ -1,6 +1,6 @@
 # Blind App — Current State
 
-**Last updated:** 2026-09-11 (session 3, Claude Code CLI) · maintained by Claude Code CLI (Fleet Commander)
+**Last updated:** 2026-09-11 (session 4, Claude Code CLI) · maintained by Claude Code CLI (Fleet Commander)
 **Read this first.** It is the single source of truth for where the iOS/KMP programme stands.
 
 ---
@@ -10,8 +10,8 @@
 **As of 2026-09-11 17:25 (session 4):**
 
 - **Phase 0 orders all gated, including P0-004:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006 —
-  **QUALITY GATE: PASS** each (§5). `0b62eed` (P0-005) is on origin; the P0-004 commit follows it
-  locally until Ibrahim pushes.
+  **QUALITY GATE: PASS** each (§5). `b3353f6` (P0-004) is on origin — the branch is fully pushed.
+  (Pushed by Ibrahim 2026-09-11 17:40.)
 - **P0-004 premise correction (found 2026-09-11 session 4):** the Retrofit/Moshi/OkHttp path in `:app`
   was **dead code** — `QuranRepositoryImpl` reads `assets/quran/quran_uthmani_tanzil.json` → Room and
   never injected `QuranApiService`; zero consumers anywhere in `app/src`. Ibrahim chose **option A:
@@ -24,8 +24,8 @@
   2. **P0-008** `AyahCard`/repository `sanitizeUthmanicText` → `domain.text.sanitizeUthmanicText`
      (UthmanicTextTest 5/5 must stay green — byte-for-byte rule, CLAUDE.md §4.4).
   3. **P0-009** Android `Surah`/`Ayah`/`Reciter`/`SurahData` → `:shared` models.
-  Assign to OpenCode CLI while B-17 stands — but see **B-18** (§6): its shell wrapper now blocks
-  `gradlew`, so orders must say "no compile probes; Claude Code compiles at the gate".
+  Assign to OpenCode CLI while B-17 stands — B-18 (its shell wrapper blocking `gradlew`) was
+  resolved 17:40 — compile probes in orders are allowed again.
 - **Uncommitted, not mine, Ibrahim's call:** Antigravity's OpenRouter fallback edits (12:50–12:52) to
   `CLAUDE.md`, `fleet_config.json`, `opencode.json`, `.agents/MEMORY_STORE.md`,
   `.agents/ACTIVE_CONTEXT_INJECTION.md`; plus `.agents/HOOKS_GUIDE.xlsx`,
@@ -210,8 +210,8 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
   daemon survives and finishes the build, but the shell that would report is gone. Run gate steps in the
   **foreground**, one `./gradlew` per call, and read results from the JUnit XML / APK timestamps rather
   than from `UP-TO-DATE`.
-- **B-18 — OpenCode's `lean-ctx` shell wrapper blocks `gradlew` (found 2026-09-11 17:02, session 4,
-  open).** Error: `'gradlew' is not in the shell allowlist … permanent restriction`. It ran fine for
+- **B-18 — RESOLVED 2026-09-11 17:40** (`lean-ctx allow gradlew`, config now at `~/.config/lean-ctx/config.toml`, 194+1 commands). Original finding (session 4, 17:02,
+  now closed): Error: `'gradlew' is not in the shell allowlist … permanent restriction`. It ran fine for
   P0-002/003b/005 this morning, so the cause is something changed since — most likely Antigravity's
   uncommitted `opencode.json` edits (12:50). Fix is one of: `lean-ctx allow gradlew`, or
   `shell_allowlist = []` in `C:\Users\Kt\.config\lean-ctx\config.toml` (file does not exist yet — built-in

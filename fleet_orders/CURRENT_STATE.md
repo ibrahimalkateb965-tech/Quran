@@ -1,21 +1,43 @@
 # Blind App — Current State
 
-**Last updated:** 2026-09-11 · maintained by Claude Code CLI (Fleet Commander)
+**Last updated:** 2026-09-11 (session 3, Claude Code CLI) · maintained by Claude Code CLI (Fleet Commander)
 **Read this first.** It is the single source of truth for where the iOS/KMP programme stands.
 
 ---
 
 ## 1. THE ONE THING TO DO NEXT
 
-**Commit the work.** Two orders are complete and verified but nothing is committed yet:
+**Decide ADR-004 (§4).** It gates Phase 3 and costs nothing to settle now. Nothing else is pending
+on the commit side — see the real state below.
 
-```powershell
-cd "F:\AI PROJECTS\Blind App"
-git add -A app/src shared iosApp build.gradle.kts settings.gradle.kts gradle.properties gradle/libs.versions.toml .gitignore
-git status          # review before committing
-```
+### Real commit state (verified by Claude Code CLI, 2026-09-11 session 3)
 
-Then decide ADR-004 (§4) — it gates Phase 3 and costs nothing to settle now.
+The earlier claim "nothing is committed yet" was **wrong**. `git ls-files` + `git log` show:
+
+- **`a819f65`** — `feat(kmp): add :shared module + iOS scaffold; remove voice commands`. Contains
+  **all** of P0-001 and P0-006 (`shared/build.gradle.kts`, `iosApp/*`, root `build.gradle.kts`,
+  `settings.gradle.kts`, `gradle/libs.versions.toml`, the 4 voice-file deletions). 323 files,
+  +96,958 / −1,078. **Already on `origin/feat/ios-kmp-phase0`.** Do not rewrite it.
+  Two blemishes it carries, both neutralised on top rather than by history rewrite:
+  - **B-16 actually happened**: 12 generated files under `shared/build/**` (`classes.jar`,
+    merged manifests, `.transforms/*.bin`, `R.txt`) were committed and pushed.
+  - ~95 % of the diff is `.agents/skills/**` (TTF fonts, `google-font-licenses.json`,
+    `phosphor-icons-upstream.json`) plus junk: `.coverage` and 3× `__pycache__/*.pyc`.
+- **`0669720`** `chore(shared): add shared/.gitignore to keep shared/build out of VCS (B-16)` —
+  replaces the misleadingly-titled local-only `2ee1a62` (rewritten via `reset --soft` +
+  recommit; it was never on a remote). Adds `shared/.gitignore` and `git rm -r --cached` of the
+  12 `shared/build/**` files, `.coverage` and the 3 `.pyc` files (17 files, +1 / −63). Nothing
+  deleted on disk. `git ls-files shared/build` now prints nothing.
+- **`docs(fleet): update CURRENT_STATE after B-16 and B-06 checks`** — this file + the handoff.
+  Both commits are local (`[ahead 2]`), **not pushed** — per the handoff, Ibrahim pushes.
+
+Loose ends left for Ibrahim: `.coverage` and `__pycache__/` now show as untracked (they exist on
+disk and no `.gitignore` rule covers them — add one or delete them). `.agents/skills/**` and
+`testers.csv`/`testers.xlsx` (28 tester e-mails, tracked since before this branch) are Ibrahim's
+call — flagged, not touched.
+
+Unrelated working-tree changes deliberately left alone: `.agents/HOOKS_GUIDE.xlsx` (modified),
+`remote_ios_dev_playbook_diagram.html` (untracked, 736 KB).
 
 ---
 
@@ -106,7 +128,7 @@ assumed away.
 | P0-003 — domain core + Koin | ⛔ **CANCELLED** — its whole payload was porting the voice parser |
 | P0-003b — domain + Koin, voice-free | To be written. Note `SharedModule` now has no first binding to register. |
 | P0-004 — endpoint/repository migration | Was blocked on B-13; **B-13 is resolved**, so it can now be specified properly |
-| P0-005 — SecureStore | Blocked on verifying B-06. `security/` and `util/` are empty directories, so `androidx.security.crypto` may simply be an unused dependency. `SessionPreferences.kt` settles it. |
+| P0-005 — SecureStore | **Unblocked — B-06 settled 2026-09-11 (session 3).** `androidx.security.crypto` IS used: `SessionPreferences.kt` wraps `EncryptedSharedPreferences` + `MasterKey` (AES256_GCM). The `expect class SecureStore` therefore needs a real Android `actual` over `EncryptedSharedPreferences` and an iOS `actual` over Keychain. See §6 B-06 for the design caveat the order must address. |
 | P0-006 — voice removal | ✅ **COMPLETE** — build green, grep empty |
 
 **P0-002 and P0-003b must run sequentially, not in parallel** — both edit
@@ -136,6 +158,34 @@ assumed away.
   Until resolved: Claude Code can read and write files through the bridge but **cannot run Gradle
   and cannot delete files**. Builds are run by Ibrahim and pasted back verbatim; a summary is not
   accepted as gate evidence.
+- **B-10 re-confirmed 2026-09-11 (session 2)** — same Plan9 error on the first `device_bash` call.
+- **B-10 cause confirmed by the app itself (2026-09-11, session 3).** The Cowork handoff states the
+  Windows update of **2026-09-08** breaks the Cowork VM's Plan9 mount — matching #92984 /
+  KB5124008 above. **Claude Code CLI is unaffected**: git, Gradle and tests all ran natively in
+  session 3 (`assembleDebug` 3 s cached, `testDebugUnitTest` 2 m 04 s, 35 tests / 0 failures).
+  The Testing Monopoly is therefore back with Claude Code CLI; Ibrahim no longer needs to paste
+  build output.
+- **Staging depth limit is 7 folders below a connected root.** `app\src\main\java\com\example\<pkg>\File.kt`
+  is 8–9 deep, so with only `F:\AI PROJECTS\Blind App` connected, every file under a sub-package
+  (`data/`, `ui/`, …) is unreachable. That is the real reason B-13 needed the second folder.
+  **The second folder must be re-connected in every new session**, or `SessionPreferences.kt`,
+  `QuranViewModel.kt` etc. cannot be read.
+- **B-06 — RESOLVED 2026-09-11 (session 3): `androidx.security.crypto` is USED, keep it.**
+  `git grep -nE "EncryptedSharedPreferences|MasterKey|security\.crypto" -- app/src` → 12 hits,
+  all in `app/src/main/java/com/example/data/local/SessionPreferences.kt` (lines 6–7, 15–24,
+  30–38), plus a comment in `res/xml/backup_rules.xml:10` that excludes
+  `mueen_session_prefs.xml` from Auto Backup for exactly this reason. Consumers:
+  `di/AppModule.kt:44` (`provideSessionPreferences`) and `ui/viewmodel/QuranViewModel.kt:78`.
+  Version `securityCrypto = "1.1.0-alpha06"` (`gradle/libs.versions.toml:37`), declared at
+  `app/build.gradle.kts:114`. **Do not remove.**
+
+  Design caveat for P0-005 (finding only — no change made): the encrypted payload is just
+  `last_reciter_id`, `last_surah_id`, `last_ayah_index` — not secrets. `createSecurePrefs` is
+  **fail-closed**: if Keystore init fails twice it throws `IllegalStateException` and the app
+  cannot start. For a blind-first app, "resume position" is not worth a hard crash; the
+  SecureStore order should decide whether the `actual` keeps encryption (parity) or degrades to
+  plain `SharedPreferences` / `UserDefaults` on failure. Also verify the library's support status
+  before pinning the KMP `actual` to it — `security-crypto` has been alpha-only for years.
 - **B-13 — RESOLVED 2026-09-11.** `…\app\src\main\java\com\example` is connected as a second
   folder. Every source file is now readable and writable.
 - OpenCode CLI is configured for `opencode/muse-spark-1.3-contributor-free` in `opencode.json`

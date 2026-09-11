@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.content.Context
+import com.aistudio.quranblind.domain.text.sanitizeUthmanicText
 import com.example.data.local.AyahDao
 import com.example.data.local.BookmarkDao
 import io.mockk.mockk
@@ -60,7 +61,7 @@ class QuranRepositoryTest {
     @Test
     fun testSanitizeUthmanicText_cleansSpecialZeroWidthCharacters() {
         val textWithSpecialChars = "بِسْمِ \uFEFFاللَّهِ \u200Aالرَّحْمَٰنِ \u2060الرَّحِيمِ"
-        val sanitized = repository.sanitizeUthmanicText(textWithSpecialChars)
+        val sanitized = sanitizeUthmanicText(textWithSpecialChars)
         assertTrue(!sanitized.contains("\uFEFF"))
         assertTrue(!sanitized.contains("\u200A"))
         assertTrue(!sanitized.contains("\u2060"))

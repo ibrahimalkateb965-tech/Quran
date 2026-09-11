@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.content.Context
+import com.aistudio.quranblind.domain.text.sanitizeUthmanicText
 import com.example.data.local.AyahDao
 import com.example.data.local.AyahEntity
 import com.example.data.local.BookmarkDao
@@ -152,16 +153,6 @@ class QuranRepositoryImpl @Inject constructor(
             android.util.Log.e("QuranRepository", "Error parsing Ayahs for Surah $surahId", e)
             emptyList()
         }
-    }
-
-    override fun sanitizeUthmanicText(text: String): String {
-        val bareNoonNextLetters = "[يرملونصذثكجشقسدطزفتضظب]"
-        val pattern = Regex("(ن)[\\u0652\\u06DF\\u06E0\\u06E1](?=\\s*$bareNoonNextLetters)")
-        return text.replace(pattern, "$1")
-            .replace('\u06E4', '\u0653')
-            .replace("\uFEFF", "")
-            .replace("\u200A", "")
-            .replace("\u2060", "")
     }
 
     private fun resolveAudioEndpoint(

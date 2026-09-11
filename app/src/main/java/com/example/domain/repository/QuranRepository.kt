@@ -13,5 +13,4 @@ interface QuranRepository {
     fun getSurahById(id: Int): Surah?
     fun findSurahByName(query: String): Surah?
     fun getAyahs(surahId: Int, reciterIdentifier: String = "ar.alafasy"): Flow<List<Ayah>>
-    fun sanitizeUthmanicText(text: String): String
 }

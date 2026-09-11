@@ -4,10 +4,10 @@
 |---|---|
 | Order ID | ORDER-P0-005 (rev. A, 2026-09-11) |
 | Issued by | Claude Code CLI (Fleet Commander) |
-| Assigned to | **Antigravity IDE** (`Gemini 3.7 Flash High`) |
+| Assigned to | **OpenCode CLI** (`opencode/muse-spark-1.3-contributor-free`) — reassigned from Antigravity by Ibrahim 2026-09-11 (B-17) |
 | Protocol | TEMPLATE_02 — Task Delegation |
-| Status | ISSUED — **blocked until ORDER-P0-003b passes its gate** (sequential: same source-set roots) |
-| Depends on | ORDER-P0-002 (`androidx.security.crypto` must be declared for `:shared` androidMain — see Step 0) |
+| Status | **DISPATCHED 2026-09-11 12:52** — ORDER-P0-003b passed its gate |
+| Depends on | ORDER-P0-002 (PASS), ORDER-P0-003b (PASS) |
 | Closes | B-06 (resolved 2026-09-11: the dependency IS used by `SessionPreferences.kt`) |
 
 ---
@@ -24,10 +24,9 @@
 the prefs file and retries once; if that throws too, it throws `IllegalStateException("Critical Security
 Error…")` and the app cannot start. The stored data is a resume position, not a secret.
 
-**Gradle prerequisite (OpenCode, not you):** `:shared` androidMain does not yet declare
-`libs.androidx.security.crypto`. Claude Code will have OpenCode add
-`implementation(libs.androidx.security.crypto)` to `androidMain.dependencies` in `shared/build.gradle.kts`
-**before** this order is dispatched. If you find it missing, **STOP and report** — do not edit Gradle.
+**Gradle prerequisite (yours — OpenCode owns Gradle):** `:shared` androidMain does not yet declare
+`libs.androidx.security.crypto`. Step 0 adds exactly one line. The catalog entry already exists
+(`androidx-security-crypto`, `securityCrypto = "1.1.0-alpha06"`) — reuse it, do not re-declare or bump it.
 
 ---
 
@@ -48,16 +47,23 @@ shared/src/androidMain/kotlin/com/aistudio/quranblind/store/SecureStore.android.
 shared/src/iosMain/kotlin/com/aistudio/quranblind/store/SecureStore.ios.kt                CREATE (actual)
 shared/src/commonTest/kotlin/com/aistudio/quranblind/store/InMemorySecureStore.kt         CREATE
 shared/src/commonTest/kotlin/com/aistudio/quranblind/store/SessionStoreTest.kt            CREATE
+shared/build.gradle.kts                                                                    MODIFY — Step 0 only (one line)
 ```
 
 ## 3. FILES YOU MUST NOT TOUCH
 
-`app/**` (especially `SessionPreferences.kt`), every Gradle file, `network/**`, `domain/**` (P0-003b's),
-`.github/**`, `CLAUDE.md`, `fleet_config.json`.
+`app/**` (especially `SessionPreferences.kt`), `gradle/libs.versions.toml` and every Gradle file other
+than the single line in Step 0, `network/**`, `domain/**`, `di/**` (P0-002/P0-003b's), `.github/**`,
+`CLAUDE.md`, `fleet_config.json`.
 
 ---
 
 ## 4. STEPS
+
+### Step 0 — Gradle (one line)
+
+In `shared/build.gradle.kts`, inside the existing `androidMain.dependencies { }` block, add
+`implementation(libs.androidx.security.crypto)`. Nothing else in that file changes.
 
 ### Step 1 — `SecureStore.kt` (commonMain)
 
@@ -159,9 +165,10 @@ Port the legacy reciter-id migration from `SessionPreferences.getSession()` **ve
 ### Step 6 — Compile probes (compile only)
 
 ```bash
-./gradlew :shared:compileDebugKotlinAndroid
-./gradlew :app:assembleDebug
+./gradlew :shared:compileAndroidMain
+./gradlew :shared:compileAndroidHostTest
 ```
+NOT `:app:assembleDebug` — it needs ~4 GB free on this host (B-17); Claude Code runs it at the gate.
 
 ---
 
@@ -178,8 +185,8 @@ works); the crash goes. Claude Code will reject any actual that throws on backen
 
 | # | Criterion |
 |---|---|
-| A1 | `:shared:compileDebugKotlinAndroid` BUILD SUCCESSFUL (Android actual compiles) |
-| A2 | `:app:assembleDebug` BUILD SUCCESSFUL; `git diff --stat -- app/` empty |
+| A1 | `:shared:compileAndroidMain` and `:shared:compileAndroidHostTest` BUILD SUCCESSFUL |
+| A2 | `git diff --stat -- app/ gradle/` empty; `git diff -- shared/build.gradle.kts` is exactly one added line |
 | A3 | Android actual never throws from `createSecureStore` once `init` was called — Claude Code reads the catch block |
 | A4 | iOS actual: `errSecItemNotFound` → `null`, everything else logged and swallowed; report states it is locally unverified |
 | A5 | `SessionStore` key names and `STORE_NAME` are byte-identical to `SessionPreferences.kt` |
@@ -188,7 +195,7 @@ works); the crash goes. Claude Code will reject any actual that throws on backen
 
 ## 7. REPORT-BACK
 
-`fleet_orders/reports/ORDER_P0_005_REPORT_ANTIGRAVITY.md`, sections: BASELINE, FILES CREATED,
+`fleet_orders/reports/ORDER_P0_005_REPORT_OPENCODE.md`, sections: BASELINE, FILES CREATED,
 `SecureStore.android.kt` FULL SOURCE, `SecureStore.ios.kt` FULL SOURCE, FAIL-OPEN PATHS (one line per
 catch/status branch), PROBE OUTPUT verbatim, `git diff --stat -- app/ gradle/`, DEVIATIONS, BLOCKED ON,
 SELF-ASSESSMENT A1–A7.

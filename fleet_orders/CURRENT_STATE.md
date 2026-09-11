@@ -7,9 +7,25 @@
 
 ## 1. THE ONE THING TO DO NEXT
 
-**ADR-004 is decided (SwiftUI native, 2026-09-11 — see §3).** Next: write **ORDER-P0-003b**
-(domain core + Koin, voice-free) and **ORDER-P0-005** (SecureStore, now unblocked — §5/§6). They
-edit different files from P0-002, but P0-002 and P0-003b must still run sequentially.
+**As of 2026-09-11 13:08 (session 3):**
+
+- **Phase 0 orders all gated:** P0-001, P0-002, P0-003b, P0-005, P0-006 — **QUALITY GATE: PASS** each
+  (§5). `7462ed4` is on origin; the P0-005 commit follows it locally until Ibrahim pushes.
+- **Next order to write: ORDER-P0-004** — migrate `QuranApiService` / `AlQuranCloudResponse` /
+  `QuranRepositoryImpl`'s network path from Retrofit+Moshi to `HttpClientFactory` + `@Serializable`
+  DTOs in `:shared`, then retire `NetworkModule`. First order that **touches `app/`**, so it needs its
+  own regression gate (35 app tests + assembleDebug) and a Devil's Advocate pass on the DTO field mapping.
+  Assign to OpenCode CLI while B-17 stands.
+- After that, the `:app` cut-over orders, one at a time: `SessionPreferences` → `SessionStore`;
+  `AyahCard`/repository `sanitizeUthmanicText` → `domain.text.sanitizeUthmanicText`; Android models →
+  `:shared` models. Each with the same regression gate.
+- **Uncommitted, not mine, Ibrahim's call:** Antigravity's OpenRouter fallback edits (12:50–12:52) to
+  `CLAUDE.md`, `fleet_config.json`, `opencode.json`, `.agents/MEMORY_STORE.md`,
+  `.agents/ACTIVE_CONTEXT_INJECTION.md`; plus `.agents/HOOKS_GUIDE.xlsx`,
+  `remote_ios_dev_playbook_diagram.html`, and `hs_err_pid*.log` / `replay_pid*.log` litter.
+- **Next order to write:** ORDER-P0-004 (endpoint + repository migration Retrofit/Moshi → Ktor, then
+  retire `NetworkModule`). Then the `:app` cut-over orders (SecureStore, sanitize, models) — each with its
+  own regression gate. All to OpenCode CLI while B-17 stands.
 
 ### Real commit state (verified by Claude Code CLI, 2026-09-11 session 3)
 
@@ -120,7 +136,7 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
 | P0-003 — domain core + Koin | ⛔ **CANCELLED** — its whole payload was porting the voice parser |
 | P0-003b — domain + Koin, voice-free | **Written** — `ORDER_P0_003B_DOMAIN_CORE.md` (Antigravity). Ports `Surah`/`Ayah`/`Reciter`/`SurahData`, `QuranRepository` interface (bookmarks omitted — Room), canonical `sanitizeUthmanicText` (= `AyahCard.kt` pass 2, a verified superset of the repository's pass 1), `ayahAudioUrl`, empty `sharedModule` + `initKoin`. Blocked on P0-002 gate. |
 | P0-004 — endpoint/repository migration | Was blocked on B-13; **B-13 is resolved**, so it can now be specified properly |
-| P0-005 — SecureStore | **Written** — `ORDER_P0_005_SECURE_STORE.md` (Antigravity). `SecureStore` interface + `expect createSecureStore`, Android actual over `EncryptedSharedPreferences` (same scheme triple as `SessionPreferences.kt`) with **fail-open** fallback to plain prefs, iOS actual over Keychain (`AfterFirstUnlock`), `SessionStore` typed wrapper with the legacy reciter-id migration. Needs OpenCode to add `androidx.security.crypto` to `:shared` androidMain first. Blocked on P0-003b gate. |
+| P0-005 — SecureStore | ✅ **QUALITY GATE: PASS** 2026-09-11 13:07 (session 3). OpenCode CLI built it. `SecureStore` interface + `expect createSecureStore`, Android actual over `EncryptedSharedPreferences` (**fail-open** to plain prefs), iOS Keychain actual (unverified locally — CI), `SessionStore` with verbatim legacy migration. `:shared` 29/29, `:app` 35/35, `assembleDebug` green. `SessionPreferences.kt` untouched — cut-over is a later order. |
 | P0-006 — voice removal | ✅ **COMPLETE** — build green, grep empty |
 
 **P0-002 and P0-003b must run sequentially, not in parallel** — both edit

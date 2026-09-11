@@ -30,7 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.data.model.Reciter
+import com.aistudio.quranblind.domain.model.Reciter
 import com.example.ui.theme.WarmAccentGold
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmAccentTerracottaBright

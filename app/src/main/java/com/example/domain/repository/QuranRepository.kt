@@ -1,8 +1,8 @@
 package com.example.domain.repository
 
 import com.example.data.local.BookmarkEntity
-import com.example.data.model.Ayah
-import com.example.data.model.Surah
+import com.aistudio.quranblind.domain.model.Ayah
+import com.aistudio.quranblind.domain.model.Surah
 import kotlinx.coroutines.flow.Flow
 
 interface QuranRepository {

@@ -125,8 +125,8 @@ import com.example.ui.theme.DarkImmersiveBorder
 import com.example.ui.theme.TextMutedZinc
 import com.example.ui.theme.TextPrimaryWhite
 import com.example.ui.viewmodel.QuranViewModel
-import com.example.data.model.Ayah
-import com.example.data.model.Reciter
+import com.aistudio.quranblind.domain.model.Ayah
+import com.aistudio.quranblind.domain.model.Reciter
 import com.example.ui.viewmodel.ScreenModeUiState
 
 import com.example.ui.theme.WarmAccentTerracotta

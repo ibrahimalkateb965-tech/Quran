@@ -6,9 +6,9 @@ import com.example.data.local.AyahDao
 import com.example.data.local.AyahEntity
 import com.example.data.local.BookmarkDao
 import com.example.data.local.BookmarkEntity
-import com.example.data.model.Ayah
-import com.example.data.model.Surah
-import com.example.data.model.SurahData
+import com.aistudio.quranblind.domain.model.Ayah
+import com.aistudio.quranblind.domain.model.Surah
+import com.aistudio.quranblind.domain.model.SurahData
 import com.example.domain.repository.QuranRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers

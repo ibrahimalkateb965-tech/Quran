@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.quranblind.domain.text.sanitizeUthmanicText
 import com.example.accessibility.LocalTalkBackEnabled
-import com.example.data.model.Ayah
+import com.aistudio.quranblind.domain.model.Ayah
 import com.example.ui.theme.UthmanTahaFont
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmCardActive

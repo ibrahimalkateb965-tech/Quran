@@ -11,7 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import com.example.ui.components.SurahIndexSheet
-import com.example.data.model.Surah
+import com.aistudio.quranblind.domain.model.Surah
 import androidx.test.espresso.Espresso
 import org.robolectric.annotation.Config
 import org.robolectric.RobolectricTestRunner

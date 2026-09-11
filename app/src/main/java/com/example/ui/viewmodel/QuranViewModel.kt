@@ -14,9 +14,9 @@ import com.example.service.QuranAudioService
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
 import com.example.data.local.BookmarkEntity
-import com.example.data.model.Ayah
-import com.example.data.model.Reciter
-import com.example.data.model.Surah
+import com.aistudio.quranblind.domain.model.Ayah
+import com.aistudio.quranblind.domain.model.Reciter
+import com.aistudio.quranblind.domain.model.Surah
 import com.example.domain.repository.QuranRepository
 import com.aistudio.quranblind.store.SessionState
 import com.aistudio.quranblind.store.SessionStore

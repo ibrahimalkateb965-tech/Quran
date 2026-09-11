@@ -7,10 +7,11 @@
 
 ## 1. THE ONE THING TO DO NEXT
 
-**As of 2026-09-11 22:30 (session 5):**
+**As of 2026-09-11 23:10 (session 5):**
 
-- **Phase 0 orders all gated, plus two cut-overs:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006, P0-007, **P0-008** —
-  **QUALITY GATE: PASS** each (§5). `21f33c8` (P0-007) is on origin; the P0-008 commit follows it locally until Ibrahim pushes.
+- **Phase 0 orders all gated, plus all three planned cut-overs:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006, P0-007, P0-008, **P0-009** —
+  **QUALITY GATE: PASS** each (§5). `5c40400` (P0-008) is on origin (pushed 22:40); P0-009 is committed locally
+  on top and **not yet pushed** — Ibrahim says "push".
 - **P0-004 premise correction (found 2026-09-11 session 4):** the Retrofit/Moshi/OkHttp path in `:app`
   was **dead code** — `QuranRepositoryImpl` reads `assets/quran/quran_uthmani_tanzil.json` → Room and
   never injected `QuranApiService`; zero consumers anywhere in `app/src`. Ibrahim chose **option A:
@@ -20,15 +21,17 @@
   (`:app` 35 tests + `assembleDebug` + `assembleRelease` + `:shared` 29 tests):
   1. ~~**P0-007** `SessionPreferences` → `SessionStore`~~ — **DONE 20:09, see §5.**
   2. ~~**P0-008** `AyahCard`/repository `sanitizeUthmanicText` → `domain.text.sanitizeUthmanicText`~~ — **DONE 22:27, see §5.**
-  3. **P0-009** Android `Surah`/`Ayah`/`Reciter`/`SurahData` → `:shared` models. Before writing it:
-     grep every consumer of `com.example.data.model.*` (ViewModel, Room entities' `toDomainModel()`,
-     `SurahData.SURAH_LIST`, composables) — the composable consumers are Commander/Antigravity edits, not
-     OpenCode's, same split as P0-008.
-  Assign to OpenCode CLI while B-17 stands — B-18 (its shell wrapper blocking `gradlew`) was
-  resolved 17:40. **But** OpenCode has now been OOM-killed at its first compile probe twice (P0-004,
-  P0-008): its `lean-ctx` shell times out on a cold Gradle start, it retries, and the second JVM tips the
-  16 GB host over. Next order: **drop the compile probes from OpenCode's steps entirely** and let the gate
-  compile — it costs nothing, since the Commander's step 1 compiles everything anyway.
+  3. ~~**P0-009** Android `Surah`/`Ayah`/`Reciter`/`SurahData` → `:shared` models~~ — **DONE 23:04, see §5.**
+     `com.example.data.model` no longer exists; every `:app` consumer imports `com.aistudio.quranblind.domain.model`.
+  4. **Nothing is queued.** The three cut-overs Ibrahim asked for are done. Candidates for the next order,
+     **Ibrahim's call, not started**: (a) retire `:app`'s own `com.example.domain.repository.QuranRepository`
+     interface in favour of `shared/.../domain/repository/QuranRepository.kt` (needs a consumer grep first —
+     `QuranViewModel` + Hilt binding + `QuranRepositoryTest`); (b) start Phase 1 (`AudioEngine` `expect`/`actual`,
+     ADR-004 SwiftUI shell). Do not pick without asking.
+  Dispatch rule, **proven on P0-009**: give OpenCode CLI **no compile probes at all** (grep-only verification)
+  and let the gate compile — OpenCode then finishes and writes its own report (first time this session; P0-004
+  and P0-008 were both OOM-killed at the first probe, B-17). Keep the composable-file split: files containing
+  `@Composable` are edited by the Commander in parallel, disjoint file sets, and the order's §2 says so.
 - **Uncommitted, not mine, Ibrahim's call:** Antigravity's OpenRouter fallback edits (12:50–12:52) to
   `CLAUDE.md`, `fleet_config.json`, `opencode.json`, `.agents/MEMORY_STORE.md`,
   `.agents/ACTIVE_CONTEXT_INJECTION.md`; plus `.agents/HOOKS_GUIDE.xlsx`,
@@ -147,6 +150,7 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
 | P0-005 — SecureStore | ✅ **QUALITY GATE: PASS** 2026-09-11 13:07 (session 3). OpenCode CLI built it. `SecureStore` interface + `expect createSecureStore`, Android actual over `EncryptedSharedPreferences` (**fail-open** to plain prefs), iOS Keychain actual (unverified locally — CI), `SessionStore` with verbatim legacy migration. `:shared` 29/29, `:app` 35/35, `assembleDebug` green. `SessionPreferences.kt` untouched — cut-over is a later order. |
 | P0-006 — voice removal | ✅ **COMPLETE** — build green, grep empty |
 | P0-008 — `sanitizeUthmanicText` → shared `domain.text` | ✅ **QUALITY GATE: PASS** 2026-09-11 22:27 (session 5). OpenCode CLI did the data layer (interface method removed, `QuranRepositoryImpl` pass-1 override deleted + import, `QuranRepositoryTest` repointed; +0/−1, +1/−10, +2/−1 exact) and was OOM-killed at the first compile probe (B-17); Commander did the reserved `AyahCard.kt` edit himself (+1/−14 — import + private pass-2 copy deleted; OpenCode may not touch composable files). One definition left in the repo. Rendered bytes unchanged: UI path was already pass 2; repository path went pass 1 → pass 2, and `pass2∘pass2 = pass2` (idempotence tested). `:app` 35/35, `assembleDebug` + `assembleRelease` green (R8 inlined the shared function; `UthmanicTextKt -> jz0`, 9 residual frames prove all 8 steps), `:shared` 29/29 (`UthmanicTextTest` is 8 cases, not 5). Report: `reports/ORDER_P0_008_REPORT_OPENCODE.md`. |
+| P0-009 — `Surah`/`Ayah`/`Reciter`/`SurahData` → shared `domain.model` | ✅ **QUALITY GATE: PASS** 2026-09-11 23:04 (session 5). Pure package rename: the four `:app` copies were field-identical to `:shared`'s (shared `Ayah`/`Surah` add `@Serializable`; `Reciter`/`SurahData` character-identical). 17 import lines in 11 files rewritten in place, 4 files deleted (`git rm`, 181 lines), `com.example.data.model` gone. OpenCode CLI did the 7 non-composable files (+2/−2, +3/−3, +1/−1, +3/−3, +1/−1 ×3, exact) with **grep-only verification — no compile probes — and finished + reported on its own**; Commander did the 4 `@Composable` files in parallel (`QuranPlayerScreen` +2/−2, `AyahCard`, `ReciterSelectorSheet`, `SurahIndexSheet` +1/−1 each). Gate: `:app` 35/35 (fresh compile), `assembleDebug`, `assembleRelease` (R8 clean; `Ayah$$serializer`/`Surah$$serializer` retained, APK +16 KB, acceptable), `:shared` 29/29. Report: `reports/ORDER_P0_009_REPORT_OPENCODE.md`. |
 | P0-007 — `SessionPreferences` → shared `SessionStore` | ✅ **QUALITY GATE: PASS** 2026-09-11 20:09 (session 4). OpenCode CLI: `QuranBlindApp.onCreate` → `SecureStoreAndroid.init`, `AppModule.provideSessionStore`, 5 surgical ViewModel lines, `SessionPreferences.kt` deleted, `security-crypto` dropped from `:app` (still via `:shared`). Order's A4 bound was the Commander's arithmetic error (+22/−15 is exact) — OpenCode flagged it correctly. `:app` 35/35, `assembleDebug` + `assembleRelease` green (mapping proves new wiring, 0 `SessionPreferences`), `:shared` 29/29. First behaviour delta in `:app`: fail-closed → fail-open on Keystore failure (intended, B-06). |
 
 **P0-002 and P0-003b must run sequentially, not in parallel** — both edit

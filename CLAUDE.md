@@ -52,8 +52,8 @@ an explicit `QUALITY GATE: PASS`. OpenCode and Antigravity **write and build onl
 
 ## 3. TARGET STACK (as of 2026-09-10)
 
-- **Shared:** Kotlin Multiplatform + Compose Multiplatform
-- **Modules:** `:shared` (domain + data + platform abstractions), `:composeApp` (shared UI), `:androidApp`, `iosApp/` (Xcode)
+- **Shared:** Kotlin Multiplatform (`:shared` only — **no Compose Multiplatform**, per ADR-004, 2026-09-11)
+- **Modules:** `:shared` (domain + data + platform abstractions), `:app` (Android, Jetpack Compose — not renamed, per ADR-003), `iosApp/` (XcodeGen, **SwiftUI** UI over the `:shared` XCFramework). `:composeApp` is never created.
 - **DI:** Koin (Hilt is Android/JVM-only and **cannot** cross to iOS)
 - **Network:** Ktor Client (`OkHttp` engine on Android, `Darwin` engine on iOS) + `kotlinx.serialization`
 - **Audio:** `expect class AudioEngine` → `Media3/ExoPlayer` (Android) / `AVPlayer` + `AVAudioSession` (iOS)

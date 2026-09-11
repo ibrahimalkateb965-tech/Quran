@@ -264,6 +264,33 @@ Rev. A proposed a four-module split: `:shared`, `:composeApp`, `:androidApp`, `i
 `project.pbxproj`. A `pbxproj` cannot be validated on Windows and is unreviewable in diff; XcodeGen is
 declarative text that regenerates deterministically on the macOS-15 runner.
 
+### ADR-004 — iOS UI: Compose Multiplatform vs native SwiftUI — ⟲ **RESOLVED 2026-09-11: SwiftUI native**
+Decided by Ibrahim on 2026-09-11 after the Fleet Commander presented both options.
+
+**Context.** The original case for KMP over Flutter was "better accessibility". That claim is false
+as stated: Compose Multiplatform on iOS draws to its own Skia canvas and *synthesises* an
+accessibility tree for VoiceOver — structurally the same approach as Flutter, and younger (CMP iOS
+stable since May 2025). KMP only beats Flutter on accessibility when the iOS UI is native.
+For this product the screen reader *is* the interface, so that is the deciding property.
+
+**Decision.** iOS screens are written in **SwiftUI** inside `iosApp/`, on top of the `:shared`
+XCFramework. **`:composeApp` is never created.** `:app` stays a plain Android Compose app.
+
+**Consequences.**
+- Phase 3 becomes "SwiftUI screens over `:shared`", not "Compose Multiplatform port". The row in §5
+  is corrected below.
+- `:shared` is justified as the guardian of domain rules (`sanitizeUthmanicText`, `QuranRepository`,
+  the EveryAyah URL scheme, network client) — a smaller payload than the plan assumed, said out loud.
+- The UI is written twice. Accepted: the surface is small (player, surah/reciter lists, settings),
+  and the cost is known up front rather than hidden in an accessibility bridge we do not own.
+- Interaction parity between platforms is explicitly **not** a goal (CLAUDE.md §3: "Never share the
+  interaction model"). Parity lives in content, features and flows; TalkBack action lists and the
+  VoiceOver rotor stay native to each platform.
+- ADR-001 (Uthmanic shaping) is now tested with SwiftUI `Text` + `uthman_taha.ttf` under CoreText —
+  no Skia text-shaping risk on iOS.
+- Any future proposal to revisit this needs a real-device VoiceOver spike (rotor, custom actions,
+  announcements) accepted by a blind user before a single screen is written.
+
 ---
 
 ## 5. PHASED PLAN
@@ -274,7 +301,7 @@ declarative text that regenerates deterministically on the macOS-15 runner.
 | **1** | Domain + `VoiceCommandParser` + `sanitizeUthmanicText` to `commonMain`; Hilt → Koin | `commonTest` green under Claude Code |
 | **1.5** | **ADR-001 spike:** Uthmanic rendering on a real iOS device | Visual parity confirmed, or stack decision revisited |
 | **2** | `expect/actual` `AudioEngine` (ExoPlayer / AVPlayer) + `SecureStore` | Background playback survives lock screen and an incoming call |
-| **3** | Compose Multiplatform UI port; `expect` accessibility layer | TalkBack parity retained, VoiceOver parity established |
+| **3** | ⟲ *(ADR-004)* **SwiftUI screens in `iosApp/` over the `:shared` XCFramework**; `expect` accessibility layer. No `:composeApp`. | TalkBack behaviour on Android unchanged; VoiceOver on iOS native (rotor, custom actions) and accepted by a blind user |
 | **4** | Speech I/O (`SFSpeechRecognizer` / `AVSpeechSynthesizer`) | Arabic command recognition benchmarked, not assumed |
 | **5** | CI rewrite, TestFlight, blind-user acceptance testing | `QUALITY GATE: PASS` |
 

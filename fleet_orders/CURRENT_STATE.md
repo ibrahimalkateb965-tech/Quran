@@ -7,8 +7,9 @@
 
 ## 1. THE ONE THING TO DO NEXT
 
-**Decide ADR-004 (§4).** It gates Phase 3 and costs nothing to settle now. Nothing else is pending
-on the commit side — see the real state below.
+**ADR-004 is decided (SwiftUI native, 2026-09-11 — see §3).** Next: write **ORDER-P0-003b**
+(domain core + Koin, voice-free) and **ORDER-P0-005** (SecureStore, now unblocked — §5/§6). They
+edit different files from P0-002, but P0-002 and P0-003b must still run sequentially.
 
 ### Real commit state (verified by Claude Code CLI, 2026-09-11 session 3)
 
@@ -85,8 +86,13 @@ success message.**
   `MainActivity` feeds its `isTalkBackEnabledFlow` into `LocalTalkBackEnabled` for the whole
   Compose tree. Deleting it breaks the app. This is the single most likely mistake for anyone
   doing a fast pass over `accessibility/`.
-- **`:app` is not renamed**, `:composeApp` is not created yet, iOS project is XcodeGen
-  (`project.yml`, never a committed `.pbxproj`).
+- **ADR-004 — iOS UI is native SwiftUI (decided by Ibrahim 2026-09-11).** `:composeApp` is
+  **never created**; `:app` stays plain Android Compose; iOS screens live in `iosApp/` over the
+  `:shared` XCFramework. Reason: CMP on iOS synthesises the VoiceOver tree over a Skia canvas
+  (Flutter's approach, less mature); for an app where the screen reader is the interface, only a
+  native UI keeps VoiceOver quality under our control. Full ADR in
+  `docs/IOS_KMP_READINESS_AUDIT.md` §4.
+- **`:app` is not renamed**, iOS project is XcodeGen (`project.yml`, never a committed `.pbxproj`).
 - **Stack is KMP, not Flutter** — because the Android app already ships. Flutter would mean
   rewriting a working product to reach a second platform.
 
@@ -94,28 +100,14 @@ success message.**
 
 ## 4. OPEN DECISIONS
 
-**ADR-004 — Compose Multiplatform vs native SwiftUI for the iOS UI. Still open, and it gates
-Phase 3.**
+- **ADR-001 — Uthmanic text shaping on iOS.** Still needs the real-device spike (ORDER-P1-005,
+  Antigravity). Under ADR-004 it is tested with SwiftUI `Text` + `uthman_taha.ttf` under CoreText.
+- **ADR-002 — Room vs SQLDelight vs no DB.** Audit recommends (c) no DB. Not yet formally closed;
+  P0-002/P0-003b must not add a persistence library while it is open.
 
-The assumption that KMP buys better accessibility than Flutter is **false as stated**: Compose
-Multiplatform on iOS renders to its own canvas and synthesises an accessibility tree for
-VoiceOver — structurally the same approach as Flutter, and less mature (CMP iOS went stable in
-May 2025; Flutter has shipped iOS a11y for years). The advantage only exists if the iOS UI is
-native SwiftUI/UIKit.
-
-For an app where the screen reader *is* the interface, that matters. Counter-consideration: the
-requirement is feature parity with Android — but since the app delegates to the system screen
-reader, and TalkBack and VoiceOver have different conventions (action lists vs rotor), literal
-interaction parity would be *wrong* on iOS. Parity belongs in content, features and flows;
-interaction should be native to each platform.
-
-**A second question worth answering honestly:** with `VoiceCommandParser` deleted, the shared
-payload has shrunk a lot. The audit had called it "the single highest-value, lowest-risk asset in
-the repository for KMP migration". What is left to share is domain models, the `QuranRepository`
-interface, `sanitizeUthmanicText`, the EveryAyah URL scheme and the network client — a few hundred
-lines. `:shared` still prevents the two apps drifting on domain rules, but the justification is
-materially weaker than when the plan was written, and that should be said out loud rather than
-assumed away.
+*ADR-004 was closed 2026-09-11 — see §3. The note that `:shared`'s payload shrank after the voice
+parser was deleted (domain models, `QuranRepository`, `sanitizeUthmanicText`, EveryAyah URL
+scheme, network client — a few hundred lines) stands and is recorded in the ADR's consequences.*
 
 ---
 

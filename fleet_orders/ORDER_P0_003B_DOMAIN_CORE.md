@@ -4,9 +4,9 @@
 |---|---|
 | Order ID | ORDER-P0-003b (rev. A, 2026-09-11) |
 | Issued by | Claude Code CLI (Fleet Commander) |
-| Assigned to | **Antigravity IDE** (`Gemini 3.7 Flash High`) |
+| Assigned to | **OpenCode CLI** (`opencode/muse-spark-1.3-contributor-free`) — reassigned from Antigravity by Ibrahim 2026-09-11 (host memory, B-17) |
 | Protocol | TEMPLATE_02 — Task Delegation |
-| Status | ISSUED — **blocked until ORDER-P0-002 passes its gate** (it declares the catalog entries you need) |
+| Status | **DISPATCHED 2026-09-11 12:45** — ORDER-P0-002 passed its gate (Ktor 3.2.3, koin-core 4.1.0 are in `:shared`) |
 | Supersedes | ORDER-P0-003 (cancelled: its payload was the deleted voice parser) |
 | Depends on | ORDER-P0-002 (Step 1b/2b: `koin-core`, `kotlinx-coroutines-test` in `:shared`) |
 
@@ -32,7 +32,7 @@ Files you will port, all read in full:
 | `app/src/test/java/com/example/UthmanicTextTest.kt` | JUnit4 | 5 tests; the fixtures are the byte-identity oracle for Step 5 |
 
 **The two `sanitizeUthmanicText` copies differ.** Production output is `pass2(pass1(text))`. Claude Code
-verified that pass 2 is a superset whose extra replacements (`۟→۠`, strip `؀`, strip `۝`)
+verified that pass 2 is a superset whose extra replacements (`\u06DF→\u06E0`, strip `\u0600`, strip `\u06DD`)
 commute with pass 1, so **`pass2(text) == pass2(pass1(text))` for every input**. The canonical shared
 function is therefore **pass 2, exactly as written in `AyahCard.kt`**. Do not "merge" them by hand; copy pass 2.
 
@@ -129,13 +129,13 @@ private val noonSukoonPattern = Regex("(ن)[\\u0652\\u06DF\\u06E0\\u06E1](?=\\s*
 
 fun sanitizeUthmanicText(text: String): String =
     text.replace(noonSukoonPattern, "$1")
-        .replace('۟', '۠')
-        .replace('ۤ', 'ٓ')
-        .replace("؀", "")
-        .replace("۝", "")
-        .replace("﻿", "")
-        .replace(" ", "")
-        .replace("⁠", "")
+        .replace('\u06DF', '\u06E0')
+        .replace('\u06E4', '\u0653')
+        .replace("\u0600", "")
+        .replace("\u06DD", "")
+        .replace("\uFEFF", "")
+        .replace("\u200A", "")
+        .replace("\u2060", "")
 ```
 
 This is `AyahCard.kt` pass 2 character for character. Keep the replacement order exactly so a reviewer can
@@ -153,16 +153,16 @@ against inline `replace` chains as the Android test does:
 
 | # | Input | Expected | Source |
 |---|---|---|---|
-| T1 | `"ءَامَنُوٓا۟؀ إِذَا"` | `"ءَامَنُوٓا۠ إِذَا"` | small rounded zero + rosette |
+| T1 | `"\u0621\u064Eامَنُو\u0653ا\u06DF\u0600 إِذَا"` | `"\u0621\u064Eامَنُو\u0653ا\u06E0 إِذَا"` | small rounded zero + rosette |
 | T2 | `"مِنْ شَرِّ مَا خَلَقَ"` | `"مِن شَرِّ مَا خَلَقَ"` | ikhfa |
 | T2b | `"مَنْ يَقُولُ"` | `"مَن يَقُولُ"` | idgham |
 | T2c | `"أَنْعَمْتَ عَلَيْهِمْ"` | unchanged | izhar — sukoon must survive |
-| T3 | `"وَلَا ٱلضَّاۤلِّینَ"` | `"وَلَا ٱلضَّآلِّینَ"` | small madda → maddah above |
-| T4 | `"مِنْ شَرِّ"` | **unchanged** (sukoon kept) | NBSP between noon and next letter. On the JVM `\\s` does not match U+00A0 (no `UNICODE_CHARACTER_CLASS`), so the lookahead fails and the sukoon survives. Assert `unchanged`; if Claude Code's iOS CI run disagrees, that is a real K/N divergence and will be handled then |
+| T3 | `"وَلَا ٱلضَّا\u06E4لِّینَ"` | `"وَلَا ٱلضَّآلِّینَ"` | small madda → maddah above |
+| T4 | `"مِنْ\u00A0شَرِّ"` | **unchanged** (sukoon kept) | NBSP between noon and next letter. On the JVM `\\s` does not match U+00A0 (no `UNICODE_CHARACTER_CLASS`), so the lookahead fails and the sukoon survives. Assert `unchanged`; if Claude Code's iOS CI run disagrees, that is a real K/N divergence and will be handled then |
 | T5 | `"بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"` | unchanged, 4 words after split | no false positives on Basmala |
 | T6 | idempotence: `f(f(x)) == f(x)` for every fixture above | | |
 
-Write the expected strings as **escaped code points** (`"ءَ…"`), not as visible Arabic — a
+Write the expected strings as **escaped code points** (`"\u0621\u064E…"`), not as visible Arabic — a
 text editor's bidi reordering or a font's glyph substitution must not be able to alter a fixture silently.
 
 ### Step 6 — Audio URL builder (`domain/audio/AyahAudioUrl.kt`) + test
@@ -214,7 +214,8 @@ Swift can call. That is the **only** file you create outside `commonMain`/`commo
 ### Step 10 — Compile probes (compile only)
 
 ```bash
-./gradlew :shared:compileDebugKotlinAndroid
+./gradlew :shared:compileAndroidMain
+./gradlew :shared:compileAndroidHostTest
 ./gradlew :app:assembleDebug
 ```
 Nothing else. No `build`, no `test`, no `allTests`, no `*Ios*` task (Kotlin/Native cannot compile iOS
@@ -226,7 +227,7 @@ targets on Windows — CI does that).
 
 | # | Criterion | Evidence |
 |---|---|---|
-| A1 | `:shared:compileDebugKotlinAndroid` → BUILD SUCCESSFUL | verbatim |
+| A1 | `:shared:compileAndroidMain` and `:shared:compileAndroidHostTest` → BUILD SUCCESSFUL | verbatim |
 | A2 | `:app:assembleDebug` → BUILD SUCCESSFUL | verbatim |
 | A3 | `git diff --stat -- app/ gradle/ '*.gradle.kts'` is empty | output |
 | A4 | `sanitizeUthmanicText` body is a character-for-character match of `AyahCard.kt:183-193` | Claude Code diffs it |
@@ -242,10 +243,10 @@ green **and** A4 exact.
 
 ## 6. REPORT-BACK
 
-Write to `fleet_orders/reports/ORDER_P0_003B_REPORT_ANTIGRAVITY.md`:
+Write to `fleet_orders/reports/ORDER_P0_003B_REPORT_OPENCODE.md`:
 
 ```
-ORDER-P0-003b REPORT — Antigravity IDE
+ORDER-P0-003b REPORT — OpenCode CLI
 
 1. BASELINE            git HEAD, working tree state before you started
 2. FILES CREATED       path, line count (13 expected)

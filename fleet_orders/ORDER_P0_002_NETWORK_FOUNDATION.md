@@ -2,11 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Order ID | ORDER-P0-002 (rev. B) |
+| Order ID | ORDER-P0-002 (rev. C, 2026-09-11) |
 | Issued by | Claude Code CLI (Fleet Commander) |
-| Assigned to | **OpenCode CLI** |
+| Assigned to | **OpenCode CLI** (`opencode/muse-spark-1.3-contributor-free`) |
 | Protocol | TEMPLATE_02 — Task Delegation |
-| Status | ISSUED — **blocked until ORDER-P0-001 passes its gate** |
+| Status | **DISPATCHED 2026-09-11** — ORDER-P0-001 passed its gate; B-10 and B-13 are resolved for Claude Code CLI |
+| rev. C delta | §0 ground truth re-verified from disk 2026-09-11 (unchanged). §4 gains Step 1b / 2b (Koin + coroutines-test in the catalog, because Antigravity may not edit Gradle). §7–§8 are historical. Package root confirmed: `com.aistudio.quranblind` (namespace `com.aistudio.quranblind.shared`). |
 | Supersedes | `ORDER-P0-002` in `fleet_orders/IOS_KMP_PHASE0_ORDERS.md` (rev. A bundled `SecureStore` and the endpoint migration into one order — both are now split out) |
 | Closes | B-05 (Retrofit/OkHttp/Moshi are JVM-only) — **foundation only** |
 | Defers | endpoint + repository migration → **new ORDER-P0-004**; `SecureStore` → **new ORDER-P0-005** |
@@ -118,6 +119,33 @@ ktor-client-mock                = { group = "io.ktor", name = "ktor-client-mock"
 > `3.2.0` is a **baseline, not a verdict.** Resolve the newest Ktor 3.x compatible with Kotlin 2.2.10 and
 > report what you actually pinned. If it fails to resolve, report the failure — do not substitute silently.
 > Ktor 2.x is **not** acceptable: its Darwin engine and `HttpTimeout` behaviour differ materially.
+
+### Step 1b — Version catalog, for the orders that follow (rev. C)
+
+Antigravity IDE owns the next two orders (domain core + Koin, SecureStore) and is **forbidden** from
+editing Gradle files. Declare their dependencies now so they never have to. Append to `[versions]`:
+```toml
+koin = "4.1.0"
+```
+Append to `[libraries]`:
+```toml
+koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
+```
+`kotlinx-coroutines-test` already exists in the catalog (`kotlinxCoroutinesTest = "1.10.2"`) — reuse it.
+Same rule as Ktor: `4.1.0` is a baseline; resolve the newest Koin 4.x and report what you pinned.
+
+### Step 2b — `shared/build.gradle.kts`, for the orders that follow (rev. C)
+
+```kotlin
+commonMain.dependencies {
+    implementation(libs.koin.core)
+}
+commonTest.dependencies {
+    implementation(libs.kotlinx.coroutines.test)
+}
+```
+Replace the two-line comment `// androidMain / iosMain intentionally carry no dependencies yet. …` with
+nothing — it is no longer true after this order.
 
 ### Step 2 — `shared/build.gradle.kts`
 
@@ -261,7 +289,7 @@ own arithmetic saying so — that is far cheaper to catch here than in an outage
 
 ---
 
-## 7. ORDERS SPAWNED BY THIS REVIEW (not yet issued)
+## 7. ORDERS SPAWNED BY THIS REVIEW — *historical as of rev. C; B-06 is resolved (used), B-13 resolved*
 
 **ORDER-P0-004 — Endpoint & repository migration.** Move `QuranApiService`, `AlQuranCloudResponse`, and the
 `QuranRepositoryImpl` network path from Retrofit/Moshi to the Ktor client built here; then retire
@@ -279,7 +307,7 @@ is the file that settles it, and it is unreadable under B-13.
 
 ---
 
-## 8. OPERATIONAL BLOCKERS
+## 8. OPERATIONAL BLOCKERS — *historical as of rev. C; both resolved for Claude Code CLI (see CURRENT_STATE §6)*
 
 **B-10 (open)** — `device_bash` cannot mount the connected folder (`no Plan9 drive shares mounted`),
 re-confirmed 2026-09-10. Claude Code cannot execute Gradle; G2 runs on verbatim console output pasted by Ibrahim.

@@ -46,6 +46,8 @@ media3 = "1.5.1"
 mockk = "1.13.17"
 hilt = "2.60.1"
 kotlinxSerialization = "1.9.0"
+ktor = "3.2.3"
+koin = "4.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -111,6 +113,14 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+ktor-client-core                = { group = "io.ktor", name = "ktor-client-core",                version.ref = "ktor" }
+ktor-client-okhttp              = { group = "io.ktor", name = "ktor-client-okhttp",              version.ref = "ktor" }
+ktor-client-darwin              = { group = "io.ktor", name = "ktor-client-darwin",              version.ref = "ktor" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-logging             = { group = "io.ktor", name = "ktor-client-logging",             version.ref = "ktor" }
+ktor-client-mock                = { group = "io.ktor", name = "ktor-client-mock",                version.ref = "ktor" }
+koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

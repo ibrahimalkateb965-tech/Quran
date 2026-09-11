@@ -116,11 +116,11 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
 | Order | State |
 |---|---|
 | P0-001 — module skeleton | ✅ PASS |
-| P0-002 — Ktor foundation | Unblocked, not started. Low urgency: Retrofit works on Android; Ktor is only needed for iOS. |
+| P0-002 — Ktor foundation | ✅ **QUALITY GATE: PASS** 2026-09-11 12:39 (session 3). OpenCode CLI built it; Commander applied 4 small amendments (Ktor **3.2.3** — 3.2.0 breaks D8 on minSdk 24; `expectSuccess = true`; injectable `warn`; test import). `:shared` 5/5, `:app` 35/35, `assembleDebug` green. Retrofit still serves 100 % of traffic. Full verdict at the end of `reports/ORDER_P0_002_REPORT_OPENCODE.md`. |
 | P0-003 — domain core + Koin | ⛔ **CANCELLED** — its whole payload was porting the voice parser |
-| P0-003b — domain + Koin, voice-free | To be written. Note `SharedModule` now has no first binding to register. |
+| P0-003b — domain + Koin, voice-free | **Written** — `ORDER_P0_003B_DOMAIN_CORE.md` (Antigravity). Ports `Surah`/`Ayah`/`Reciter`/`SurahData`, `QuranRepository` interface (bookmarks omitted — Room), canonical `sanitizeUthmanicText` (= `AyahCard.kt` pass 2, a verified superset of the repository's pass 1), `ayahAudioUrl`, empty `sharedModule` + `initKoin`. Blocked on P0-002 gate. |
 | P0-004 — endpoint/repository migration | Was blocked on B-13; **B-13 is resolved**, so it can now be specified properly |
-| P0-005 — SecureStore | **Unblocked — B-06 settled 2026-09-11 (session 3).** `androidx.security.crypto` IS used: `SessionPreferences.kt` wraps `EncryptedSharedPreferences` + `MasterKey` (AES256_GCM). The `expect class SecureStore` therefore needs a real Android `actual` over `EncryptedSharedPreferences` and an iOS `actual` over Keychain. See §6 B-06 for the design caveat the order must address. |
+| P0-005 — SecureStore | **Written** — `ORDER_P0_005_SECURE_STORE.md` (Antigravity). `SecureStore` interface + `expect createSecureStore`, Android actual over `EncryptedSharedPreferences` (same scheme triple as `SessionPreferences.kt`) with **fail-open** fallback to plain prefs, iOS actual over Keychain (`AfterFirstUnlock`), `SessionStore` typed wrapper with the legacy reciter-id migration. Needs OpenCode to add `androidx.security.crypto` to `:shared` androidMain first. Blocked on P0-003b gate. |
 | P0-006 — voice removal | ✅ **COMPLETE** — build green, grep empty |
 
 **P0-002 and P0-003b must run sequentially, not in parallel** — both edit
@@ -178,6 +178,12 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
   SecureStore order should decide whether the `actual` keeps encryption (parity) or degrades to
   plain `SharedPreferences` / `UserDefaults` on failure. Also verify the library's support status
   before pinning the KMP `actual` to it — `security-crypto` has been alpha-only for years.
+- **B-17 — host memory (found 2026-09-11, session 3, open).** 15.8 GB machine at its commit limit
+  (`vmmem` 4.1 GB, Chrome 1.6 GB, Antigravity IDE 1.5 GB, Claude 1.9 GB). Gradle daemon (`-Xmx4g`) +
+  Kotlin daemon (`-Xmx3g`) + D8 crash with `G1 virtual space` mmap failures, and MockK's ByteBuddy
+  self-attach fails because no JVM can be spawned. **Rules:** kill stale Gradle/Kotlin daemons before a
+  gate run; never let two agents run Gradle at once; close the Cowork VM or Antigravity IDE for a full
+  `assembleDebug`. Also: `agy`/OpenCode runs that go silent for >10 min are hung — kill and redo.
 - **B-13 — RESOLVED 2026-09-11.** `…\app\src\main\java\com\example` is connected as a second
   folder. Every source file is now readable and writable.
 - OpenCode CLI is configured for `opencode/muse-spark-1.3-contributor-free` in `opencode.json`

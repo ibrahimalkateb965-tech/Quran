@@ -13,8 +13,6 @@ import androidx.core.content.ContextCompat
 import com.example.service.QuranAudioService
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
-import com.example.accessibility.VoiceCommandManager
-import com.example.accessibility.VoiceCommandResult
 import com.example.data.local.BookmarkEntity
 import com.example.data.model.Ayah
 import com.example.data.model.Reciter
@@ -57,10 +55,6 @@ data class BookmarkUiState(
     val isCurrentAyahBookmarked: Boolean = false
 )
 
-data class VoiceUiState(
-    val isListeningVoice: Boolean = false
-)
-
 enum class StartupStep { RECITERS, SURAHS, COMPLETED }
 
 data class DialogUiState(
@@ -81,7 +75,6 @@ class QuranViewModel @Inject constructor(
     private val repository: QuranRepository,
     val haptic: HapticFeedbackManager,
     val speechManager: SpeechManager,
-    private val voiceManager: VoiceCommandManager,
     private val sessionPrefs: SessionPreferences
 ) : AndroidViewModel(application) {
 
@@ -104,9 +97,6 @@ class QuranViewModel @Inject constructor(
 
     private val _bookmarkUiState = MutableStateFlow(BookmarkUiState())
     val bookmarkUiState: StateFlow<BookmarkUiState> = _bookmarkUiState.asStateFlow()
-
-    private val _voiceUiState = MutableStateFlow(VoiceUiState())
-    val voiceUiState: StateFlow<VoiceUiState> = _voiceUiState.asStateFlow()
 
     private val _dialogUiState = MutableStateFlow(DialogUiState())
     val dialogUiState: StateFlow<DialogUiState> = _dialogUiState.asStateFlow()
@@ -591,114 +581,6 @@ class QuranViewModel @Inject constructor(
         }
     }
 
-    fun startVoiceCommand() {
-        performAction("", HapticType.VOICE_LISTENING_STARTED)
-
-        // Pause Quran audio while listening to avoid the microphone picking up the recitation.
-        val wasPlaying = mediaController?.isPlaying == true
-        if (wasPlaying) {
-            mediaController?.pause()
-            _playbackUiState.update { it.copy(isLoadingAudio = false) }
-        }
-
-        voiceManager.startListening(
-            onResult = { result ->
-                handleVoiceCommandResult(result, wasPlaying)
-            },
-            onStatusChange = { isListening ->
-                _voiceUiState.update { it.copy(isListeningVoice = isListening) }
-            }
-        )
-    }
-
-    private fun handleVoiceCommandResult(result: VoiceCommandResult, wasPlayingBeforeListening: Boolean) {
-        when (result) {
-            is VoiceCommandResult.PlaySurahByName -> {
-                haptic.vibrateVoiceCommandSuccess()
-                val surah = repository.findSurahByName(result.surahName)
-                if (surah != null) {
-                    announce("جاري تشغيل سورة ${surah.nameArabic}", forceSpeak = true)
-                    loadSurah(surah.id, autoPlay = true)
-                } else {
-                    haptic.vibrateVoiceCommandFailure()
-                    announce("لم أجد سورة باسم ${result.surahName}", forceSpeak = true)
-                }
-            }
-            is VoiceCommandResult.GoToAyahNumber -> {
-                haptic.vibrateVoiceCommandSuccess()
-                val ayahs = _playbackUiState.value.currentAyahs
-                val targetIndex = (result.ayahNumber - 1).coerceIn(0, (ayahs.size - 1).coerceAtLeast(0))
-                if (ayahs.isNotEmpty()) {
-                    goToAyah(targetIndex, autoPlay = true)
-                    announce("الانتقال إلى الآية ${result.ayahNumber}", forceSpeak = true)
-                }
-            }
-            VoiceCommandResult.Pause -> {
-                haptic.vibrateVoiceCommandSuccess()
-                if (mediaController?.isPlaying == true) mediaController?.pause()
-                announce("تم الإيقاف", forceSpeak = true)
-            }
-            VoiceCommandResult.Resume -> {
-                haptic.vibrateVoiceCommandSuccess()
-                mediaController?.play()
-                announce("تم التشغيل", forceSpeak = true)
-            }
-            VoiceCommandResult.NextAyah -> {
-                haptic.vibrateVoiceCommandSuccess()
-                playNextAyah()
-            }
-            VoiceCommandResult.PreviousAyah -> {
-                haptic.vibrateVoiceCommandSuccess()
-                playPreviousAyah()
-            }
-            VoiceCommandResult.ToggleBookmark -> {
-                haptic.vibrateVoiceCommandSuccess()
-                toggleCurrentBookmark(forceSpeak = true)
-            }
-            VoiceCommandResult.ToggleRepeatMode -> {
-                haptic.vibrateVoiceCommandSuccess()
-                toggleRepeatMode(forceSpeak = true)
-            }
-            VoiceCommandResult.ToggleContinuousPlay -> {
-                haptic.vibrateVoiceCommandSuccess()
-                toggleContinuousPlay(forceSpeak = true)
-            }
-            VoiceCommandResult.ReplayAyah -> {
-                haptic.vibrateVoiceCommandSuccess()
-                replayCurrentAyah()
-            }
-            is VoiceCommandResult.ChangeReciter -> {
-                haptic.vibrateVoiceCommandSuccess()
-                val found = Reciter.DEFAULT_RECITERS.find { it.id == result.reciterId }
-                if (found != null) selectReciter(found)
-            }
-            VoiceCommandResult.ShowSurahIndex -> {
-                haptic.vibrateVoiceCommandSuccess()
-                _dialogUiState.update { it.copy(showSurahIndex = true) }
-                announce("تم فتح قائمة السور", forceSpeak = true)
-            }
-            VoiceCommandResult.ShowHelp -> {
-                haptic.vibrateVoiceCommandSuccess()
-                _dialogUiState.update { it.copy(showHelpDialog = true) }
-                announce("تم فتح قائمة التعليمات والأوامر الصوتية", forceSpeak = true)
-            }
-            is VoiceCommandResult.UnknownCommand -> {
-                haptic.vibrateVoiceCommandFailure()
-                announce("لم أتعرف على الأمر: ${result.originalText}", forceSpeak = true)
-            }
-            is VoiceCommandResult.Error -> {
-                haptic.vibrateVoiceCommandFailure()
-                announce(result.message, forceSpeak = true)
-            }
-        }
-
-        // Resume Quran audio if it was playing before the voice command,
-        // unless the user explicitly asked to pause.
-        if (wasPlayingBeforeListening && result !is VoiceCommandResult.Pause) {
-            mediaController?.play()
-        }
-    }
-
     fun toggleScreenOffMode() {
         haptic.vibrateLongPress()
         val next = !_screenModeUiState.value.isScreenOffMode
@@ -783,9 +665,6 @@ class QuranViewModel @Inject constructor(
             HapticType.BOOKMARK -> haptic.vibrateBookmark()
             HapticType.NETWORK_LOSS -> haptic.vibrateNetworkLoss()
             HapticType.NETWORK_RECOVERY -> haptic.vibrateNetworkRecovery()
-            HapticType.VOICE_LISTENING_STARTED -> haptic.vibrateVoiceListeningStarted()
-            HapticType.VOICE_COMMAND_SUCCESS -> haptic.vibrateVoiceCommandSuccess()
-            HapticType.VOICE_COMMAND_FAILURE -> haptic.vibrateVoiceCommandFailure()
             HapticType.NONE -> {}
         }
         if (msg.isNotEmpty()) {
@@ -851,7 +730,6 @@ class QuranViewModel @Inject constructor(
         mediaController = null
 
         speechManager.shutdown()
-        voiceManager.destroy()
         super.onCleared()
     }
 }
@@ -859,6 +737,5 @@ class QuranViewModel @Inject constructor(
 enum class HapticType {
     CLICK, DOUBLE_TAP, LONG_PRESS, REPEAT_ON, REPEAT_OFF, BOOKMARK,
     NETWORK_LOSS, NETWORK_RECOVERY,
-    VOICE_LISTENING_STARTED, VOICE_COMMAND_SUCCESS, VOICE_COMMAND_FAILURE,
     NONE
 }

@@ -640,10 +640,10 @@
 - id: MEM-2026-09-04-001
   type: milestone
   timestamp: "2026-09-04T06:16:00+03:00"
-  agents: [devops-deployer, code-architect, android-kotlin-pro, persistent-memory-engine]
+  agents: [devops-deployer, code-architect, android-kotlin-pro, persistent-memory-engine, agent-optimizer]
   context: "معالجة التشغيل المفاجئ للصوت بعد إنهاء المكالمات الهاتفية وإرسال أول إصدار للمراجعة على Google Play Console"
-  content: "1. إصلاح استئناف الصوت غير المرغوب بعد المكالمات في QuranAudioService باعتراض واستهلاك أحداث MediaButton (ACTION_DOWN و ACTION_UP) لكافة مفاتيح التشغيل وتجاوز onPlaybackResumption عندما يكون المشغل متوقفاً عمداً.\n2. إنشاء وتوقيع حزمة الإنتاج الرسمية app-release.aab (الإصدار 1.0.0، Target SDK 36، حجم التنزيل 5.99MB).\n3. إكمال 100% من متطلبات Google Play Console (سياسة الخصوصية، تصنيف المحتوى IARC للجميع، استبيان أمان البيانات، الهوية البصرية، صفحة المتجر باللغتين، والتوزيع على 176 دولة).\n4. إنشاء مسار الاختبار المغلق (Closed testing - Alpha) وإضافة 6 مختبرين وإرسال كافة التغييرات الـ 15 رسمياً للمراجعة (In review)."
-  tags: [google-play-console, closed-testing, release-submission, phone-call-resume-fix, aab, production, milestone]
+  content: "1. إصلاح استئناف الصوت غير المرغوب بعد المكالمات في QuranAudioService باعتراض واستهلاك أحداث MediaButton (ACTION_DOWN و ACTION_UP) لكافة مفاتيح التشغيل وتجاوز onPlaybackResumption عندما يكون المشغل متوقفاً عمداً.\n2. إنشاء وتوقيع حزمة الإنتاج الرسمية app-release.aab (الإصدار 1.0.0، Target SDK 36، حجم التنزيل 5.99MB).\n3. إكمال 100% من متطلبات Google Play Console (سياسة الخصوصية، تصنيف المحتوى IARC للجميع، استبيان أمان البيانات، الهوية البصرية، صفحة المتجر باللغتين، والتوزيع على 176 دولة).\n4. إنشاء مسار الاختبار المغلق (Closed testing - Alpha) وإضافة 6 مختبرين وإرسال كافة التغييرات الـ 15 رسمياً للمراجعة (In review) واجتياز الفحص السريع (Quick checks) بنجاح 100%.\n5. مزامنة ورفع كافة التعديلات السحابية إلى مستودع GitHub بنجاح على فرع chore/remove-trial-lock-for-play-release.\n[ANTI-PATTERN AVOIDED]:\n1. تجنب الاعتماد على onAudioFocusChangeListener وحده للتعامل مع المكالمات، لأن أجهزة البلوتوث/النظام ترسل حدث MediaButton منفصل يستأنف المشغل قسرياً.\n2. تجنب ترك ملاحظات الإصدار في Google Play بدون وسوم اللغة <ar>...</ar> لمنع خطأ Text outside language tags.\n3. تجنب الرفع المباشر إلى main دون مراجعة الفروع المخصصة وتأمين المفاتيح في .gitignore."
+  tags: [google-play-console, closed-testing, release-submission, phone-call-resume-fix, aab, production, milestone, post-mortem]
   status: active
 ```
 

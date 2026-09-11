@@ -26,3 +26,6 @@ WhatsApp Image*
 *.jks
 *.keystore
 key.properties
+
+# XcodeGen generates this; never commit it.
+iosApp/QuranBlind.xcodeproj/

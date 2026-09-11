@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -61,11 +60,9 @@ import com.example.ui.components.player.AyahCard
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.components.player.AyahNumberCard
 import com.example.ui.components.player.SurahNameCard
-import com.example.ui.components.player.BigVoiceMicrophoneButton
 import com.example.ui.components.player.ControlPanel
 import com.example.ui.components.player.GestureHintChip
 import com.example.ui.components.player.HeaderBar
-import com.example.ui.components.player.ListeningVoiceBanner
 import com.example.ui.components.player.ScreenOffSaverOverlay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -143,7 +140,6 @@ fun QuranPlayerScreen(
     val playbackUiState by viewModel.playbackUiState.collectAsStateWithLifecycle()
     val settingsUiState by viewModel.settingsUiState.collectAsStateWithLifecycle()
     val bookmarkUiState by viewModel.bookmarkUiState.collectAsStateWithLifecycle()
-    val voiceUiState by viewModel.voiceUiState.collectAsStateWithLifecycle()
     val dialogUiState by viewModel.dialogUiState.collectAsStateWithLifecycle()
     val screenModeUiState by viewModel.screenModeUiState.collectAsStateWithLifecycle()
     val isTalkBackEnabled = LocalTalkBackEnabled.current

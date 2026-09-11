@@ -3,7 +3,6 @@ package com.example.di
 import android.content.Context
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
-import com.example.accessibility.VoiceCommandManager
 import com.example.data.local.AyahDao
 import com.example.data.local.BookmarkDao
 import com.example.data.local.QuranDatabase
@@ -56,15 +55,6 @@ object AppModule {
     @Singleton
     fun provideSpeechManager(@ApplicationContext context: Context): SpeechManager {
         return SpeechManager(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideVoiceCommandManager(
-        @ApplicationContext context: Context,
-        quranRepository: QuranRepository
-    ): VoiceCommandManager {
-        return VoiceCommandManager(context, quranRepository)
     }
 }
 

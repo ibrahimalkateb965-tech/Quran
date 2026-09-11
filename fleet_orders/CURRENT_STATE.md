@@ -7,25 +7,30 @@
 
 ## 1. THE ONE THING TO DO NEXT
 
-**As of 2026-09-11 13:08 (session 3):**
+**As of 2026-09-11 17:25 (session 4):**
 
-- **Phase 0 orders all gated:** P0-001, P0-002, P0-003b, P0-005, P0-006 — **QUALITY GATE: PASS** each
-  (§5). `7462ed4` is on origin; the P0-005 commit follows it locally until Ibrahim pushes.
-- **Next order to write: ORDER-P0-004** — migrate `QuranApiService` / `AlQuranCloudResponse` /
-  `QuranRepositoryImpl`'s network path from Retrofit+Moshi to `HttpClientFactory` + `@Serializable`
-  DTOs in `:shared`, then retire `NetworkModule`. First order that **touches `app/`**, so it needs its
-  own regression gate (35 app tests + assembleDebug) and a Devil's Advocate pass on the DTO field mapping.
-  Assign to OpenCode CLI while B-17 stands.
-- After that, the `:app` cut-over orders, one at a time: `SessionPreferences` → `SessionStore`;
-  `AyahCard`/repository `sanitizeUthmanicText` → `domain.text.sanitizeUthmanicText`; Android models →
-  `:shared` models. Each with the same regression gate.
+- **Phase 0 orders all gated, including P0-004:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006 —
+  **QUALITY GATE: PASS** each (§5). `0b62eed` (P0-005) is on origin; the P0-004 commit follows it
+  locally until Ibrahim pushes.
+- **P0-004 premise correction (found 2026-09-11 session 4):** the Retrofit/Moshi/OkHttp path in `:app`
+  was **dead code** — `QuranRepositoryImpl` reads `assets/quran/quran_uthmani_tanzil.json` → Room and
+  never injected `QuranApiService`; zero consumers anywhere in `app/src`. Ibrahim chose **option A:
+  retire only, no Ktor port**. Ktor in `:shared` (P0-002) is now the programme's only network stack and
+  currently has no caller — that is fine; audio streams by URL straight into ExoPlayer.
+- **Next orders — the `:app` cut-overs, one at a time, each with the full regression gate**
+  (`:app` 35 tests + `assembleDebug` + `assembleRelease` + `:shared` 29 tests):
+  1. **P0-007** `SessionPreferences` → `SessionStore` over `createSecureStore` (call
+     `SecureStoreAndroid.init(context)` from the `Application`; same file name → zero migration).
+  2. **P0-008** `AyahCard`/repository `sanitizeUthmanicText` → `domain.text.sanitizeUthmanicText`
+     (UthmanicTextTest 5/5 must stay green — byte-for-byte rule, CLAUDE.md §4.4).
+  3. **P0-009** Android `Surah`/`Ayah`/`Reciter`/`SurahData` → `:shared` models.
+  Assign to OpenCode CLI while B-17 stands — but see **B-18** (§6): its shell wrapper now blocks
+  `gradlew`, so orders must say "no compile probes; Claude Code compiles at the gate".
 - **Uncommitted, not mine, Ibrahim's call:** Antigravity's OpenRouter fallback edits (12:50–12:52) to
   `CLAUDE.md`, `fleet_config.json`, `opencode.json`, `.agents/MEMORY_STORE.md`,
   `.agents/ACTIVE_CONTEXT_INJECTION.md`; plus `.agents/HOOKS_GUIDE.xlsx`,
-  `remote_ios_dev_playbook_diagram.html`, and `hs_err_pid*.log` / `replay_pid*.log` litter.
-- **Next order to write:** ORDER-P0-004 (endpoint + repository migration Retrofit/Moshi → Ktor, then
-  retire `NetworkModule`). Then the `:app` cut-over orders (SecureStore, sanitize, models) — each with its
-  own regression gate. All to OpenCode CLI while B-17 stands.
+  `remote_ios_dev_playbook_diagram.html`, and `hs_err_pid*.log` / `replay_pid*.log` litter (now 7 files
+  after today's OOM kills).
 
 ### Real commit state (verified by Claude Code CLI, 2026-09-11 session 3)
 
@@ -135,7 +140,7 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
 | P0-002 — Ktor foundation | ✅ **QUALITY GATE: PASS** 2026-09-11 12:39 (session 3). OpenCode CLI built it; Commander applied 4 small amendments (Ktor **3.2.3** — 3.2.0 breaks D8 on minSdk 24; `expectSuccess = true`; injectable `warn`; test import). `:shared` 5/5, `:app` 35/35, `assembleDebug` green. Retrofit still serves 100 % of traffic. Full verdict at the end of `reports/ORDER_P0_002_REPORT_OPENCODE.md`. |
 | P0-003 — domain core + Koin | ⛔ **CANCELLED** — its whole payload was porting the voice parser |
 | P0-003b — domain + Koin, voice-free | **Written** — `ORDER_P0_003B_DOMAIN_CORE.md` (Antigravity). Ports `Surah`/`Ayah`/`Reciter`/`SurahData`, `QuranRepository` interface (bookmarks omitted — Room), canonical `sanitizeUthmanicText` (= `AyahCard.kt` pass 2, a verified superset of the repository's pass 1), `ayahAudioUrl`, empty `sharedModule` + `initKoin`. Blocked on P0-002 gate. |
-| P0-004 — endpoint/repository migration | Was blocked on B-13; **B-13 is resolved**, so it can now be specified properly |
+| P0-004 — retire dead Retrofit path | ✅ **QUALITY GATE: PASS** 2026-09-11 17:19 (session 4). Re-scoped from "migrate to Ktor" to **delete** after the premise proved false (zero consumers). OpenCode CLI did Steps 1–5 (3 `git rm`, −7/−13/−12 lines in `app/build.gradle.kts` / `proguard-rules.pro` / `libs.versions.toml`), then was OOM-killed before reporting; Commander verified every diff and wrote `reports/ORDER_P0_004_REPORT_OPENCODE.md`. `:app` 35/35, `assembleDebug` + **`assembleRelease` (R8)** green, `mapping.txt` has 0 retrofit/moshi classes, `:shared` 29/29. First order to touch `app/`. |
 | P0-005 — SecureStore | ✅ **QUALITY GATE: PASS** 2026-09-11 13:07 (session 3). OpenCode CLI built it. `SecureStore` interface + `expect createSecureStore`, Android actual over `EncryptedSharedPreferences` (**fail-open** to plain prefs), iOS Keychain actual (unverified locally — CI), `SessionStore` with verbatim legacy migration. `:shared` 29/29, `:app` 35/35, `assembleDebug` green. `SessionPreferences.kt` untouched — cut-over is a later order. |
 | P0-006 — voice removal | ✅ **COMPLETE** — build green, grep empty |
 
@@ -200,13 +205,25 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
   self-attach fails because no JVM can be spawned. **Rules:** kill stale Gradle/Kotlin daemons before a
   gate run; never let two agents run Gradle at once; close the Cowork VM or Antigravity IDE for a full
   `assembleDebug`. Also: `agy`/OpenCode runs that go silent for >10 min are hung — kill and redo.
+  **Session 4 addendum:** Claude Code's own *background* Bash jobs get killed by the harness's
+  low-memory watchdog mid-Gradle ("stopped because the system is running low on memory") — the Gradle
+  daemon survives and finishes the build, but the shell that would report is gone. Run gate steps in the
+  **foreground**, one `./gradlew` per call, and read results from the JUnit XML / APK timestamps rather
+  than from `UP-TO-DATE`.
+- **B-18 — OpenCode's `lean-ctx` shell wrapper blocks `gradlew` (found 2026-09-11 17:02, session 4,
+  open).** Error: `'gradlew' is not in the shell allowlist … permanent restriction`. It ran fine for
+  P0-002/003b/005 this morning, so the cause is something changed since — most likely Antigravity's
+  uncommitted `opencode.json` edits (12:50). Fix is one of: `lean-ctx allow gradlew`, or
+  `shell_allowlist = []` in `C:\Users\Kt\.config\lean-ctx\config.toml` (file does not exist yet — built-in
+  defaults are in effect). **Ibrahim's call.** Until then, orders to OpenCode must not include compile
+  probes; Claude Code compiles at the gate.
 - **B-13 — RESOLVED 2026-09-11.** `…\app\src\main\java\com\example` is connected as a second
   folder. Every source file is now readable and writable.
 - OpenCode CLI is configured for `opencode/muse-spark-1.3-contributor-free` in `opencode.json`
   but **has no API key yet** — `opencode auth login`, free, email only, no card.
 - Build warnings worth knowing, none blocking: `TYPE_ANNOUNCEMENT` deprecated,
-  `PhoneStateListener` deprecated, `abandonAudioFocus` deprecated, Moshi KAPT codegen deprecated
-  (moot once P0-004 retires Moshi), and Gradle features incompatible with Gradle 10.
+  `PhoneStateListener` deprecated, `abandonAudioFocus` deprecated, and Gradle features incompatible
+  with Gradle 10. (The Moshi codegen warning is gone — P0-004 removed Moshi.)
 
 ---
 

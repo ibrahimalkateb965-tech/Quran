@@ -22,7 +22,6 @@ android {
     versionName = "1.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    buildConfigField("String", "BASE_URL", "\"https://api.alquran.cloud/v1/\"")
   }
 
   val keystorePropertiesFile = rootProject.file("key.properties")
@@ -117,7 +116,6 @@ dependencies {
   implementation(libs.androidx.media3.ui)
   implementation(libs.androidx.media3.database)
   // implementation(libs.coil.compose)
-  implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
@@ -131,11 +129,7 @@ dependencies {
   // implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
-  implementation(libs.moshi.kotlin)
-  implementation(libs.okhttp)
   // implementation(libs.play.services.location)
-  implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -156,5 +150,4 @@ dependencies {
   implementation(libs.hilt.android)
   "ksp"(libs.hilt.compiler)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
 }

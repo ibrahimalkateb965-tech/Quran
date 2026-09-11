@@ -18,7 +18,8 @@ import com.example.data.model.Ayah
 import com.example.data.model.Reciter
 import com.example.data.model.Surah
 import com.example.domain.repository.QuranRepository
-import com.example.data.local.SessionPreferences
+import com.aistudio.quranblind.store.SessionState
+import com.aistudio.quranblind.store.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -75,7 +76,7 @@ class QuranViewModel @Inject constructor(
     private val repository: QuranRepository,
     val haptic: HapticFeedbackManager,
     val speechManager: SpeechManager,
-    private val sessionPrefs: SessionPreferences
+    private val sessionStore: SessionStore
 ) : AndroidViewModel(application) {
 
     private var mediaController: MediaController? = null
@@ -233,7 +234,7 @@ class QuranViewModel @Inject constructor(
             }
         }, ContextCompat.getMainExecutor(application))
 
-        val savedSession = sessionPrefs.getSession()
+        val savedSession = sessionStore.load()
         if (savedSession != null) {
             val reciter = Reciter.DEFAULT_RECITERS.find { it.serverIdentifier == savedSession.reciterId } ?: Reciter.DEFAULT_RECITER
             _settingsUiState.update { it.copy(selectedReciter = reciter) }
@@ -279,10 +280,12 @@ class QuranViewModel @Inject constructor(
             
             announce("${surah.translationArabic}. عدد آياتها ${surah.ayahCount}.")
             
-            sessionPrefs.saveSession(
-                reciterId = _settingsUiState.value.selectedReciter.serverIdentifier,
-                surahId = surahId,
-                ayahIndex = targetAyahIndex
+            sessionStore.save(
+                SessionState(
+                    reciterId = _settingsUiState.value.selectedReciter.serverIdentifier,
+                    surahId = surahId,
+                    ayahIndex = targetAyahIndex
+                )
             )
 
             repository.getAyahs(surahId, _settingsUiState.value.selectedReciter.serverIdentifier).collect { ayahs ->
@@ -496,10 +499,12 @@ class QuranViewModel @Inject constructor(
         }
         val ayah = state.currentAyahs[index]
         
-        sessionPrefs.saveSession(
-            reciterId = _settingsUiState.value.selectedReciter.serverIdentifier,
-            surahId = state.currentSurah?.id ?: 1,
-            ayahIndex = index
+        sessionStore.save(
+            SessionState(
+                reciterId = _settingsUiState.value.selectedReciter.serverIdentifier,
+                surahId = state.currentSurah?.id ?: 1,
+                ayahIndex = index
+            )
         )
         
         performAction("", HapticType.CLICK)
@@ -552,10 +557,12 @@ class QuranViewModel @Inject constructor(
         
         val currentSurahId = _playbackUiState.value.currentSurah?.id
         if (currentSurahId != null) {
-            sessionPrefs.saveSession(
-                reciterId = reciter.serverIdentifier,
-                surahId = currentSurahId,
-                ayahIndex = _playbackUiState.value.currentAyahIndex
+            sessionStore.save(
+                SessionState(
+                    reciterId = reciter.serverIdentifier,
+                    surahId = currentSurahId,
+                    ayahIndex = _playbackUiState.value.currentAyahIndex
+                )
             )
         }
         

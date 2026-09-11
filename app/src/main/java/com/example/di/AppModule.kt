@@ -6,7 +6,8 @@ import com.example.accessibility.SpeechManager
 import com.example.data.local.AyahDao
 import com.example.data.local.BookmarkDao
 import com.example.data.local.QuranDatabase
-import com.example.data.local.SessionPreferences
+import com.aistudio.quranblind.store.SessionStore
+import com.aistudio.quranblind.store.createSecureStore
 import com.example.data.repository.QuranRepositoryImpl
 import com.example.domain.repository.QuranRepository
 import dagger.Binds
@@ -41,8 +42,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSessionPreferences(@ApplicationContext context: Context): SessionPreferences {
-        return SessionPreferences.getInstance(context)
+    fun provideSessionStore(): SessionStore {
+        return SessionStore(createSecureStore(SessionStore.STORE_NAME))
     }
 
     @Provides

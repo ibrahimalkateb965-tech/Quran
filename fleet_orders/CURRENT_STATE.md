@@ -7,11 +7,11 @@
 
 ## 1. THE ONE THING TO DO NEXT
 
-**As of 2026-09-11 17:25 (session 4):**
+**As of 2026-09-11 20:12 (session 4):**
 
-- **Phase 0 orders all gated, including P0-004:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006 —
-  **QUALITY GATE: PASS** each (§5). `b3353f6` (P0-004) is on origin — the branch is fully pushed.
-  (Pushed by Ibrahim 2026-09-11 17:40.)
+- **Phase 0 orders all gated, plus the first cut-over:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006, **P0-007** —
+  **QUALITY GATE: PASS** each (§5). `4846e67` is on origin; the P0-007 commit follows it locally until Ibrahim pushes.
+  (P0-004 pushed 17:40.)
 - **P0-004 premise correction (found 2026-09-11 session 4):** the Retrofit/Moshi/OkHttp path in `:app`
   was **dead code** — `QuranRepositoryImpl` reads `assets/quran/quran_uthmani_tanzil.json` → Room and
   never injected `QuranApiService`; zero consumers anywhere in `app/src`. Ibrahim chose **option A:
@@ -19,8 +19,7 @@
   currently has no caller — that is fine; audio streams by URL straight into ExoPlayer.
 - **Next orders — the `:app` cut-overs, one at a time, each with the full regression gate**
   (`:app` 35 tests + `assembleDebug` + `assembleRelease` + `:shared` 29 tests):
-  1. **P0-007** `SessionPreferences` → `SessionStore` over `createSecureStore` (call
-     `SecureStoreAndroid.init(context)` from the `Application`; same file name → zero migration).
+  1. ~~**P0-007** `SessionPreferences` → `SessionStore`~~ — **DONE 20:09, see §5.**
   2. **P0-008** `AyahCard`/repository `sanitizeUthmanicText` → `domain.text.sanitizeUthmanicText`
      (UthmanicTextTest 5/5 must stay green — byte-for-byte rule, CLAUDE.md §4.4).
   3. **P0-009** Android `Surah`/`Ayah`/`Reciter`/`SurahData` → `:shared` models.
@@ -143,6 +142,7 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
 | P0-004 — retire dead Retrofit path | ✅ **QUALITY GATE: PASS** 2026-09-11 17:19 (session 4). Re-scoped from "migrate to Ktor" to **delete** after the premise proved false (zero consumers). OpenCode CLI did Steps 1–5 (3 `git rm`, −7/−13/−12 lines in `app/build.gradle.kts` / `proguard-rules.pro` / `libs.versions.toml`), then was OOM-killed before reporting; Commander verified every diff and wrote `reports/ORDER_P0_004_REPORT_OPENCODE.md`. `:app` 35/35, `assembleDebug` + **`assembleRelease` (R8)** green, `mapping.txt` has 0 retrofit/moshi classes, `:shared` 29/29. First order to touch `app/`. |
 | P0-005 — SecureStore | ✅ **QUALITY GATE: PASS** 2026-09-11 13:07 (session 3). OpenCode CLI built it. `SecureStore` interface + `expect createSecureStore`, Android actual over `EncryptedSharedPreferences` (**fail-open** to plain prefs), iOS Keychain actual (unverified locally — CI), `SessionStore` with verbatim legacy migration. `:shared` 29/29, `:app` 35/35, `assembleDebug` green. `SessionPreferences.kt` untouched — cut-over is a later order. |
 | P0-006 — voice removal | ✅ **COMPLETE** — build green, grep empty |
+| P0-007 — `SessionPreferences` → shared `SessionStore` | ✅ **QUALITY GATE: PASS** 2026-09-11 20:09 (session 4). OpenCode CLI: `QuranBlindApp.onCreate` → `SecureStoreAndroid.init`, `AppModule.provideSessionStore`, 5 surgical ViewModel lines, `SessionPreferences.kt` deleted, `security-crypto` dropped from `:app` (still via `:shared`). Order's A4 bound was the Commander's arithmetic error (+22/−15 is exact) — OpenCode flagged it correctly. `:app` 35/35, `assembleDebug` + `assembleRelease` green (mapping proves new wiring, 0 `SessionPreferences`), `:shared` 29/29. First behaviour delta in `:app`: fail-closed → fail-open on Keystore failure (intended, B-06). |
 
 **P0-002 and P0-003b must run sequentially, not in parallel** — both edit
 `shared/build.gradle.kts` and `gradle/libs.versions.toml`.

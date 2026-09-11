@@ -643,7 +643,13 @@
   agents: [devops-deployer, code-architect, android-kotlin-pro, persistent-memory-engine, agent-optimizer]
   context: "معالجة التشغيل المفاجئ للصوت بعد إنهاء المكالمات الهاتفية وإرسال أول إصدار للمراجعة على Google Play Console"
   content: "1. إصلاح استئناف الصوت غير المرغوب بعد المكالمات في QuranAudioService باعتراض واستهلاك أحداث MediaButton (ACTION_DOWN و ACTION_UP) لكافة مفاتيح التشغيل وتجاوز onPlaybackResumption عندما يكون المشغل متوقفاً عمداً.\n2. إنشاء وتوقيع حزمة الإنتاج الرسمية app-release.aab (الإصدار 1.0.0، Target SDK 36، حجم التنزيل 5.99MB).\n3. إكمال 100% من متطلبات Google Play Console (سياسة الخصوصية، تصنيف المحتوى IARC للجميع، استبيان أمان البيانات، الهوية البصرية، صفحة المتجر باللغتين، والتوزيع على 176 دولة).\n4. إنشاء مسار الاختبار المغلق (Closed testing - Alpha) وإضافة 6 مختبرين وإرسال كافة التغييرات الـ 15 رسمياً للمراجعة (In review) واجتياز الفحص السريع (Quick checks) بنجاح 100%.\n5. مزامنة ورفع كافة التعديلات السحابية إلى مستودع GitHub بنجاح على فرع chore/remove-trial-lock-for-play-release.\n[ANTI-PATTERN AVOIDED]:\n1. تجنب الاعتماد على onAudioFocusChangeListener وحده للتعامل مع المكالمات، لأن أجهزة البلوتوث/النظام ترسل حدث MediaButton منفصل يستأنف المشغل قسرياً.\n2. تجنب ترك ملاحظات الإصدار في Google Play بدون وسوم اللغة <ar>...</ar> لمنع خطأ Text outside language tags.\n3. تجنب الرفع المباشر إلى main دون مراجعة الفروع المخصصة وتأمين المفاتيح في .gitignore."
-  tags: [google-play-console, closed-testing, release-submission, phone-call-resume-fix, aab, production, milestone, post-mortem]
+- id: MEM-2026-09-11-001
+  type: fleet-config
+  timestamp: "2026-09-11T11:39:00+03:00"
+  agents: [persistent-memory-engine, code-architect, devops-deployer]
+  context: "تحديث وضبط نموذج OpenCode CLI في الأسطول إلى Meta Muse Spark 1.3"
+  content: "تم تعديل وضبط نموذج OpenCode CLI في منظومة أسطول الـ CLIs (Hook 22) ليعتمد نموذج ميتا الأخير: Meta Muse Spark 1.3 (opencode/muse-spark-1.3-contributor-free)، وتحديث fleet_config.json بتمرير راية النموذج صراحة (-m opencode/muse-spark-1.3-contributor-free) وفقاً للقيد 32، ومطابقة CLAUDE.md و fleet_orders و fleet_config_seed.json لضمان اتساق الأسطول بالكامل."
+  tags: [fleet-orchestrator, hook-22, opencode-cli, meta-muse-spark, fleet-config]
   status: active
 ```
 

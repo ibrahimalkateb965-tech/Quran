@@ -41,7 +41,7 @@ Every subsequent request is converted into structured delegation using
 | Agent | Owns | Absolutely forbidden |
 | :--- | :--- | :--- |
 | **Claude Code CLI** (`Opus 5`) | Planning, architectural review, Devil's Advocate Audit, **exclusive execution of ALL automated tests**, final approval / Quality Gates | Writing bulk boilerplate that a cheaper model can produce |
-| **OpenCode CLI** (`Ox Alpha Unlimited`) | Terminal execution, build files, Gradle / version catalog, database layer, network clients, CI workflows | **Running any test.** Touching UI composables or accessibility semantics |
+| **OpenCode CLI** (`Meta Muse Spark 1.3`) | Terminal execution, build files, Gradle / version catalog, database layer, network clients, CI workflows | **Running any test.** Touching UI composables or accessibility semantics |
 | **Antigravity IDE** (`Gemini 3.7 Flash High`) | UI building, iOS adaptation, Domain Logic, `expect/actual` platform abstractions, persistent memory | **Running any test.** Editing Gradle files or CI workflows |
 
 ### Testing Monopoly

@@ -13,7 +13,7 @@
 
 ### ORDER-P0-001
 ASSIGNED TO : opencode-cli
-MODEL       : Ox Alpha Unlimited
+MODEL       : Meta Muse Spark 1.3
 PRIORITY    : P0
 DEPENDS ON  : none
 
@@ -103,7 +103,7 @@ REPORT BACK
 
 ### ORDER-P0-002
 ASSIGNED TO : opencode-cli
-MODEL       : Ox Alpha Unlimited
+MODEL       : Meta Muse Spark 1.3
 PRIORITY    : P0
 DEPENDS ON  : ORDER-P0-001
 

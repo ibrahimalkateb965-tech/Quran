@@ -35,3 +35,32 @@ Claude outputs/
 
 # Generated visual-check artifacts — regenerable, ~2.5 MB, no reason to version them
 *.visual-check.*
+
+# ==============================================================================
+# AI Assistants, Multi-CLI Fleet & IDE Configuration (Claude, Antigravity, OpenCode)
+# ==============================================================================
+
+# Claude Code configuration, sessions & instructions
+.claude/
+CLAUDE.md
+
+# Antigravity IDE, Gemini & Local Agent ecosystem
+.agents/
+.gemini/
+.antigravity/
+mcp_config.json
+MEMORY_STORE.md
+
+# OpenCode CLI & Multi-CLI Fleet orchestration
+opencode.json
+.opencode/
+fleet_config.json
+fleet_orders/
+fleet_templates/
+
+# JVM / Gradle crash & replay logs
+hs_err_pid*.log
+replay_pid*.log
+**/hs_err_pid*.log
+**/replay_pid*.log
+

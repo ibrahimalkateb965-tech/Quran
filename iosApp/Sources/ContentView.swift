@@ -33,6 +33,7 @@ struct SurahView: View {
     let surah: Surah
     let repository: QuranRepository
 
+    @StateObject private var player = SurahPlayer()
     @State private var ayahs: [Ayah] = []
     @State private var loadError: String?
 
@@ -45,13 +46,30 @@ struct SurahView: View {
                 ProgressView()
                     .accessibilityLabel("جارٍ التحميل")
             } else {
-                List(ayahs, id: \.globalNumber) { ayah in
-                    Text(ayah.textArabic)
-                        .font(.title3)
-                        .accessibilityLabel("الآية \(ayah.numberInSurah): \(ayah.textArabic)")
+                // Every row is a "recite from here" button; the ayah being recited is
+                // exposed to VoiceOver through its accessibilityValue, not colour alone.
+                List(Array(ayahs.enumerated()), id: \.element.globalNumber) { index, ayah in
+                    let isCurrent = player.currentAyah?.globalNumber == ayah.globalNumber
+                    Button {
+                        player.play(ayahs, from: index)
+                    } label: {
+                        Text(ayah.textArabic)
+                            .font(.title3)
+                            .fontWeight(isCurrent ? .bold : .regular)
+                            .foregroundColor(.primary)
+                    }
+                    .accessibilityLabel("الآية \(ayah.numberInSurah): \(ayah.textArabic)")
+                    .accessibilityValue(isCurrent ? "قيد التلاوة" : "")
+                    .accessibilityHint("شغّل التلاوة من هذه الآية")
                 }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if player.currentAyah != nil || player.failure != nil {
+                PlaybackBar(player: player)
+            }
+        }
+        .onDisappear { player.stop() }
         .navigationTitle(surah.nameArabic)
         .task {
             do {
@@ -64,5 +82,47 @@ struct SurahView: View {
                 loadError = error.localizedDescription
             }
         }
+    }
+}
+
+// Bottom bar shown while a recitation is queued: what is being recited, pause/resume,
+// stop, and any playback failure. Grouped so VoiceOver reads it as one region.
+private struct PlaybackBar: View {
+    @ObservedObject var player: SurahPlayer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let failure = player.failure {
+                Text(failure)
+                    .foregroundColor(.red)
+                    .accessibilityLabel("خطأ في التشغيل: \(failure)")
+            }
+            HStack {
+                Text(statusText)
+                    .accessibilityLabel(statusText)
+                Spacer()
+                Button(player.isPlaying ? "إيقاف مؤقت" : "تشغيل") {
+                    player.togglePause()
+                }
+                .accessibilityHint(player.isPlaying ? "يوقف التلاوة مؤقتاً" : "يستأنف التلاوة")
+                Button("إيقاف") {
+                    player.stop()
+                }
+                .accessibilityHint("ينهي التلاوة")
+            }
+        }
+        .padding()
+        .background(.thinMaterial)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var statusText: String {
+        if player.hasEnded {
+            return "انتهت التلاوة"
+        }
+        if let ayah = player.currentAyah {
+            return "يُتلى الآن: الآية \(ayah.numberInSurah)"
+        }
+        return ""
     }
 }

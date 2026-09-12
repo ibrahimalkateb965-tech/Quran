@@ -3,7 +3,7 @@ package com.aistudio.quranblind.audio
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Platform audio engine. Android wraps a Media3 Player, iOS an AVQueuePlayer.
+ * Platform audio engine. Android wraps a Media3 Player, iOS an AVPlayer over a [TrackQueue].
  *
  * Threading: every member must be used from the platform's main thread, like the
  * player it wraps. The engine never owns the player; [release] only detaches listeners.

@@ -3,13 +3,15 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import android.content.ComponentName
 import androidx.core.content.ContextCompat
+import com.aistudio.quranblind.audio.AudioEngine
+import com.aistudio.quranblind.audio.AudioEngineEvent
+import com.aistudio.quranblind.audio.AudioTrack
+import com.aistudio.quranblind.audio.AyahTrackId
+import com.aistudio.quranblind.audio.PlaybackStatus
 import com.example.service.QuranAudioService
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
@@ -29,6 +31,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -81,7 +85,8 @@ class QuranViewModel @Inject constructor(
 
     private var mediaController: MediaController? = null
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
-    private var playerListener: Player.Listener? = null
+    private var audioEngine: AudioEngine? = null
+    private var eventsJob: Job? = null
     private var isControllerReleased = false
     private var pendingAudioUrlToPlay: String? = null
     private var pendingAyahAnnouncement: String? = null
@@ -127,10 +132,10 @@ class QuranViewModel @Inject constructor(
                     delay(500L)
                     continue
                 }
-                val controller = mediaController
-                if (controller != null && controller.isPlaying) {
-                    val currentPos = controller.currentPosition
-                    val dur = controller.duration
+                val engine = audioEngine
+                if (engine != null && engine.isPlaying) {
+                    val currentPos = engine.positionMs
+                    val dur = engine.durationMs
                     val prog = if (dur > 0L) (currentPos.toFloat() / dur.toFloat()).coerceIn(0f, 1f) else 0f
                     _playbackProgress.value = prog
                     _playbackUiState.update { it.copy(playbackProgress = prog) }
@@ -149,84 +154,79 @@ class QuranViewModel @Inject constructor(
         }
     }
 
+    private fun handleAudioEngineEvent(event: AudioEngineEvent) {
+        when (event) {
+            is AudioEngineEvent.IsPlayingChanged -> {
+                _playbackUiState.update { it.copy(isPlaying = event.isPlaying) }
+                if (event.isPlaying) {
+                    startProgressTracking()
+                    pendingAyahAnnouncement?.let { msg ->
+                        pendingAyahAnnouncement = null
+                        viewModelScope.launch { delay(400); announce(msg) }
+                    }
+                    if (isAwaitingNetworkRecovery) {
+                        isAwaitingNetworkRecovery = false
+                        networkRetryCount = 0
+                        haptic.vibrateNetworkRecovery()
+                        announce("عاد الاتصال بالإنترنت، جاري مواصلة التلاوة")
+                    }
+                } else {
+                    stopProgressTracking()
+                }
+            }
+
+            is AudioEngineEvent.StatusChanged -> {
+                when (event.status) {
+                    PlaybackStatus.BUFFERING -> {
+                        _playbackUiState.update { it.copy(isLoadingAudio = true) }
+                    }
+                    PlaybackStatus.READY -> {
+                        _playbackUiState.update { it.copy(isLoadingAudio = false) }
+                    }
+                    PlaybackStatus.ENDED -> {
+                        onAyahPlaybackEnded()
+                    }
+                    PlaybackStatus.IDLE -> {}
+                }
+            }
+
+            is AudioEngineEvent.TrackChanged -> {
+                if (!event.automatic) return
+                val (surahId, ayahNumber) = event.trackId?.let { AyahTrackId.decode(it) } ?: return
+                val currentAyahs = _playbackUiState.value.currentAyahs
+                val newIndex = currentAyahs.indexOfFirst { it.surahId == surahId && it.numberInSurah == ayahNumber }
+                if (newIndex != -1 && newIndex != _playbackUiState.value.currentAyahIndex) {
+                    _playbackUiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1, playbackProgress = 0f) }
+                    viewModelScope.launch {
+                        val bookmarked = repository.isBookmarked(surahId, ayahNumber)
+                        _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
+                    }
+                }
+            }
+
+            is AudioEngineEvent.PlaybackFailed -> {
+                pendingAyahAnnouncement = null
+                if (event.isNetworkRelated) {
+                    handleNetworkPlaybackError()
+                } else {
+                    announce("حدث خطأ في تشغيل الصوت")
+                }
+            }
+        }
+    }
+
     init {
         val sessionToken = SessionToken(application, ComponentName(application, QuranAudioService::class.java))
         controllerFuture = MediaController.Builder(application, sessionToken).buildAsync()
         
         controllerFuture?.addListener({
             if (isControllerReleased) return@addListener
-            mediaController = controllerFuture?.get()
+            val controller = controllerFuture?.get() ?: return@addListener
+            mediaController = controller
+            val engine = AudioEngine(controller)
+            audioEngine = engine
+            eventsJob = engine.events.onEach { event -> handleAudioEngineEvent(event) }.launchIn(viewModelScope)
 
-            playerListener = object : Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    _playbackUiState.update { it.copy(isPlaying = isPlaying) }
-                    if (isPlaying) {
-                        startProgressTracking()
-                        pendingAyahAnnouncement?.let { msg ->
-                            pendingAyahAnnouncement = null
-                            viewModelScope.launch { delay(400); announce(msg) }
-                        }
-                        if (isAwaitingNetworkRecovery) {
-                            isAwaitingNetworkRecovery = false
-                            networkRetryCount = 0
-                            haptic.vibrateNetworkRecovery()
-                            announce("عاد الاتصال بالإنترنت، جاري مواصلة التلاوة")
-                        }
-                    } else {
-                        stopProgressTracking()
-                    }
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_BUFFERING -> {
-                            _playbackUiState.update { it.copy(isLoadingAudio = true) }
-                        }
-                        Player.STATE_READY -> {
-                            _playbackUiState.update { it.copy(isLoadingAudio = false) }
-                        }
-                        Player.STATE_ENDED -> {
-                            onAyahPlaybackEnded()
-                        }
-                        else -> {}
-                    }
-                }
-
-                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                    super.onMediaItemTransition(mediaItem, reason)
-                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-                        val mediaId = mediaItem?.mediaId ?: return
-                        val parts = mediaId.split("_")
-                        if (parts.size == 2) {
-                            val surahId = parts[0].toIntOrNull()
-                            val ayahNumber = parts[1].toIntOrNull()
-                            if (surahId != null && ayahNumber != null) {
-                                val currentAyahs = _playbackUiState.value.currentAyahs
-                                val newIndex = currentAyahs.indexOfFirst { it.surahId == surahId && it.numberInSurah == ayahNumber }
-                                if (newIndex != -1 && newIndex != _playbackUiState.value.currentAyahIndex) {
-                                    _playbackUiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1, playbackProgress = 0f) }
-                                    viewModelScope.launch {
-                                        val bookmarked = repository.isBookmarked(surahId, ayahNumber)
-                                        _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    pendingAyahAnnouncement = null
-                    if (isNetworkRelatedError(error)) {
-                        handleNetworkPlaybackError()
-                    } else {
-                        announce("حدث خطأ في تشغيل الصوت")
-                    }
-                }
-            }.also { listener ->
-                mediaController?.addListener(listener)
-            }
-            
             // Play pending audio if any
             pendingAudioUrlToPlay?.let { url ->
                 pendingAudioUrlToPlay = null
@@ -311,10 +311,10 @@ class QuranViewModel @Inject constructor(
     }
 
     private fun playAudioUrl(url: String) {
-        mediaController?.let { controller ->
-            controller.setMediaItem(MediaItem.fromUri(url), 0L)
-            controller.prepare()
-            controller.play()
+        audioEngine?.let { engine ->
+            engine.setQueue(listOf(AudioTrack(id = "", url = url)), 0)
+            engine.prepare()
+            engine.play()
         } ?: run {
             pendingAudioUrlToPlay = url
         }
@@ -333,28 +333,25 @@ class QuranViewModel @Inject constructor(
             _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
         }
 
-        val controller = mediaController
-        if (controller != null) {
+        val engine = audioEngine
+        if (engine != null) {
             val isContinuous = _settingsUiState.value.isContinuousPlayEnabled
             val repeatMode = _settingsUiState.value.tarkizRepeatMode
-            
+
             if (isContinuous && repeatMode <= 1) {
-                val mediaItems = ayahs.drop(index).map { ayah ->
-                    androidx.media3.common.MediaItem.Builder()
-                        .setUri(ayah.audioUrl)
-                        .setMediaId("${ayah.surahId}_${ayah.numberInSurah}")
-                        .build()
+                val tracks = ayahs.drop(index).map { ayah ->
+                    AudioTrack(id = AyahTrackId.encode(ayah.surahId, ayah.numberInSurah), url = ayah.audioUrl)
                 }
-                controller.setMediaItems(mediaItems, 0, 0L)
+                engine.setQueue(tracks, 0)
             } else {
-                val mediaItem = androidx.media3.common.MediaItem.Builder()
-                    .setUri(activeAyah.audioUrl)
-                    .setMediaId("${activeAyah.surahId}_${activeAyah.numberInSurah}")
-                    .build()
-                controller.setMediaItem(mediaItem, 0L)
+                val track = AudioTrack(
+                    id = AyahTrackId.encode(activeAyah.surahId, activeAyah.numberInSurah),
+                    url = activeAyah.audioUrl
+                )
+                engine.setQueue(listOf(track), 0)
             }
-            controller.prepare()
-            controller.play()
+            engine.prepare()
+            engine.play()
         } else {
             pendingAudioUrlToPlay = activeAyah.audioUrl
         }
@@ -386,33 +383,33 @@ class QuranViewModel @Inject constructor(
         if (_settingsUiState.value.isContinuousPlayEnabled) {
             goToAyah(playbackState.currentAyahIndex + 1, autoPlay = true, isManual = false)
         } else {
-            mediaController?.pause()
+            audioEngine?.pause()
             _playbackUiState.update { it.copy(isPlaying = false) }
         }
     }
 
     fun togglePlayback() {
-        if (mediaController?.playWhenReady == true && mediaController?.isPlaying == true) {
-            mediaController?.pause()
+        if (audioEngine?.playWhenReady == true && audioEngine?.isPlaying == true) {
+            audioEngine?.pause()
             performAction("تم الإيقاف المؤقت", HapticType.DOUBLE_TAP)
         } else {
             val ayahs = _playbackUiState.value.currentAyahs
             val index = _playbackUiState.value.currentAyahIndex
             val activeAyah = ayahs.getOrNull(index)
-            val currentLoadedUri = mediaController?.currentMediaItem?.localConfiguration?.uri?.toString()
+            val currentLoadedUri = audioEngine?.currentTrack?.url
 
-            if (activeAyah != null && (currentLoadedUri == null || currentLoadedUri != activeAyah.audioUrl || mediaController?.playbackState == Player.STATE_ENDED || mediaController?.playbackState == Player.STATE_IDLE)) {
+            if (activeAyah != null && (currentLoadedUri == null || currentLoadedUri != activeAyah.audioUrl || audioEngine?.status == PlaybackStatus.ENDED || audioEngine?.status == PlaybackStatus.IDLE)) {
                 playCurrentAyah()
                 performAction("جاري التشغيل", HapticType.DOUBLE_TAP)
             } else {
-                mediaController?.play()
+                audioEngine?.play()
                 performAction("جاري التشغيل", HapticType.DOUBLE_TAP)
             }
         }
     }
 
     fun pausePlayback() {
-        mediaController?.pause()
+        audioEngine?.pause()
         _playbackUiState.update { it.copy(isPlaying = false) }
     }
 
@@ -430,34 +427,24 @@ class QuranViewModel @Inject constructor(
         if (next) {
             _playbackUiState.update { it.copy(continuousPlayStartIndex = it.currentAyahIndex) }
             performAction("وضع الاستماع المتواصل مفعّل", HapticType.CLICK, forceSpeak = forceSpeak)
-            mediaController?.let { controller ->
-                if (controller.playbackState != Player.STATE_IDLE && controller.playbackState != Player.STATE_ENDED) {
+            audioEngine?.let { engine ->
+                if (engine.status != PlaybackStatus.IDLE && engine.status != PlaybackStatus.ENDED) {
                     val ayahs = _playbackUiState.value.currentAyahs
                     val index = _playbackUiState.value.currentAyahIndex
                     val repeatMode = _settingsUiState.value.tarkizRepeatMode
-                    if (repeatMode <= 1 && index + 1 < ayahs.size) {
-                        val mediaItemsToAdd = ayahs.drop(index + 1).map { ayah ->
-                            MediaItem.Builder()
-                                .setUri(ayah.audioUrl)
-                                .setMediaId("${ayah.surahId}_${ayah.numberInSurah}")
-                                .build()
+                    if (repeatMode <= 1 && index + 1 < ayahs.size && engine.currentIndex != -1) {
+                        val tracksToAdd = ayahs.drop(index + 1).map { ayah ->
+                            AudioTrack(id = AyahTrackId.encode(ayah.surahId, ayah.numberInSurah), url = ayah.audioUrl)
                         }
-                        val currentItemIndex = controller.currentMediaItemIndex
-                        if (currentItemIndex != -1) {
-                            if (controller.mediaItemCount > currentItemIndex + 1) {
-                                controller.removeMediaItems(currentItemIndex + 1, controller.mediaItemCount)
-                            }
-                            controller.addMediaItems(currentItemIndex + 1, mediaItemsToAdd)
-                        }
+                        engine.replaceUpcoming(tracksToAdd)
                     }
                 }
             }
         } else {
             performAction("تم إيقاف الاستماع المتواصل", HapticType.CLICK, forceSpeak = forceSpeak)
-            mediaController?.let { controller ->
-                val currentItemIndex = controller.currentMediaItemIndex
-                if (currentItemIndex != -1 && controller.mediaItemCount > currentItemIndex + 1) {
-                    controller.removeMediaItems(currentItemIndex + 1, controller.mediaItemCount)
+            audioEngine?.let { engine ->
+                if (engine.currentIndex != -1) {
+                    engine.clearUpcoming()
                 }
             }
         }
@@ -581,8 +568,8 @@ class QuranViewModel @Inject constructor(
             performAction("تم تغيير القارئ إلى ${reciter.nameArabic}", HapticType.CLICK)
             val surah = _playbackUiState.value.currentSurah
             if (surah != null) {
-                mediaController?.stop()
-                mediaController?.clearMediaItems()
+                audioEngine?.stop()
+                audioEngine?.clearQueue()
                 loadSurah(surah.id, _playbackUiState.value.currentAyahIndex, autoPlay = true)
             }
         }
@@ -612,8 +599,8 @@ class QuranViewModel @Inject constructor(
     fun toggleSurahIndex(show: Boolean) {
         performAction("", HapticType.CLICK)
         if (show) {
-            if (mediaController?.isPlaying == true) {
-                mediaController?.pause()
+            if (audioEngine?.isPlaying == true) {
+                audioEngine?.pause()
             }
             _playbackUiState.update { it.copy(isLoadingAudio = false) }
         }
@@ -623,8 +610,8 @@ class QuranViewModel @Inject constructor(
     fun toggleBookmarksSheet(show: Boolean) {
         performAction("", HapticType.CLICK)
         if (show) {
-            if (mediaController?.isPlaying == true) {
-                mediaController?.pause()
+            if (audioEngine?.isPlaying == true) {
+                audioEngine?.pause()
             }
             _playbackUiState.update { it.copy(isLoadingAudio = false) }
         }
@@ -634,8 +621,8 @@ class QuranViewModel @Inject constructor(
     fun toggleReciterDialog(show: Boolean) {
         performAction("", HapticType.CLICK)
         if (show) {
-            if (mediaController?.isPlaying == true) {
-                mediaController?.pause()
+            if (audioEngine?.isPlaying == true) {
+                audioEngine?.pause()
             }
             _playbackUiState.update { it.copy(isLoadingAudio = false) }
         }
@@ -645,8 +632,8 @@ class QuranViewModel @Inject constructor(
     fun toggleHelpDialog(show: Boolean) {
         performAction("", HapticType.CLICK)
         if (show) {
-            if (mediaController?.isPlaying == true) {
-                mediaController?.pause()
+            if (audioEngine?.isPlaying == true) {
+                audioEngine?.pause()
             }
             _playbackUiState.update { it.copy(isLoadingAudio = false) }
         }
@@ -679,16 +666,6 @@ class QuranViewModel @Inject constructor(
         }
     }
 
-    private fun isNetworkRelatedError(error: PlaybackException): Boolean {
-        return when (error.errorCode) {
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
-            PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
-            PlaybackException.ERROR_CODE_TIMEOUT -> true
-            else -> false
-        }
-    }
-
     private fun handleNetworkPlaybackError() {
         if (!isAwaitingNetworkRecovery) {
             isAwaitingNetworkRecovery = true
@@ -705,7 +682,7 @@ class QuranViewModel @Inject constructor(
                 networkRetryCount++
                 val backoffMs = MIN_RETRY_BACKOFF_MS * (1 shl (networkRetryCount - 1))
                 delay(backoffMs.coerceAtMost(MAX_RETRY_BACKOFF_MS))
-                mediaController?.prepare()
+                audioEngine?.prepare()
             } else {
                 isAwaitingNetworkRecovery = false
                 networkRetryCount = 0
@@ -727,9 +704,11 @@ class QuranViewModel @Inject constructor(
         stopProgressTracking(resetProgress = true)
         isControllerReleased = true
         networkRetryJob?.cancel()
-        playerListener?.let { mediaController?.removeListener(it) }
-        playerListener = null
-        
+        eventsJob?.cancel()
+        eventsJob = null
+        audioEngine?.release()
+        audioEngine = null
+
         controllerFuture?.let { future ->
             MediaController.releaseFuture(future)
         }

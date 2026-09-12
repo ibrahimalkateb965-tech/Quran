@@ -94,7 +94,8 @@ jobs:
           file "$FW/SharedKit"
           ls -la "$FW/Headers"
           # The exported header must mention the iosMain entry points; grep -c exits 1 on zero matches.
-          grep -c "initKoinIos" "$FW/Headers/SharedKit.h"
+          # Kotlin/Native prefixes `do` to exported functions named init* (ObjC init-family rule).
+          grep -c "doInitKoinIos" "$FW/Headers/SharedKit.h"
           grep -c "AudioEngine" "$FW/Headers/SharedKit.h"
           grep -c "SecureStore" "$FW/Headers/SharedKit.h"
 

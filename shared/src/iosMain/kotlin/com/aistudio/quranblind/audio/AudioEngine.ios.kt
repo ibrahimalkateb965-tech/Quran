@@ -20,15 +20,15 @@ actual class AudioEngine {
     actual val currentIndex: Int get() = -1
     actual val queueSize: Int get() = 0
 
-    actual fun setQueue(tracks: List<AudioTrack>, startIndex: Int) = notReady()
-    actual fun replaceUpcoming(tracks: List<AudioTrack>) = notReady()
-    actual fun clearUpcoming() = notReady()
-    actual fun prepare() = notReady()
-    actual fun play() = notReady()
-    actual fun pause() = notReady()
-    actual fun stop() = notReady()
-    actual fun clearQueue() = notReady()
-    actual fun release() = notReady()
+    actual fun setQueue(tracks: List<AudioTrack>, startIndex: Int) { notReady() }
+    actual fun replaceUpcoming(tracks: List<AudioTrack>) { notReady() }
+    actual fun clearUpcoming() { notReady() }
+    actual fun prepare() { notReady() }
+    actual fun play() { notReady() }
+    actual fun pause() { notReady() }
+    actual fun stop() { notReady() }
+    actual fun clearQueue() { notReady() }
+    actual fun release() { notReady() }
 
     private fun notReady(): Nothing =
         throw NotImplementedError("AudioEngine on iOS is ORDER-P1-006-IOS")

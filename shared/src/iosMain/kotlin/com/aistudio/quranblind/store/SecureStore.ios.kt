@@ -1,12 +1,14 @@
 package com.aistudio.quranblind.store
 
-import kotlinx.cinterop.CFTypeRefVar
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
 import platform.CoreFoundation.CFDataCreate
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
@@ -15,6 +17,7 @@ import platform.CoreFoundation.CFDictionaryCreateMutable
 import platform.CoreFoundation.CFDictionarySetValue
 import platform.CoreFoundation.CFRelease
 import platform.CoreFoundation.CFStringCreateWithCString
+import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFStringEncodingUTF8
 import platform.Foundation.NSLog
@@ -40,8 +43,8 @@ import platform.Security.kSecValueData
 class IosSecureStore(private val service: String) : SecureStore {
 
     override fun getString(key: String): String? = memScoped {
-        val serviceCf = CFStringCreateWithCString(null, service.cstr, kCFStringEncodingUTF8)
-        val accountCf = CFStringCreateWithCString(null, key.cstr, kCFStringEncodingUTF8)
+        val serviceCf = CFStringCreateWithCString(null, service, kCFStringEncodingUTF8)
+        val accountCf = CFStringCreateWithCString(null, key, kCFStringEncodingUTF8)
         val query = CFDictionaryCreateMutable(null, 0, null, null)
         CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword)
         CFDictionarySetValue(query, kSecAttrService, serviceCf)
@@ -65,13 +68,12 @@ class IosSecureStore(private val service: String) : SecureStore {
             CFRelease(cfData)
             return@memScoped ""
         }
-        val bytes = ByteArray(length)
         val bytePtr = CFDataGetBytePtr(cfData)
         if (bytePtr == null) {
             CFRelease(cfData)
             return@memScoped null
         }
-        for (i in 0 until length) bytes[i] = bytePtr[i]
+        val bytes = bytePtr.readBytes(length)
         CFRelease(cfData)
         bytes.decodeToString()
     }
@@ -81,8 +83,8 @@ class IosSecureStore(private val service: String) : SecureStore {
         val dataCf = bytes.usePinned { pinned ->
             CFDataCreate(null, pinned.addressOf(0).reinterpret(), bytes.size.toLong())
         }
-        val serviceCf = CFStringCreateWithCString(null, service.cstr, kCFStringEncodingUTF8)
-        val accountCf = CFStringCreateWithCString(null, key.cstr, kCFStringEncodingUTF8)
+        val serviceCf = CFStringCreateWithCString(null, service, kCFStringEncodingUTF8)
+        val accountCf = CFStringCreateWithCString(null, key, kCFStringEncodingUTF8)
         val accessibleCf = kSecAttrAccessibleAfterFirstUnlock
         val addQuery = CFDictionaryCreateMutable(null, 0, null, null)
         CFDictionarySetValue(addQuery, kSecClass, kSecClassGenericPassword)
@@ -122,8 +124,8 @@ class IosSecureStore(private val service: String) : SecureStore {
     }
 
     override fun remove(key: String) = memScoped {
-        val serviceCf = CFStringCreateWithCString(null, service.cstr, kCFStringEncodingUTF8)
-        val accountCf = CFStringCreateWithCString(null, key.cstr, kCFStringEncodingUTF8)
+        val serviceCf = CFStringCreateWithCString(null, service, kCFStringEncodingUTF8)
+        val accountCf = CFStringCreateWithCString(null, key, kCFStringEncodingUTF8)
         val query = CFDictionaryCreateMutable(null, 0, null, null)
         CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword)
         CFDictionarySetValue(query, kSecAttrService, serviceCf)
@@ -138,7 +140,7 @@ class IosSecureStore(private val service: String) : SecureStore {
     }
 
     override fun clear() = memScoped {
-        val serviceCf = CFStringCreateWithCString(null, service.cstr, kCFStringEncodingUTF8)
+        val serviceCf = CFStringCreateWithCString(null, service, kCFStringEncodingUTF8)
         val query = CFDictionaryCreateMutable(null, 0, null, null)
         CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword)
         CFDictionarySetValue(query, kSecAttrService, serviceCf)

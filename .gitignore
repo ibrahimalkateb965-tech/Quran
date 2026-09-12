@@ -63,4 +63,7 @@ hs_err_pid*.log
 replay_pid*.log
 **/hs_err_pid*.log
 **/replay_pid*.log
+# Local gate logs (CLAUDE.md §6) — never staged
+gate.log
+*.gate.log
 

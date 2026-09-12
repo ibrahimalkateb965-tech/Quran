@@ -2,6 +2,7 @@
 
 package com.aistudio.quranblind.audio
 
+import com.aistudio.quranblind.kvo.QbKvoObserverProtocol
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.channels.BufferOverflow
@@ -46,7 +47,7 @@ actual class AudioEngine {
     private val center = NSNotificationCenter.defaultCenter
     private val notificationTokens = mutableListOf<NSObjectProtocol>()
 
-    private val kvo = object : NSObject() {
+    private val kvo = object : NSObject(), QbKvoObserverProtocol {
         override fun observeValueForKeyPath(
             keyPath: String?,
             ofObject: Any?,

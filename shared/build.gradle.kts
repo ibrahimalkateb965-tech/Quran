@@ -32,6 +32,10 @@ kotlin {
             baseName = "SharedKit"   // ASCII, distinct from the module name
             isStatic = true          // simplifies App Store submission
         }
+        // Objective-C protocol that makes observeValueForKeyPath overridable (KVO in AudioEngine.ios.kt).
+        iosTarget.compilations.getByName("main").cinterops.create("kvo") {
+            definitionFile.set(project.file("src/nativeInterop/cinterop/kvo.def"))
+        }
     }
 
     sourceSets {

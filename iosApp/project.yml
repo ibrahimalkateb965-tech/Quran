@@ -11,6 +11,10 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      # The Uthmanic dataset is referenced from the Android assets tree so there is
+      # exactly one copy of the text in the repository (CLAUDE.md section 4.4).
+      - path: ../app/src/main/assets/quran/quran_uthmani_tanzil.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aistudio.quranblind.a11y

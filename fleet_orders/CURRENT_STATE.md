@@ -1,17 +1,18 @@
 # Blind App — Current State
 
-**Last updated:** 2026-09-11 (session 5, Claude Code CLI) · maintained by Claude Code CLI (Fleet Commander)
+**Last updated:** 2026-09-12 (session 5, Claude Code CLI) · maintained by Claude Code CLI (Fleet Commander)
 **Read this first.** It is the single source of truth for where the iOS/KMP programme stands.
 
 ---
 
 ## 1. THE ONE THING TO DO NEXT
 
-**As of 2026-09-12 00:10 (session 5):**
+**As of 2026-09-12 (session 5, after compact):**
 
 - **Phase 0 orders all gated, plus four cut-overs:** P0-001, P0-002, P0-003b, P0-004, P0-005, P0-006, P0-007, P0-008, P0-009, **P0-010** —
-  **QUALITY GATE: PASS** each (§5). `5c40400` (P0-008) is on origin (pushed 22:40); `9077e76` (P0-009) and the
-  P0-010 commit on top are **local, not yet pushed** — Ibrahim says "push".
+  **QUALITY GATE: PASS** each (§5). Everything is on origin: `5c40400` (P0-008) pushed 22:40; `9077e76` (P0-009)
+  and `7df31db` (P0-010) pushed on Ibrahim's "push" — `origin/feat/ios-kmp-phase0` = `7df31db`, branch clean
+  (`[ahead 0]`).
 - **P0-004 premise correction (found 2026-09-11 session 4):** the Retrofit/Moshi/OkHttp path in `:app`
   was **dead code** — `QuranRepositoryImpl` reads `assets/quran/quran_uthmani_tanzil.json` → Room and
   never injected `QuranApiService`; zero consumers anywhere in `app/src`. Ibrahim chose **option A:
@@ -27,16 +28,28 @@
      **DONE 00:05, see §5.** Picked autonomously under Ibrahim's "continue by yourself for half an hour"
      (2026-09-11 23:15). The shared interface is now the single declaration of the read contract; `:app` adds
      only the three Room-bookmark members.
-  5. **Nothing is queued.** The `:app` ⇄ `:shared` seam is now: shared models, shared sanitizer, shared
-     `SessionStore`/`SecureStore`, shared read contract; Android-only: Hilt, Room (`AyahEntity`, `BookmarkEntity`,
-     DAOs), `QuranRepositoryImpl` (assets JSON → Room), ExoPlayer service, Compose UI. **Next is Ibrahim's call:**
-     (a) Phase 1 — `expect class AudioEngine` in `:shared` with the Media3 `actual`, or (b) an iOS-side
-     `QuranRepository` implementation over the same assets JSON (needs a decision on how the JSON ships in the
-     iOS bundle). Do not pick without asking.
-  Dispatch rule, **proven on P0-009**: give OpenCode CLI **no compile probes at all** (grep-only verification)
-  and let the gate compile — OpenCode then finishes and writes its own report (first time this session; P0-004
-  and P0-008 were both OOM-killed at the first probe, B-17). Keep the composable-file split: files containing
-  `@Composable` are edited by the Commander in parallel, disjoint file sets, and the order's §2 says so.
+  5. ~~**ORDER-P1-006** `expect class AudioEngine` in `:shared` with the Media3 `actual`~~ — **DONE 05:31,
+     see §5.** Ibrahim chose **(a)**. New `com.aistudio.quranblind.audio` package: `AudioTrack`, `AyahTrackId`
+     (byte-compatible with the ViewModel's `"surahId_ayahNumber"` media ids), `PlaybackStatus`,
+     `AudioEngineEvent`, `expect class AudioEngine` (queue + controls + snapshot props + event `Flow`);
+     Android `actual` wraps any Media3 `Player`; iOS `actual` is a compile-shaped placeholder that throws
+     (`ORDER-P1-006-IOS` implements the real `AVQueuePlayer`, needs a macOS verifier). **`:app` is completely
+     untouched** — release APK stayed byte-identical to P0-010, confirming R8 tree-shook the unused package.
+     Owner deviation: `agy` has no non-interactive CLI mode (`agy --print` is the Electron launcher, not a
+     CLI, verified this session) — OpenCode wrote the files instead of Antigravity, recorded in the order.
+  6. **Nothing is queued.** **Next is Ibrahim's call:**
+     (a) wire `QuranViewModel`/`QuranAudioService` onto the new `AudioEngine` (the ViewModel keeps driving
+     `MediaController` directly today — P1-006 only added the contract), or
+     (b) an iOS-side `QuranRepository` implementation over the assets JSON (needs a decision on how the JSON
+     ships in the iOS bundle), or
+     (c) `ORDER-P1-006-IOS` — the real `AVQueuePlayer`/`AVAudioSession` actual (needs a macOS verifier this
+     Windows host does not have). Do not pick without asking.
+  Dispatch rule, **proven on P0-009, P0-010, P1-006**: give OpenCode CLI **no compile probes at all**
+  (grep-only verification) and let the gate compile — OpenCode then finishes and writes its own report. Keep
+  the composable-file split: files containing `@Composable` are edited by the Commander in parallel, disjoint
+  file sets, and the order's §2 says so. B-17 update: **two** consecutive R8 daemon OOM-kills happened on
+  P1-006 (P0-010 needed only one) — if a second `assembleRelease` retry also dies, check `Get-Process java`
+  and kill any idle `kotlin-compiler-embeddable` daemon before a third attempt, not just retry blindly.
 - **Uncommitted, not mine, Ibrahim's call:** Antigravity's OpenRouter fallback edits (12:50–12:52) to
   `CLAUDE.md`, `fleet_config.json`, `opencode.json`, `.agents/MEMORY_STORE.md`,
   `.agents/ACTIVE_CONTEXT_INJECTION.md`; plus `.agents/HOOKS_GUIDE.xlsx`,
@@ -62,7 +75,7 @@ The earlier claim "nothing is committed yet" was **wrong**. `git ls-files` + `gi
   12 `shared/build/**` files, `.coverage` and the 3 `.pyc` files (17 files, +1 / −63). Nothing
   deleted on disk. `git ls-files shared/build` now prints nothing.
 - **`docs(fleet): update CURRENT_STATE after B-16 and B-06 checks`** — this file + the handoff.
-  Both commits are local (`[ahead 2]`), **not pushed** — per the handoff, Ibrahim pushes.
+  Both commits were pushed with `5c40400` at 22:40.
 
 Loose ends left for Ibrahim: `.coverage` and `__pycache__/` now show as untracked (they exist on
 disk and no `.gitignore` rule covers them — add one or delete them). `.agents/skills/**` and
@@ -158,6 +171,7 @@ scheme, network client — a few hundred lines) stands and is recorded in the AD
 | P0-009 — `Surah`/`Ayah`/`Reciter`/`SurahData` → shared `domain.model` | ✅ **QUALITY GATE: PASS** 2026-09-11 23:04 (session 5). Pure package rename: the four `:app` copies were field-identical to `:shared`'s (shared `Ayah`/`Surah` add `@Serializable`; `Reciter`/`SurahData` character-identical). 17 import lines in 11 files rewritten in place, 4 files deleted (`git rm`, 181 lines), `com.example.data.model` gone. OpenCode CLI did the 7 non-composable files (+2/−2, +3/−3, +1/−1, +3/−3, +1/−1 ×3, exact) with **grep-only verification — no compile probes — and finished + reported on its own**; Commander did the 4 `@Composable` files in parallel (`QuranPlayerScreen` +2/−2, `AyahCard`, `ReciterSelectorSheet`, `SurahIndexSheet` +1/−1 each). Gate: `:app` 35/35 (fresh compile), `assembleDebug`, `assembleRelease` (R8 clean; `Ayah$$serializer`/`Surah$$serializer` retained, APK +16 KB, acceptable), `:shared` 29/29. Report: `reports/ORDER_P0_009_REPORT_OPENCODE.md`. |
 | P0-010 — `:app` `QuranRepository` extends shared `domain.repository.QuranRepository` | ✅ **QUALITY GATE: PASS** 2026-09-12 00:05 (session 5). One file: `domain/repository/QuranRepository.kt` +2/−7 — `interface QuranRepository : SharedQuranRepository` (import alias), keeps only `allBookmarks`/`toggleBookmark`/`isBookmarked`; the 4 read members are inherited; dead default `reciterIdentifier = "ar.alafasy"` dropped (sole caller passes both args). `QuranRepositoryImpl`, Hilt binding, ViewModel, tests untouched. OpenCode CLI did it (grep-only, no probes, own report, English summary) and correctly flagged the Commander's wrong grep count (13 hits, not 8 — `FakeQuranRepository` + `AyahDao` were out of scope). Gate: `:app` 35/35, `assembleDebug`, `assembleRelease` — **first attempt crashed the Gradle daemon inside R8 (native OOM, B-17, `hs_err_pid25108.log`), retry green**, APK byte-identical to P0-009 (5,867,725 B; R8 merged the shared super-interface into `ik0`), `:shared` 29/29. Report: `reports/ORDER_P0_010_REPORT_OPENCODE.md`. |
 | P0-007 — `SessionPreferences` → shared `SessionStore` | ✅ **QUALITY GATE: PASS** 2026-09-11 20:09 (session 4). OpenCode CLI: `QuranBlindApp.onCreate` → `SecureStoreAndroid.init`, `AppModule.provideSessionStore`, 5 surgical ViewModel lines, `SessionPreferences.kt` deleted, `security-crypto` dropped from `:app` (still via `:shared`). Order's A4 bound was the Commander's arithmetic error (+22/−15 is exact) — OpenCode flagged it correctly. `:app` 35/35, `assembleDebug` + `assembleRelease` green (mapping proves new wiring, 0 `SessionPreferences`), `:shared` 29/29. First behaviour delta in `:app`: fail-closed → fail-open on Keystore failure (intended, B-06). |
+| P1-006 — `expect class AudioEngine` in `:shared` + Media3 `actual` | ✅ **QUALITY GATE: PASS** 2026-09-12 05:31 (session 5). New `com.aistudio.quranblind.audio` package: `AudioTrack`, `AyahTrackId` (encode/decode for the ViewModel's `"surahId_ayahNumber"` media ids), `PlaybackStatus`, `AudioEngineEvent` (sealed: `IsPlayingChanged`/`StatusChanged`/`TrackChanged`/`PlaybackFailed`), `expect class AudioEngine` (queue + imperative controls + snapshot props + `Flow<AudioEngineEvent>`); Android `actual` wraps any Media3 `Player`; iOS `actual` is a placeholder throwing `NotImplementedError` (`ORDER-P1-006-IOS` does the real `AVQueuePlayer`, needs a macOS verifier). Plus one Gradle alias (`androidx-media3-common`) and one `:shared` dependency line, both +1/−0. **Zero `:app` files touched** — this is the contract only, not the ViewModel cut-over. Owner deviation: `agy` has no non-interactive CLI (`agy --print` just warns and returns nothing, verified this session) — OpenCode wrote the files instead of Antigravity, grep-only verification, own report. Commander wrote the reserved `AyahTrackIdTest.kt` (3 tests) in parallel. Gate: `:shared` 32/32 (up from 29), `:app` 35/35 unchanged, `assembleDebug` (new audio classes confirmed present in `classes6.dex`), `assembleRelease` — **two consecutive R8 daemon OOM-kills** (`hs_err_pid20388.log`, `hs_err_pid23324.log`, B-17), an idle 1.57 GB `kotlin-compiler-embeddable` daemon was killed to free memory, third attempt green: APK **byte-identical to P0-009/P0-010** (5,867,725 B) — R8 tree-shook the whole unused `audio` package, 0 "Missing class". Report: `reports/ORDER_P1_006_REPORT_OPENCODE.md`. |
 
 **P0-002 and P0-003b must run sequentially, not in parallel** — both edit
 `shared/build.gradle.kts` and `gradle/libs.versions.toml`.

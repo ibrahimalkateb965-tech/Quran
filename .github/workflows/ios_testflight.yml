@@ -1,0 +1,323 @@
+# =============================================================================
+#  Blind Quran App — iOS archive, sign and upload to TestFlight (KMP + SwiftUI)
+# =============================================================================
+#  Why this file exists
+#  --------------------
+#  The maintainer's machine is Windows. Kotlin/Native cannot link iOS targets
+#  there and nothing there can codesign, so this workflow is the ONLY place a
+#  signed .ipa is produced. It never runs on push: it is manual
+#  (workflow_dispatch) or tag-driven (ios-v*), because every run bills macOS
+#  minutes and needs the Apple secrets below to exist.
+#
+#  Secrets (GitHub -> Settings -> Secrets and variables -> Actions). The
+#  preflight step fails fast and lists every missing NAME; no value is ever
+#  printed. Names match REMOTE_IOS_DEV_PLAYBOOK.md section 6, so its section 4
+#  recipe ("Apple credentials without a Mac") still applies verbatim.
+#
+#    BUILD_CERTIFICATE_BASE64              base64 of the Apple Distribution .p12
+#    P12_PASSWORD                          password chosen when exporting the .p12
+#    KEYCHAIN_PASSWORD                     any random string (ephemeral keychain)
+#    PROVISIONING_PROFILE_APPSTORE_BASE64  base64 of the App Store .mobileprovision
+#                                          for com.aistudio.quranblind.a11y
+#    APPLE_TEAM_ID                         10-character team id
+#    APPSTORE_KEY_ID                       App Store Connect API key id
+#    APPSTORE_ISSUER_ID                    App Store Connect issuer id (UUID)
+#    APPSTORE_PRIVATE_KEY                  raw contents of AuthKey_<key id>.p8
+#
+#  Privacy: the app collects no data (CLAUDE.md section 4.3).
+#  iosApp/Resources/PrivacyInfo.xcprivacy declares that; it is linted before
+#  archiving and its presence inside the archived .app is asserted.
+# =============================================================================
+
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload to TestFlight after archiving (false = keep the .ipa as a run artifact only)'
+        required: true
+        default: true
+        type: boolean
+  push:
+    tags:
+      - 'ios-v*'
+
+# One archive per ref; a newer dispatch cancels an older one still running.
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SCHEME: QuranBlind
+  BUNDLE_ID: com.aistudio.quranblind.a11y
+  # A tag push has no inputs, so a tag always uploads.
+  UPLOAD: ${{ github.event_name == 'push' || inputs.upload }}
+
+jobs:
+  archive:
+    name: Archive, sign and upload (macOS)
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      # The wrapper script is tracked from a Windows host; make sure it is executable.
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # Same runner sizing as ios_shared_compile.yml (7 GB runner, 16 GB desktop defaults).
+      - name: Size JVM heaps for the runner
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8
+          kotlin.daemon.jvmargs=-Xmx1g
+          kotlin.native.jvmArgs=-Xmx3g
+          org.gradle.workers.max=2
+          EOF
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      # -- 0. Fail fast if any Apple secret is missing ---------------------------
+      - name: Preflight the Apple secrets
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          PROVISIONING_PROFILE_APPSTORE_BASE64: ${{ secrets.PROVISIONING_PROFILE_APPSTORE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in BUILD_CERTIFICATE_BASE64 P12_PASSWORD KEYCHAIN_PASSWORD \
+                      PROVISIONING_PROFILE_APPSTORE_BASE64 APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Secret $name is not set (see the header of this workflow)."; missing=1
+            fi
+          done
+          if [ "$UPLOAD" = "true" ]; then
+            for name in APPSTORE_KEY_ID APPSTORE_ISSUER_ID APPSTORE_PRIVATE_KEY; do
+              if [ -z "${!name:-}" ]; then
+                echo "::error::Secret $name is not set (required because upload=true)."; missing=1
+              fi
+            done
+          fi
+          [ "$missing" = "0" ] || exit 1
+          echo "All required secrets are present (values are never printed)."
+
+      # -- 1. Privacy manifest ----------------------------------------------------
+      - name: Lint the privacy manifest
+        run: |
+          set -euo pipefail
+          M=iosApp/Resources/PrivacyInfo.xcprivacy
+          plutil -lint "$M"
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :NSPrivacyTracking' "$M")" = "false" ] \
+            || { echo "::error::NSPrivacyTracking must be false"; exit 1; }
+          if /usr/libexec/PlistBuddy -c 'Print :NSPrivacyCollectedDataTypes:0' "$M" >/dev/null 2>&1; then
+            echo "::error::NSPrivacyCollectedDataTypes must be empty: the app collects no data"; exit 1
+          fi
+          echo "Privacy manifest OK: no tracking, no collected data."
+
+      # -- 2. Signing identity + profile in an ephemeral keychain -------------------
+      - name: Import the signing certificate and provisioning profile
+        id: signing
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          PROVISIONING_PROFILE_APPSTORE_BASE64: ${{ secrets.PROVISIONING_PROFILE_APPSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/signing.p12"
+          PROFILE_PATH="$RUNNER_TEMP/appstore.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64"             | base64 --decode -o "$CERT_PATH"
+          echo -n "$PROVISIONING_PROFILE_APPSTORE_BASE64" | base64 --decode -o "$PROFILE_PATH"
+
+          # Dedicated ephemeral keychain: never touch the runner's login keychain.
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          # Lets codesign use the key without an interactive prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+
+          # Install the profile under the UUID name Xcode expects and check it is for THIS app.
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PLIST"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PLIST")"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PLIST")"
+          PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PLIST")"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          case "$PROFILE_APP_ID" in
+            *".$BUNDLE_ID") echo "Profile '$PROFILE_NAME' matches $BUNDLE_ID." ;;
+            *) echo "::error::Profile '$PROFILE_NAME' is for '$PROFILE_APP_ID', not '<TEAM>.$BUNDLE_ID'."; exit 1 ;;
+          esac
+          echo "profile_uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
+          echo "profile_name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+
+      # -- 3. Xcode project from project.yml ---------------------------------------
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: iosApp
+        run: xcodegen generate
+
+      # -- 4. Archive: device, Release, manual signing -----------------------------
+      # The project.yml pre-build script runs `./gradlew :shared:embedAndSignAppleFrameworkForXcode`
+      # inside this xcodebuild (links the iosArm64 Release framework, static, into the app).
+      - name: Archive
+        working-directory: iosApp
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_UUID: ${{ steps.signing.outputs.profile_uuid }}
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project QuranBlind.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/QuranBlind.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" | grep -E "error:|warning:|ARCHIVE |Ld |embedAndSign|SharedKit|Signing" || true
+          grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/xcodebuild-archive.log"
+
+      - name: Verify the archived app bundle
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/QuranBlind.xcarchive/Products/Applications/QuranBlind.app"
+          test -d "$APP" || { echo "::error::$APP not found in the archive"; exit 1; }
+          test -f "$APP/PrivacyInfo.xcprivacy" \
+            || { echo "::error::PrivacyInfo.xcprivacy is not inside the archived .app"; exit 1; }
+          # Recitation must keep playing with the screen locked; without this key iOS kills the audio mid-ayah.
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' "$APP/Info.plist" | grep -q audio \
+            || { echo "::error::UIBackgroundModes lacks 'audio'"; exit 1; }
+          echo "CFBundleShortVersionString=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")"
+          echo "CFBundleVersion=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+      # -- 5. Export the .ipa ---------------------------------------------------------
+      - name: Export the .ipa
+        id: ipa
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.signing.outputs.profile_name }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>destination</key><string>export</string>
+            <key>uploadSymbols</key><true/>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/QuranBlind.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild-export.log" | grep -E "error:|warning:|EXPORT |Exported" || true
+          grep -q "EXPORT SUCCEEDED" "$RUNNER_TEMP/xcodebuild-export.log"
+          IPA="$(ls "$RUNNER_TEMP"/export/*.ipa | head -n 1)"
+          ls -la "$IPA"
+          echo "path=$IPA" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the .ipa as a run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuranBlind-ipa-${{ github.run_number }}
+          path: ${{ steps.ipa.outputs.path }}
+          retention-days: 14
+          if-no-files-found: error
+
+      # -- 6. TestFlight ----------------------------------------------------------------
+      - name: Install the App Store Connect API key
+        if: env.UPLOAD == 'true'
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          # altool looks the key up by id in this exact directory.
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$APPSTORE_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+
+      - name: Validate with App Store Connect
+        if: env.UPLOAD == 'true'
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          # Validating first turns a 10-minute upload + rejection into a fast fail.
+          xcrun altool --validate-app --type ios \
+            --file "${{ steps.ipa.outputs.path }}" \
+            --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
+
+      - name: Upload to TestFlight
+        if: env.UPLOAD == 'true'
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcrun altool --upload-app --type ios \
+            --file "${{ steps.ipa.outputs.path }}" \
+            --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
+          echo "Uploaded build $GITHUB_RUN_NUMBER; it appears in TestFlight after Apple's processing (10-30 min)."
+
+      - name: Upload xcodebuild logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-testflight-log-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/xcodebuild-archive.log
+            ${{ runner.temp }}/xcodebuild-export.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Remove the ephemeral keychain, profile and API key
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision
+          rm -f "$HOME/.appstoreconnect/private_keys/"*.p8

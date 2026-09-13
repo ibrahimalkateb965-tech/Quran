@@ -15,10 +15,18 @@ targets:
       # exactly one copy of the text in the repository (CLAUDE.md section 4.4).
       - path: ../app/src/main/assets/quran/quran_uthmani_tanzil.json
         buildPhase: resources
+      # App-level privacy manifest: no tracking, no data collected (CLAUDE.md section 4.3).
+      # A resources build phase puts the file at the bundle root, where App Store Connect looks for it.
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aistudio.quranblind.a11y
         SWIFT_VERSION: "5.0"
+        # Version keys live in build settings so CI can stamp CURRENT_PROJECT_VERSION per run
+        # (TestFlight rejects a re-used build number). Info.plist references them below.
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         FRAMEWORK_SEARCH_PATHS:
           - $(inherited)
           - $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
@@ -30,6 +38,11 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: "القرآن للمكفوفين"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Only HTTPS via the OS networking stack is used (exempt encryption). Declaring it here
+        # removes the export-compliance question from every TestFlight upload.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

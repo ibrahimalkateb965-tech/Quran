@@ -108,8 +108,6 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   // implementation(libs.androidx.navigation.compose)
-  implementation(libs.androidx.room.ktx)
-  implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.session)
   implementation(libs.androidx.media3.ui)
@@ -148,5 +146,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   implementation(libs.hilt.android)
   "ksp"(libs.hilt.compiler)
-  "ksp"(libs.androidx.room.compiler)
 }

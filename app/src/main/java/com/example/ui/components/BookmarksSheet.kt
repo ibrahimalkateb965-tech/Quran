@@ -25,7 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.local.BookmarkEntity
+import com.aistudio.quranblind.domain.model.Bookmark
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmCardActive
 import com.example.ui.theme.WarmTextLight
@@ -33,7 +33,7 @@ import com.example.ui.theme.WarmTextPrimary
 
 @Composable
 fun BookmarksSheet(
-    bookmarks: List<BookmarkEntity>,
+    bookmarks: List<Bookmark>,
     onSelectBookmark: (Int, Int) -> Unit, // surahId, ayahIndex
     onDismiss: () -> Unit,
     onAnnounce: (String) -> Unit

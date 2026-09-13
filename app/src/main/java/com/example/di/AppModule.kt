@@ -3,9 +3,7 @@ package com.example.di
 import android.content.Context
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
-import com.example.data.local.AyahDao
-import com.example.data.local.BookmarkDao
-import com.example.data.local.QuranDatabase
+import com.aistudio.quranblind.store.BookmarkStore
 import com.aistudio.quranblind.store.SessionStore
 import com.aistudio.quranblind.store.createSecureStore
 import com.example.data.repository.QuranRepositoryImpl
@@ -24,26 +22,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideQuranDatabase(@ApplicationContext context: Context): QuranDatabase {
-        return QuranDatabase.getDatabase(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideAyahDao(database: QuranDatabase): AyahDao {
-        return database.ayahDao()
-    }
-
-    @Provides
-    @Singleton
-    fun provideBookmarkDao(database: QuranDatabase): BookmarkDao {
-        return database.bookmarkDao()
-    }
-
-    @Provides
-    @Singleton
     fun provideSessionStore(): SessionStore {
         return SessionStore(createSecureStore(SessionStore.STORE_NAME))
+    }
+
+    @Provides
+    @Singleton
+    fun provideBookmarkStore(): BookmarkStore {
+        return BookmarkStore(createSecureStore(BookmarkStore.STORE_NAME), System::currentTimeMillis)
     }
 
     @Provides

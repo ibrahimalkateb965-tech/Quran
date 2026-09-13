@@ -2,8 +2,6 @@ package com.example.data.repository
 
 import android.content.Context
 import com.aistudio.quranblind.domain.text.sanitizeUthmanicText
-import com.example.data.local.AyahDao
-import com.example.data.local.BookmarkDao
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -14,16 +12,12 @@ import org.junit.Test
 class QuranRepositoryTest {
 
     private lateinit var mockContext: Context
-    private lateinit var mockBookmarkDao: BookmarkDao
-    private lateinit var mockAyahDao: AyahDao
     private lateinit var repository: QuranRepositoryImpl
 
     @Before
     fun setUp() {
         mockContext = mockk(relaxed = true)
-        mockBookmarkDao = mockk(relaxed = true)
-        mockAyahDao = mockk(relaxed = true)
-        repository = QuranRepositoryImpl(mockContext, mockBookmarkDao, mockAyahDao)
+        repository = QuranRepositoryImpl(mockContext)
     }
 
     @Test

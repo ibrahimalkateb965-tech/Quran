@@ -2,10 +2,6 @@ package com.example.data.repository
 
 import android.content.Context
 import com.aistudio.quranblind.domain.text.sanitizeUthmanicText
-import com.example.data.local.AyahDao
-import com.example.data.local.AyahEntity
-import com.example.data.local.BookmarkDao
-import com.example.data.local.BookmarkEntity
 import com.aistudio.quranblind.domain.model.Ayah
 import com.aistudio.quranblind.domain.model.Surah
 import com.aistudio.quranblind.domain.model.SurahData
@@ -21,36 +17,11 @@ import javax.inject.Singleton
 
 @Singleton
 class QuranRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val bookmarkDao: BookmarkDao,
-    private val ayahDao: AyahDao
+    @ApplicationContext private val context: Context
 ) : QuranRepository {
-
-    override val allBookmarks: Flow<List<BookmarkEntity>> = bookmarkDao.getAllBookmarks()
 
     @Volatile
     private var cachedQuranJson: JSONObject? = null
-
-    override suspend fun toggleBookmark(surahId: Int, surahNameAr: String, ayahNumber: Int): Boolean {
-        val isBookmarked = bookmarkDao.isBookmarked(surahId, ayahNumber)
-        if (isBookmarked) {
-            bookmarkDao.deleteBySurahAndAyah(surahId, ayahNumber)
-            return false
-        } else {
-            bookmarkDao.insertBookmark(
-                BookmarkEntity(
-                    surahId = surahId,
-                    surahNameAr = surahNameAr,
-                    ayahNumber = ayahNumber
-                )
-            )
-            return true
-        }
-    }
-
-    override suspend fun isBookmarked(surahId: Int, ayahNumber: Int): Boolean {
-        return bookmarkDao.isBookmarked(surahId, ayahNumber)
-    }
 
     override fun getAllSurahs(): List<Surah> {
         return SurahData.SURAH_LIST
@@ -89,17 +60,7 @@ class QuranRepositoryImpl @Inject constructor(
 
         // 1. Fetch from Offline Verified Dataset in Assets (Primary Official Source)
         val assetAyahs = loadSurahFromAssets(surahId, reciterIdentifier)
-        if (assetAyahs.isNotEmpty()) {
-            emit(assetAyahs)
-        } else {
-            // 2. Fallback to Local Database
-            val localAyahs = ayahDao.getAyahsForSurah(surahId, reciterIdentifier)
-            if (localAyahs.isNotEmpty()) {
-                emit(localAyahs.map { it.toDomainModel().copy(textArabic = sanitizeUthmanicText(it.textArabic)) })
-            } else {
-                emit(emptyList())
-            }
-        }
+        emit(assetAyahs)
     }.flowOn(Dispatchers.IO)
 
     private fun getOrLoadQuranJson(): JSONObject? {
@@ -120,8 +81,7 @@ class QuranRepositoryImpl @Inject constructor(
             val jsonObject = getOrLoadQuranJson() ?: return emptyList()
             val ayahsArray = jsonObject.optJSONArray(surahId.toString()) ?: return emptyList()
             val list = mutableListOf<Ayah>()
-            val entities = mutableListOf<AyahEntity>()
-            
+
             for (i in 0 until ayahsArray.length()) {
                 val item = ayahsArray.getJSONObject(i)
                 val numberInSurah = item.getInt("numberInSurah")
@@ -130,23 +90,19 @@ class QuranRepositoryImpl @Inject constructor(
                 val page = item.optInt("page", 1)
                 val juz = item.optInt("juz", 1)
                 val audioUrl = resolveAudioEndpoint(reciterIdentifier, surahId, numberInSurah)
-                
-                val entity = AyahEntity(
-                    globalNumber = globalNumber,
-                    numberInSurah = numberInSurah,
-                    textArabic = text,
-                    textTranslation = "",
-                    audioUrl = audioUrl,
-                    surahId = surahId,
-                    page = page,
-                    juz = juz,
-                    reciterIdentifier = reciterIdentifier
+
+                list.add(
+                    Ayah(
+                        numberInSurah = numberInSurah,
+                        globalNumber = globalNumber,
+                        textArabic = text,
+                        textTranslation = "",
+                        audioUrl = audioUrl,
+                        surahId = surahId,
+                        page = page,
+                        juz = juz
+                    )
                 )
-                entities.add(entity)
-                list.add(entity.toDomainModel())
-            }
-            if (entities.isNotEmpty()) {
-                ayahDao.insertAyahs(entities)
             }
             list
         } catch (e: Exception) {

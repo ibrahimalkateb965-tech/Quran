@@ -15,7 +15,8 @@ import com.aistudio.quranblind.audio.PlaybackStatus
 import com.example.service.QuranAudioService
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
-import com.example.data.local.BookmarkEntity
+import com.aistudio.quranblind.domain.model.Bookmark
+import com.aistudio.quranblind.store.BookmarkStore
 import com.aistudio.quranblind.domain.model.Ayah
 import com.aistudio.quranblind.domain.model.Reciter
 import com.aistudio.quranblind.domain.model.Surah
@@ -28,13 +29,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -80,7 +80,8 @@ class QuranViewModel @Inject constructor(
     private val repository: QuranRepository,
     val haptic: HapticFeedbackManager,
     val speechManager: SpeechManager,
-    private val sessionStore: SessionStore
+    private val sessionStore: SessionStore,
+    private val bookmarkStore: BookmarkStore
 ) : AndroidViewModel(application) {
 
     private var mediaController: MediaController? = null
@@ -113,11 +114,7 @@ class QuranViewModel @Inject constructor(
     private val _announcementEvent = Channel<String>(Channel.BUFFERED)
     val announcementEvent = _announcementEvent.receiveAsFlow()
 
-    val bookmarks: StateFlow<List<BookmarkEntity>> = repository.allBookmarks.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    val bookmarks: StateFlow<List<Bookmark>> = bookmarkStore.bookmarks
 
     private val _playbackProgress = MutableStateFlow(0f)
     val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
@@ -197,10 +194,6 @@ class QuranViewModel @Inject constructor(
                 val newIndex = currentAyahs.indexOfFirst { it.surahId == surahId && it.numberInSurah == ayahNumber }
                 if (newIndex != -1 && newIndex != _playbackUiState.value.currentAyahIndex) {
                     _playbackUiState.update { it.copy(currentAyahIndex = newIndex, currentLoopCount = 1, playbackProgress = 0f) }
-                    viewModelScope.launch {
-                        val bookmarked = repository.isBookmarked(surahId, ayahNumber)
-                        _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
-                    }
                 }
             }
 
@@ -216,6 +209,14 @@ class QuranViewModel @Inject constructor(
     }
 
     init {
+        // ADR-005: the bookmark flag is derived from the store flow, so a late legacy
+        // migration or a toggle is reflected without any point-in-time reads.
+        combine(bookmarkStore.bookmarks, _playbackUiState) { list, playback ->
+            val ayah = playback.currentAyahs.getOrNull(playback.currentAyahIndex)
+            ayah != null && list.any { it.surahId == ayah.surahId && it.ayahNumber == ayah.numberInSurah }
+        }.onEach { bookmarked ->
+            _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
+        }.launchIn(viewModelScope)
         val sessionToken = SessionToken(application, ComponentName(application, QuranAudioService::class.java))
         controllerFuture = MediaController.Builder(application, sessionToken).buildAsync()
         
@@ -289,18 +290,11 @@ class QuranViewModel @Inject constructor(
             )
 
             repository.getAyahs(surahId, _settingsUiState.value.selectedReciter.serverIdentifier).collect { ayahs ->
-                val initialBookmarked = if (ayahs.isNotEmpty()) {
-                    repository.isBookmarked(surahId, ayahs[targetAyahIndex.coerceIn(0, ayahs.lastIndex)].numberInSurah)
-                } else false
-
                 _playbackUiState.update {
                     it.copy(
                         currentAyahs = ayahs,
                         isLoadingAudio = false
                     )
-                }
-                _bookmarkUiState.update {
-                    it.copy(isCurrentAyahBookmarked = initialBookmarked)
                 }
 
                 if (autoPlay && ayahs.isNotEmpty()) {
@@ -327,11 +321,6 @@ class QuranViewModel @Inject constructor(
 
         val activeAyah = ayahs[index]
         if (activeAyah.audioUrl.isBlank()) return
-
-        viewModelScope.launch {
-            val bookmarked = repository.isBookmarked(activeAyah.surahId, activeAyah.numberInSurah)
-            _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = bookmarked) }
-        }
 
         val engine = audioEngine
         if (engine != null) {
@@ -524,12 +513,11 @@ class QuranViewModel @Inject constructor(
         val activeAyah = ayahs[playback.currentAyahIndex]
 
         viewModelScope.launch {
-            val isNowBookmarked = repository.toggleBookmark(
+            val isNowBookmarked = bookmarkStore.toggle(
                 surahId = surah.id,
                 surahNameAr = surah.nameArabic,
                 ayahNumber = activeAyah.numberInSurah
             )
-            _bookmarkUiState.update { it.copy(isCurrentAyahBookmarked = isNowBookmarked) }
             
             if (isNowBookmarked) {
                 performAction("تم إضافة سورة ${surah.nameArabic} الآية ${activeAyah.numberInSurah} للإشارات المرجعية", HapticType.BOOKMARK, forceSpeak = forceSpeak)

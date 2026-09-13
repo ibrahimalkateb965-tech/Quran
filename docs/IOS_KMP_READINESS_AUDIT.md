@@ -238,7 +238,7 @@ Al-Baqarah 1–5 and compare against the Android screenshot at pixel level.
 If CoreText mispositions marks, the entire typography approach changes — and finding that
 out in month two instead of week one is the difference between a delay and a rewrite.
 
-### ADR-002 — Room KMP vs SQLDelight vs no database at all
+### ADR-002 — Room KMP vs SQLDelight vs no database at all — ⟲ **RESOLVED 2026-09-13: (c) no database in `:shared`**
 The dataset is a static 2 MB JSON asset plus a tiny mutable session state
 (last surah, last ayah, reciter). This does not need a relational database on either platform.
 Options: (a) Room KMP 2.7 + bundled SQLite driver, (b) SQLDelight, (c) drop the DB —
@@ -246,6 +246,23 @@ in-memory index over the JSON + a key-value `SecureStore`.
 **Recommendation: (c).** It removes KSP-per-target complexity, one dependency, and one
 whole class of migration bugs. Devil's Advocate position: Room here is over-engineering
 carried over from the Android build, not a requirement.
+
+**Resolution (2026-09-13, read from the tree at `69ff703`).** Option **(c)** is what was built:
+
+- `shared/build.gradle.kts` declares neither Room nor SQLDelight. The `libs.versions.toml` Room
+  coordinates (2.7.0) are consumed by `:app` only (`app/build.gradle.kts:111-112,151`).
+- **Static text** — `JsonQuranRepository` (commonMain) over `QuranJsonSource`; Android reads the asset,
+  iOS reads the same file from the app bundle via `BundleQuranJsonSource` (iosMain). `iosApp/project.yml`
+  references `../app/src/main/assets/quran/quran_uthmani_tanzil.json` as a resource, so the repository
+  holds exactly one copy of the Uthmanic text (CLAUDE.md §4.4).
+- **Mutable session state** — `SessionStore` (commonMain; `last_reciter_id`, `last_surah_id`,
+  `last_ayah_index` in store `mueen_session_prefs`) over `interface SecureStore` +
+  `expect fun createSecureStore(name)`: `EncryptedSharedPreferences` on Android, Keychain (`SecItem*`) on iOS.
+  Delivered by ORDER-P0-005 / P0-007 / P0-010 / P1-008; host-tested by `JsonQuranRepositoryTest`,
+  `SessionStoreTest` (`InMemorySecureStore`).
+- **Out of scope of this ADR:** the Android-only Room layer in `app/src/main/java/com/example/data/local/`
+  (`QuranDatabase`, `AyahDao`, `BookmarkDao`, wired in `di/AppModule.kt`) still exists. It is not shared
+  and its retirement is a separate `:app` decision (I-02 stays open until then).
 
 ### ADR-003 — Module topology — ⟲ **RESOLVED 2026-09-10 (ORDER-P0-001 rev. B)**
 Rev. A proposed a four-module split: `:shared`, `:composeApp`, `:androidApp`, `iosApp/`.
@@ -330,6 +347,9 @@ Two operational consequences, both binding on the whole fleet:
 ---
 
 ## 7. ⟲ REVISION LOG
+
+**Rev. C — 2026-09-13.** ADR-002 resolved as (c) "no database in `:shared`", with the evidence
+listed under the ADR. No other section changed.
 
 **Rev. B — 2026-09-10.** Read from disk: `gradle.properties`, `settings.gradle.kts`, root and app
 `build.gradle.kts`, `libs.versions.toml`, `gradle-wrapper.properties`, `di/AppModule.kt`,

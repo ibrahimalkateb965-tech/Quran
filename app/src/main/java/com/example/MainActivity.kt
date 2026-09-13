@@ -22,7 +22,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.screens.QuranPlayerScreen
-import com.example.ui.screens.TrialExpiredScreen
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.viewmodel.QuranViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,14 +34,12 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
-        if (!recordAudioGranted) {
-            viewModel.announce("تنبيه: صلاحية الميكروفون مطلوبة لتفعيل الأوامر الصوتية.")
-        }
-
+        // The notification warning used to be gated on the microphone permission having been
+        // granted. With voice commands gone that coupling is meaningless — background playback
+        // matters to every user, so this now warns unconditionally.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notificationsGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
-            if (!notificationsGranted && recordAudioGranted) {
+            if (!notificationsGranted) {
                 viewModel.announce("تنبيه: صلاحية الإشعارات مطلوبة لتشغيل الصوت في الخلفية.")
             }
         }
@@ -56,7 +53,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             QuranBlindTheme {
-                val trialExpired by viewModel.isTrialExpired.collectAsState(initial = null)
                 val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
 
                 val lifecycleOwner = LocalLifecycleOwner.current
@@ -83,20 +79,7 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        when (trialExpired) {
-                            null -> {
-                                // Loading state while checking trial
-                            }
-                            true -> {
-                                TrialExpiredScreen(
-                                    isTalkBackEnabled = isTalkBackEnabled,
-                                    onAnnounce = { msg -> viewModel.announce(msg) }
-                                )
-                            }
-                            false -> {
-                                QuranPlayerScreen(viewModel = viewModel)
-                            }
-                        }
+                        QuranPlayerScreen(viewModel = viewModel)
                     }
                 }
             }
@@ -105,10 +88,6 @@ class MainActivity : ComponentActivity() {
 
     private fun checkAndRequestPermissions() {
         val permissionsToRequest = mutableListOf<String>()
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
-        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

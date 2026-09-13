@@ -29,8 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.quranblind.domain.text.sanitizeUthmanicText
 import com.example.accessibility.LocalTalkBackEnabled
-import com.example.data.model.Ayah
+import com.aistudio.quranblind.domain.model.Ayah
 import com.example.ui.theme.UthmanTahaFont
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmCardActive
@@ -175,18 +176,4 @@ fun SurahNameCard(
             )
         }
     }
-}
-
-private val bareNoonNextLetters = "[يرملونصذثكجشقسدطزفتضظب]"
-private val noonSukoonPattern = Regex("(ن)[\\u0652\\u06DF\\u06E0\\u06E1](?=\\s*$bareNoonNextLetters)")
-
-private fun sanitizeUthmanicText(text: String): String {
-    return text.replace(noonSukoonPattern, "$1")
-        .replace('\u06DF', '\u06E0')
-        .replace('\u06E4', '\u0653')
-        .replace("\u0600", "")
-        .replace("\u06DD", "")
-        .replace("\uFEFF", "")
-        .replace("\u200A", "")
-        .replace("\u2060", "")
 }

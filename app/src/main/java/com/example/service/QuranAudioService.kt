@@ -21,18 +21,22 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.example.MainActivity
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 
 class QuranAudioService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private lateinit var player: ExoPlayer
     private lateinit var cache: SimpleCache
     private var audioManager: AudioManager? = null
+    private var callEndTracker: CallEndTracker? = null
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        callEndTracker = CallEndTracker(this).also { it.register() }
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
@@ -90,6 +94,15 @@ class QuranAudioService : MediaSessionService() {
                 return MediaSession.ConnectionResult.reject()
             }
 
+            override fun onPlaybackResumption(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo
+            ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                return Futures.immediateFailedFuture(
+                    UnsupportedOperationException("Background playback resumption is disabled")
+                )
+            }
+
             override fun onMediaButtonEvent(
                 session: MediaSession,
                 controllerInfo: MediaSession.ControllerInfo,
@@ -102,16 +115,16 @@ class QuranAudioService : MediaSessionService() {
                     intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
                 }
 
-                if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
-                    val keyCode = keyEvent.keyCode
-                    if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
-                        keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
-                        keyCode == KeyEvent.KEYCODE_HEADSETHOOK) {
-                        // If player is explicitly paused/stopped, prevent unsolicited background resume (e.g. from telecom/headset disconnect)
-                        if (!player.playWhenReady) {
-                            return true // Consume event safely without starting playback
-                        }
-                    }
+                // Only a play request arriving in the moments around a call ending is treated as
+                // the telephony-injected ghost event. Everything else -- notification and lock
+                // screen buttons, headset controls, skip and seek at any playback state -- is
+                // passed straight through. See MediaButtonPolicy for why timing is the only
+                // signal available at this callback.
+                val millisSinceCallEnded =
+                    callEndTracker?.millisSinceCallEnded() ?: MediaButtonPolicy.NO_CALL_RECORDED
+
+                if (MediaButtonPolicy.shouldConsume(keyEvent, player.playWhenReady, millisSinceCallEnded)) {
+                    return true
                 }
                 return super.onMediaButtonEvent(session, controllerInfo, intent)
             }
@@ -143,6 +156,8 @@ class QuranAudioService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        callEndTracker?.unregister()
+        callEndTracker = null
         mediaSession?.run {
             player.release()
             release()

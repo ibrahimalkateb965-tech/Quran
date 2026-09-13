@@ -1,0 +1,706 @@
+# REMOTE_IOS_DEV_PLAYBOOK.md
+
+**Building the Blind Quran iOS app (Flutter) from a phone, on Linux, with no Mac.**
+
+Companion documents:
+
+| Document | Covers |
+| :--- | :--- |
+| `ACCESSIBILITY_GUIDELINES_IOS.md` | VoiceOver parity: semantics, gestures, audio session, haptics, announcements |
+| `.github/workflows/ios_build.yml` | The executable pipeline this playbook operates |
+| **This file** | The machine topology, one-time setup, credentials, and the daily loop |
+
+Audience: the maintainer of `com.aistudio.quranblind.a11y`, working from an iPhone in Safari/Chrome against a `remote.futrx` LXD container. Every command below is meant to be pasted into either (a) the Remote web terminal, (b) code-server's integrated terminal on `:8842`, or (c) the Remote chat box that fronts `claude -p` / `agy --print`.
+
+---
+
+## 1. The Problem: One Boundary, Two Machines
+
+There is exactly one hard constraint in this entire architecture, and every design decision below follows from it:
+
+> **`xcodebuild` runs only on macOS.** Apple ships no Linux toolchain for compiling, linking, code-signing, or packaging an `.ipa`. No container, no cross-compiler, no emulation layer changes this. The workarounds people reach for (Darling, hackintosh VMs, "macOS in Docker" images) are either non-functional for signing or violate the Apple SLA.
+
+So the work splits across three machines that never share a filesystem. Git is the only thing that crosses between them.
+
+| Machine | Owns | Never does |
+| :--- | :--- | :--- |
+| **iPhone** (Safari/Chrome PWA) | Typing, reading, agent tasking, **real VoiceOver testing** | Compiling anything |
+| **LXD container** on the Ubuntu 24.04 VPS | Source of truth, `flutter analyze`, `flutter test`, `flutter build web`, git, agents, code-server | `xcodebuild`, signing, `.ipa` |
+| **GitHub `macos-15` runner** (ephemeral, ~12 min/build) | `flutter build ipa`, code-signing, TestFlight/Firebase/Diawi upload | Holding state between runs |
+
+The container is where you *live*. The macOS runner is a vending machine: you push a commit in, an installable build falls out. You never SSH into it, never debug on it interactively, and never store anything on it — which is precisely why the credential handling in §4–6 is built the way it is.
+
+**The consequence for your day:** you have a *fast inner loop* (edit → analyze → Flutter Web preview, ~10 s, entirely on Linux) and a *slow outer loop* (push → macOS build → TestFlight → device, ~20–35 min). §7 is organised around keeping as much work as possible in the fast loop, because the slow loop is the one that costs money and minutes.
+
+---
+
+## 2. Architecture Topology
+
+```
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │  iPhone — Safari / Chrome (PWA, added to Home Screen)                        │
+ │                                                                              │
+ │   [Remote chat]      [code-server]        [Live preview]      [TestFlight]   │
+ │   agent tasking      mobile IDE           Flutter Web         real device    │
+ │        │                  │                     │                  ▲        │
+ └────────┼──────────────────┼─────────────────────┼──────────────────┼────────┘
+          │ HTTPS            │ HTTPS               │ HTTPS            │ APNs
+          ▼                  ▼                     ▼                  │
+ ┌──────────────────────────────────────────────────────────────┐     │
+ │  Hostinger VPS — Ubuntu 24.04 LTS                            │     │
+ │                                                              │     │
+ │  ┌────────────────────────────────────────────────────────┐  │     │
+ │  │ Caddy — wildcard TLS, Let's Encrypt                    │  │     │
+ │  │  remote.<domain>            → :7682  (Remote UI)       │  │     │
+ │  │  blindquran.code.remote.<d> → :8842  (code-server)     │  │     │
+ │  │  blindquran.dev.remote.<d>  → :8080  (Flutter Web)     │  │     │
+ │  └───────────────────────┬────────────────────────────────┘  │     │
+ │                          ▼                                   │     │
+ │  ┌────────────────────────────────────────────────────────┐  │     │
+ │  │ Go daemon 127.0.0.1:7682 (root) ── lxc CLI ──┐         │  │     │
+ │  └──────────────────────────────────────────────┼─────────┘  │     │
+ │                                                 ▼            │     │
+ │  ┌────────────────────────────────────────────────────────┐  │     │
+ │  │ LXD container: blindquran-ios (Ubuntu 24.04)           │  │     │
+ │  │                                                        │  │     │
+ │  │   ~/blind-app/            git worktree (source of      │  │     │
+ │  │     ├── app/              truth; Kotlin reference)     │  │     │
+ │  │     ├── flutter_app/      ← the new Flutter project    │  │     │
+ │  │     ├── web_ios/          existing PWA + assets        │  │     │
+ │  │     └── .github/workflows/ios_build.yml                │  │     │
+ │  │                                                        │  │     │
+ │  │   flutter 3.35.5 (no Android SDK)   code-server :8842  │  │     │
+ │  │   claude / agy CLIs                 web-server :8080   │  │     │
+ │  └───────────────────────┬────────────────────────────────┘  │     │
+ └──────────────────────────┼───────────────────────────────────┘     │
+                            │ git push (HTTPS + PAT)                  │
+                            ▼                                         │
+ ┌──────────────────────────────────────────────────────────────┐     │
+ │  GitHub Actions                                              │     │
+ │   ┌──────────────────────┐      ┌─────────────────────────┐  │     │
+ │   │ verify               │ ──►  │ build                   │  │     │
+ │   │ ubuntu-latest  (1×)  │      │ macos-15       (10×)    │  │     │
+ │   │ format/analyze/test  │      │ ephemeral keychain      │  │     │
+ │   │ ~3 min               │      │ flutter build ipa       │  │     │
+ │   └──────────────────────┘      │ altool upload           │  │     │
+ │                                 └───────────┬─────────────┘  │     │
+ └─────────────────────────────────────────────┼────────────────┘     │
+                                               ▼                      │
+                          ┌────────────────────────────────┐          │
+                          │ App Store Connect / TestFlight │──────────┘
+                          │  (or Firebase App Dist / Diawi)│
+                          └────────────────────────────────┘
+```
+
+### Round-trip budget
+
+Measure your own numbers after the first week, but plan against these:
+
+| Leg | Typical | Notes |
+| :--- | :--- | :--- |
+| Edit → `flutter analyze` in container | 5–15 s | The loop you should spend 90 % of your time in |
+| Edit → Flutter Web hot restart | 5–20 s | Structure/copy validation only — see §7 Step C |
+| `git push` → `verify` job green | 3–5 min | Linux, 1× billing |
+| `verify` → `build` job produces `.ipa` | 9–14 min | macOS, 10× billing; first run slower (no Pods cache) |
+| `.ipa` → TestFlight "Ready to Test" | 5–20 min | Apple-side processing; **not** under your control |
+| TestFlight notification → installed | 1–2 min | |
+| **Total push → VoiceOver on device** | **20–35 min** | Budget two of these per day, not twenty |
+
+That last row is the reason §7 exists in the shape it does.
+
+---
+
+## 3. Container Setup
+
+### 3.1 DNS records
+
+Point these at the VPS before installing anything; Caddy needs the wildcard to resolve before it will issue certificates. Values shown use the RFC 5737 documentation IP — substitute your own.
+
+| Record | Type | Value | Serves |
+| :--- | :--- | :--- | :--- |
+| `remote.example.com` | A | `203.0.113.10` | Remote control plane |
+| `*.code.remote.example.com` | A | `203.0.113.10` | code-server, per project |
+| `*.dev.remote.example.com` | A | `203.0.113.10` | Live app previews, per project |
+
+Verify from the phone before proceeding — a wildcard that resolves for `code.` but not `*.dev.` is the single most common cause of a preview URL that 502s:
+
+```bash
+dig +short blindquran.dev.remote.example.com
+dig +short blindquran.code.remote.example.com
+# Both must return 203.0.113.10
+```
+
+### 3.2 Create the project container
+
+From the Remote UI: **Projects → New → Ubuntu 24.04**, slug `blindquran-ios`. Or from the VPS shell:
+
+```bash
+lxc launch ubuntu:24.04 blindquran-ios
+lxc config set blindquran-ios limits.cpu 2
+lxc config set blindquran-ios limits.memory 4GiB
+# Flutter's pub cache plus a web build is ~6 GB; give it headroom.
+lxc config device override blindquran-ios root size=25GiB
+lxc exec blindquran-ios -- bash
+```
+
+Everything from here runs **inside** the container.
+
+### 3.3 Base toolchain
+
+```bash
+apt-get update
+apt-get install -y \
+  git curl unzip xz-utils zip \
+  libglu1-mesa \
+  openssl jq \
+  ca-certificates gnupg
+
+# GitHub CLI — used for secrets (§5) and for watching builds from the phone (§8)
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  > /etc/apt/sources.list.d/github-cli.list
+apt-get update && apt-get install -y gh
+```
+
+### 3.4 Flutter — deliberately without the Android SDK
+
+This container will never build an APK; the Kotlin app in `app/` stays on your Windows machine's Android toolchain. Skipping the Android SDK saves ~8 GB and removes a whole class of `flutter doctor` noise.
+
+```bash
+useradd -m -s /bin/bash dev && su - dev
+
+git clone --depth 1 --branch 3.35.5 https://github.com/flutter/flutter.git ~/flutter
+echo 'export PATH="$HOME/flutter/bin:$HOME/.pub-cache/bin:$PATH"' >> ~/.bashrc
+export PATH="$HOME/flutter/bin:$HOME/.pub-cache/bin:$PATH"
+
+flutter config --no-analytics
+flutter config --no-enable-android
+flutter config --enable-web
+flutter precache --web
+flutter doctor -v
+```
+
+**Expected `flutter doctor` output — the failures are correct:**
+
+```
+[✓] Flutter (Channel stable, 3.35.5, on Ubuntu 24.04 LTS)
+[✗] Android toolchain                    ← intentional: --no-enable-android
+[✗] Xcode - develop for iOS and macOS    ← EXPECTED. iOS builds happen on the
+                                            macos-15 runner, never here.
+[✓] Chrome - develop for the web
+[✓] Linux toolchain
+[✓] Connected device (1 available)       ← "Web Server"
+```
+
+> If you ever "fix" the Xcode line, something has gone wrong. That `[✗]` is the boundary from §1 rendered as a doctor check. `flutter analyze`, `flutter test`, and `flutter build web` all work without it — and those are the only Flutter commands this container ever runs.
+
+### 3.5 Clone the repository and scaffold the Flutter app
+
+```bash
+cd ~
+git clone https://github.com/<you>/blind-app.git
+cd blind-app
+git config user.name  "Ibrahim Alkateb"
+git config user.email "ibrahimalkateb965@gmail.com"
+
+git checkout -b feat/ios-flutter-port
+```
+
+The workflow's `APP_DIR` is `flutter_app`, and its `BUNDLE_ID` assertion expects `com.aistudio.quranblind.a11y` — matching `applicationId` in `app/build.gradle.kts`, so both platforms share one identity in App Store Connect analytics and in your own head. Scaffold accordingly:
+
+```bash
+flutter create \
+  --org com.aistudio.quranblind \
+  --project-name a11y \
+  --platforms ios,web \
+  --template app \
+  flutter_app
+
+cd flutter_app
+grep -m1 -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*' ios/Runner.xcodeproj/project.pbxproj
+# → PRODUCT_BUNDLE_IDENTIFIER = com.aistudio.quranblind.a11y
+```
+
+That `grep` is the same assertion the workflow runs at `ios_build.yml:202`. If it disagrees, fix it now — the workflow refuses to rewrite your project files, by design.
+
+### 3.6 Reuse the assets you already have
+
+`web_ios/` is prior art, not dead weight. It already carries the Uthmanic font and the offline Quran text, both of which the Flutter app needs and neither of which should be re-sourced.
+
+```bash
+mkdir -p assets/data assets/fonts
+cp ../web_ios/assets/quran.json        assets/data/
+cp ../web_ios/assets/uthman_taha.ttf   assets/fonts/
+ls -la assets/data assets/fonts
+```
+
+Declare them in `pubspec.yaml`:
+
+```yaml
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/quran.json
+  fonts:
+    - family: UthmanTaha
+      fonts:
+        - asset: assets/fonts/uthman_taha.ttf
+```
+
+### 3.7 Dependencies
+
+```bash
+flutter pub add just_audio audio_service audio_session \
+                just_audio_background \
+                speech_to_text \
+                shared_preferences \
+                http path_provider
+flutter pub add --dev flutter_lints
+flutter pub get
+```
+
+The rationale for each, and the Android component it replaces, is in `ACCESSIBILITY_GUIDELINES_IOS.md` §5.
+
+### 3.8 Info.plist — the four keys that cause launch crashes if missing
+
+Set them non-interactively; there is no Xcode here.
+
+```bash
+cd ~/blind-app/flutter_app/ios/Runner
+
+# Background recitation while the screen is locked.
+plutil -replace UIBackgroundModes -json '["audio"]' Info.plist
+
+# Voice commands (VoiceCommandManager parity). A missing usage-description key
+# is not a warning on iOS — the app is killed the moment the API is touched.
+plutil -replace NSMicrophoneUsageDescription \
+  -string 'يُستخدم الميكروفون لتنفيذ الأوامر الصوتية للتنقل في المصحف.' Info.plist
+plutil -replace NSSpeechRecognitionUsageDescription \
+  -string 'يُستخدم التعرف على الكلام لفهم الأوامر الصوتية داخل التطبيق.' Info.plist
+
+# Export compliance — skips the manual TestFlight questionnaire on every upload.
+# The workflow also sets this (ios_build.yml:289) so a fresh clone still works.
+plutil -replace ITSAppUsesNonExemptEncryption -bool false Info.plist
+
+plutil -p Info.plist | grep -E 'UIBackgroundModes|UsageDescription|NonExempt'
+```
+
+> **Why `ITSAppUsesNonExemptEncryption = false` is accurate here, not a shortcut:** the app's only cryptography is HTTPS to `api.alquran.cloud`, i.e. the operating system's own TLS. That falls under the US EAR 740.17(b) exemption. Declaring it in the plist means TestFlight never blocks a build waiting for you to answer a web form on your phone. Re-evaluate this line if you ever add your own crypto.
+
+### 3.9 Expose the ports
+
+```bash
+# From the VPS host, not the container:
+lxc config device add blindquran-ios preview  proxy \
+  listen=tcp:127.0.0.1:18080 connect=tcp:127.0.0.1:8080
+lxc config device add blindquran-ios codesrv  proxy \
+  listen=tcp:127.0.0.1:18842 connect=tcp:127.0.0.1:8842
+```
+
+Remote's UI does this for you when you register a port on the project; the manual form is here so you can repair it when a preview URL goes dark. Caddy then maps `blindquran.dev.remote.example.com → 127.0.0.1:18080`.
+
+---
+
+## 4. Apple Credentials Without a Mac
+
+This is the section people assume is impossible. It is not: a code-signing certificate is an X.509 certificate, and `openssl` predates Xcode. You need a paid Apple Developer Program membership ($99/yr) and about 25 minutes, once.
+
+Do all of it inside the container, in a directory you will delete afterwards.
+
+### 4.1 Generate the CSR
+
+```bash
+mkdir -p ~/apple-signing && cd ~/apple-signing && chmod 700 .
+
+openssl genrsa -out ios_distribution.key 2048
+
+openssl req -new \
+  -key ios_distribution.key \
+  -out ios_distribution.certSigningRequest \
+  -subj "/emailAddress=ibrahimalkateb965@gmail.com/CN=Ibrahim Alkateb/C=SA"
+```
+
+`CN` and `emailAddress` must match your Apple ID's name and email or the portal rejects the request.
+
+### 4.2 Exchange the CSR for a certificate (mobile Safari)
+
+1. `developer.apple.com/account/resources/certificates/add`
+2. Type: **Apple Distribution**.
+3. Upload `ios_distribution.certSigningRequest` — download it out of code-server to Files first.
+4. Download the resulting `distribution.cer` back into `~/apple-signing/`.
+
+### 4.3 Convert to a `.p12` bundle
+
+```bash
+cd ~/apple-signing
+
+# Apple hands back DER; openssl wants PEM.
+openssl x509 -inform DER -in distribution.cer -out ios_distribution.pem
+
+# NOTE THE -legacy FLAG. OpenSSL 3.x defaults to an AES-256-CBC + PBKDF2 PKCS#12
+# MAC that macOS `security import` cannot read: it fails with
+#   "MAC verification failed during PKCS12 import (wrong password?)"
+# — a message that sends you hunting for a password bug that does not exist.
+openssl pkcs12 -export -legacy \
+  -inkey ios_distribution.key \
+  -in ios_distribution.pem \
+  -out ios_distribution.p12 \
+  -name "Apple Distribution: Ibrahim Alkateb" \
+  -passout pass:"$P12_PASSWORD"
+```
+
+Choose `$P12_PASSWORD` yourself; it becomes the `P12_PASSWORD` GitHub secret.
+
+### 4.4 Register the App ID and provisioning profiles
+
+Still in mobile Safari, at `developer.apple.com/account/resources`:
+
+1. **Identifiers → +** → App IDs → App → Bundle ID **`com.aistudio.quranblind.a11y`** (explicit, not wildcard — wildcards cannot carry entitlements). Nothing extra is required for `UIBackgroundModes: audio`, but if you later add push, this is where it goes.
+2. **Profiles → +** → **App Store Connect** → your App ID → your distribution certificate → name it `BlindQuran AppStore` → download.
+3. **Profiles → +** → **Ad Hoc** → same App ID → select the test devices → name it `BlindQuran AdHoc` → download.
+
+You need both: TestFlight requires the App Store profile; Diawi and Firebase App Distribution require Ad Hoc. `ios_build.yml:217` picks between them based on the `distribution` input, which is why both secrets exist.
+
+**Registering your iPhone's UDID for Ad Hoc, from the iPhone itself:** install the *Apple Developer* app, or visit a UDID-profile service in Safari and install the configuration profile it offers — either yields the UDID to paste into **Devices → +**. You do not need iTunes or a Mac.
+
+### 4.5 App Store Connect API key
+
+TestFlight uploads authenticate with a key, not your Apple ID password — which means no 2FA prompt in the middle of a CI run.
+
+`appstoreconnect.apple.com/access/integrations/api` → **+** → Access: **App Manager** → download the `AuthKey_XXXXXXXXXX.p8`. **It is downloadable exactly once.** Record alongside it:
+
+- **Key ID** — the `XXXXXXXXXX` in the filename, e.g. `ABCD1234EF`
+- **Issuer ID** — a UUID shown above the key list, e.g. `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+- **Team ID** — 10 characters, top-right of the developer portal, e.g. `A1B2C3D4E5`
+
+### 4.6 Base64-encode everything
+
+GitHub secrets are text; three of these are binary.
+
+```bash
+cd ~/apple-signing
+base64 -w0 ios_distribution.p12                > p12.b64
+base64 -w0 BlindQuran_AppStore.mobileprovision > pp_appstore.b64
+base64 -w0 BlindQuran_AdHoc.mobileprovision    > pp_adhoc.b64
+wc -c *.b64      # sanity: each should be thousands of bytes, never 0
+```
+
+---
+
+## 5. Loading the Secrets into GitHub
+
+Authenticate `gh` once (device flow — it prints a code you type into Safari, no local browser needed):
+
+```bash
+gh auth login --hostname github.com --git-protocol https --web
+```
+
+Then, from `~/apple-signing`:
+
+```bash
+R=<you>/blind-app
+
+gh secret set BUILD_CERTIFICATE_BASE64 --repo "$R" < p12.b64
+gh secret set P12_PASSWORD             --repo "$R" --body "$P12_PASSWORD"
+gh secret set KEYCHAIN_PASSWORD        --repo "$R" --body "$(openssl rand -base64 24)"
+gh secret set PROVISIONING_PROFILE_APPSTORE_BASE64 --repo "$R" < pp_appstore.b64
+gh secret set PROVISIONING_PROFILE_ADHOC_BASE64    --repo "$R" < pp_adhoc.b64
+gh secret set APPLE_TEAM_ID        --repo "$R" --body "A1B2C3D4E5"
+gh secret set APPSTORE_KEY_ID      --repo "$R" --body "ABCD1234EF"
+gh secret set APPSTORE_ISSUER_ID   --repo "$R" --body "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+gh secret set APPSTORE_PRIVATE_KEY --repo "$R" < AuthKey_ABCD1234EF.p8
+
+gh secret list --repo "$R"
+```
+
+Then **destroy the local copies**. The container is a long-lived machine with a web-facing IDE on it; the signing key has no business staying there.
+
+```bash
+cd ~ && shred -uvz -n 3 ~/apple-signing/* 2>/dev/null; rm -rf ~/apple-signing
+```
+
+> Keep one offline backup of `ios_distribution.p12` and its password somewhere outside this system (a password manager's file attachment). Losing it is recoverable — revoke and re-issue — but revoking a distribution certificate invalidates every profile built from it.
+
+---
+
+## 6. GitHub Secrets Reference
+
+This is the section `ios_build.yml:27` and the `BUILD_CERTIFICATE_BASE64` error at `ios_build.yml:232` point at.
+
+| Secret | Encoding | Where it comes from | Required for | Read at |
+| :--- | :--- | :--- | :--- | :--- |
+| `BUILD_CERTIFICATE_BASE64` | base64 of `.p12` | §4.3 | **all builds** | `ios_build.yml:219` |
+| `P12_PASSWORD` | plain | you chose it, §4.3 | **all builds** | `:220` |
+| `KEYCHAIN_PASSWORD` | plain, random | `openssl rand`, §5 | **all builds** | `:221` |
+| `PROVISIONING_PROFILE_APPSTORE_BASE64` | base64 of `.mobileprovision` | §4.4 | `testflight`, `artifact` | `:222` |
+| `PROVISIONING_PROFILE_ADHOC_BASE64` | base64 of `.mobileprovision` | §4.4 | `firebase`, `diawi` | `:223` |
+| `APPLE_TEAM_ID` | plain, 10 chars | developer portal | **all builds** | `:315` (ExportOptions) |
+| `APPSTORE_KEY_ID` | plain, 10 chars | §4.5 | `testflight` | `:393`, `:405`, `:419` |
+| `APPSTORE_ISSUER_ID` | plain, UUID | §4.5 | `testflight` | `:406`, `:420` |
+| `APPSTORE_PRIVATE_KEY` | raw `.p8` contents | §4.5 | `testflight` | `:394` |
+| `FIREBASE_APP_ID` | plain, `1:000000000000:ios:0000000000000000` | Firebase console | `firebase` | `:433` |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | raw JSON | GCP service account | `firebase` | `:434` |
+| `DIAWI_TOKEN` | plain | diawi.com account | `diawi` | `:453` |
+| `NOTIFY_WEBHOOK_URL` | plain URL | optional | build notifications | `:147` |
+
+**Minimum set to get a build onto your phone via TestFlight:** rows 1, 2, 3, 4, 6, 7, 8, 9. The Firebase and Diawi rows are alternate distribution paths; leave them unset if you do not use them — the workflow only reads the ones the selected `distribution` needs.
+
+> **Calendar this:** the Apple Distribution certificate expires after **one year**, and every provisioning profile derived from it dies with it. Nothing warns you until a build fails with `No signing certificate "iOS Distribution" found`. Set a reminder for month 11 to redo §4.1–4.6. Ad Hoc profiles additionally need regeneration whenever you add a test device.
+
+---
+
+## 7. The Daily Loop
+
+Four steps, in order, every session. A–C run on the VPS and cost nothing. D costs macOS minutes, so it comes last and deliberately.
+
+### Step A — Task the agent (Remote chat)
+
+Open `https://remote.example.com` → project `blindquran-ios` → chat. Behind that box:
+
+```bash
+# Claude Code — streaming JSON, fully non-interactive
+claude -p "<prompt>" \
+  --output-format stream-json \
+  --dangerously-skip-permissions
+
+# Antigravity — for long refactors that outlive an HTTP timeout
+agy --print "<prompt>" \
+  --dangerously-skip-permissions \
+  --print-timeout 240m
+```
+
+Prompts land far better when they name the invariant, not the widget. The accessibility document is written to be quoted at the agent:
+
+> "Port `QuranPlayerScreen.kt:287-327` (the Stealth Box) to `lib/widgets/stealth_surface.dart`. Follow `ACCESSIBILITY_GUIDELINES_IOS.md` §3 exactly: a single `Semantics` node, `ExcludeSemantics` on the child, `customSemanticsActions` for replay, and RTL-aware `onScrollLeft`/`onScrollRight` mapping. Then write the widget test from §9 asserting that a right-scroll in RTL advances to the *next* ayah."
+
+Two rules that save a lot of grief:
+
+- **One invariant per task.** An agent asked to port audio *and* semantics *and* haptics in one go will produce something that analyzes cleanly and behaves wrongly in three places at once.
+- **Always ask for the test in the same prompt.** On this project the failure mode is never a crash; it is a silently inverted gesture or a dropped announcement, which no amount of reading catches and one widget test catches every time.
+
+### Step B — Edit (code-server on `:8842`)
+
+```bash
+# In the container
+code-server --bind-addr 0.0.0.0:8842 --auth password ~/blind-app
+```
+
+Reach it at `https://blindquran.code.remote.example.com`. Settings worth changing before your first real editing session on a phone screen — paste into code-server's `settings.json`:
+
+```json
+{
+  "workbench.editor.showTabs": "single",
+  "editor.fontSize": 15,
+  "editor.wordWrap": "on",
+  "editor.minimap.enabled": false,
+  "editor.lineNumbers": "off",
+  "editor.renderWhitespace": "none",
+  "explorer.compactFolders": false,
+  "workbench.activityBar.location": "hidden",
+  "terminal.integrated.fontSize": 14,
+  "editor.acceptSuggestionOnEnter": "off",
+  "editor.quickSuggestions": { "other": false, "comments": false, "strings": false }
+}
+```
+
+The last two matter more than they look: on an iOS soft keyboard, autocomplete-on-Enter turns every newline into a coin flip.
+
+Use **Add to Home Screen** on both the Remote UI and code-server. Standalone PWA mode removes Safari's chrome — roughly 15 % of a phone screen — and stops the toolbar from swallowing your taps.
+
+The tight verify loop, in code-server's terminal:
+
+```bash
+cd ~/blind-app/flutter_app
+flutter analyze --fatal-infos --fatal-warnings   # same flags as the CI verify job
+flutter test
+dart format --set-exit-if-changed lib test       # CI fails on unformatted code
+```
+
+Running these three before every push is the whole reason the `verify` job is cheap: a Dart typo should cost you 10 seconds, not 10 macOS minutes at 10× billing.
+
+### Step C — Preview (Flutter Web, `:8080`)
+
+```bash
+cd ~/blind-app/flutter_app
+flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
+```
+
+`--web-hostname 0.0.0.0` is not optional. The default binds to loopback inside the container's network namespace, and Caddy's proxy — which arrives on the container's bridge address — gets a connection refused that surfaces on your phone as a bare 502.
+
+Then open `https://blindquran.dev.remote.example.com` in Safari. To make the accessibility tree actually exist, force semantics on at startup:
+
+```dart
+// lib/main.dart
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Flutter Web builds the a11y tree lazily; without this the DOM is an empty
+  // <flt-semantics-host> and VoiceOver on the phone reads nothing at all.
+  SemanticsBinding.instance.ensureSemantics();
+  runApp(const BlindQuranApp());
+}
+```
+
+Hot reload keeps working over HTTPS: press `r` in the container terminal and Safari updates. This is the fast loop — you should be in it most of the day.
+
+**Be precise about what this step is worth.** Flutter Web's semantics layer is a DOM shim, not the real iOS accessibility bridge. Treating a green Step C as sign-off is how broken builds ship.
+
+| Step C **can** tell you | Step C **cannot** tell you |
+| :--- | :--- |
+| Semantic labels exist and read correctly in Arabic | Whether a 3-finger VoiceOver swipe fires `onScrollLeft` |
+| Tree shape: leaks past `ExcludeSemantics`, orphan nodes | Whether Magic Tap reaches `accessibilityPerformMagicTap` |
+| Traversal order under `OrdinalSortKey` | Whether `AVAudioSession` ducks or clobbers VoiceOver |
+| Layout, RTL mirroring, font rendering | Whether recitation survives the lock screen |
+| Business logic, state transitions, JSON parsing | Anything about Core Haptics |
+| Custom action *labels* appearing in the rotor shim | Whether an announcement posted mid-utterance is dropped |
+
+The right-hand column is exactly what `ACCESSIBILITY_GUIDELINES_IOS.md` §9's 13-point device checklist covers — and it can only be run in Step D.
+
+### Step D — Build and test on the device
+
+```bash
+cd ~/blind-app
+git add -A
+git commit -m "feat(ios): port stealth surface with RTL-aware scroll actions
+
+Claude-Session: https://claude.ai/code/session_01TypAS1ye6Nk7dgF3XYLQo5"
+git push origin feat/ios-flutter-port
+```
+
+The push triggers `verify` → `build` automatically (the workflow watches `flutter_app/**` on `main`, `feat/ios-**`, and `chore/ios-**`). To choose a destination other than TestFlight, or to rebuild without a code change:
+
+```bash
+gh workflow run ios_build.yml \
+  --ref feat/ios-flutter-port \
+  -f distribution=testflight \
+  -f release_notes="Stealth surface + RTL scroll fix"
+
+gh run watch                # live progress, readable on a phone
+gh run view --log-failed    # only the failing step's log
+```
+
+Then: TestFlight app on the iPhone → install → **turn VoiceOver on** → work through the device checklist. Test with the screen off and the phone in your pocket at least once per session; that is the actual usage posture for this app, and it is where lock-screen audio and ghost-resume bugs reveal themselves.
+
+`distribution` options and when each is right:
+
+| Value | Lands in | Wait | Use when |
+| :--- | :--- | :--- | :--- |
+| `testflight` | TestFlight | +5–20 min Apple processing | Default. Real distribution, external testers possible |
+| `firebase` | Firebase App Distribution | ~1 min | Fast iteration when you only need it on *your* registered devices |
+| `diawi` | a one-time install link | ~1 min | Handing a build to someone over WhatsApp |
+| `artifact` | GitHub Actions artifact | — | Archiving a signed `.ipa` without distributing it |
+
+---
+
+## 8. Cheat Sheets
+
+### Container
+
+```bash
+lxc list                                  # what's running, what it's eating
+lxc exec blindquran-ios -- su - dev       # get in as the dev user
+lxc info blindquran-ios                   # CPU/memory/disk for one container
+lxc snapshot blindquran-ios pre-upgrade   # before touching the Flutter version
+lxc restore  blindquran-ios pre-upgrade   # undo it
+sudo systemctl status remote.futrx
+sudo journalctl -u remote.futrx -f
+```
+
+### Flutter (container-safe subset)
+
+```bash
+flutter analyze --fatal-infos --fatal-warnings
+flutter test --coverage
+dart format lib test
+flutter pub outdated
+flutter clean && flutter pub get          # first thing to try on weird build errors
+flutter build web --release               # proves the tree compiles; NOT an iOS build
+flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
+```
+
+### CI, from the phone
+
+```bash
+gh run list --workflow=ios_build.yml --limit 5
+gh run watch
+gh run view --log-failed
+gh run rerun <run-id> --failed
+gh run cancel <run-id>                    # stops the 10× meter immediately
+gh secret list
+```
+
+### Git
+
+```bash
+git switch -c feat/ios-<topic>            # matches the workflow's branch filter
+git add -A && git commit -m "…"
+git push -u origin HEAD
+git log --oneline -10
+git restore --source=HEAD -- <path>       # discard one file's changes
+```
+
+---
+
+## 9. Troubleshooting
+
+| Symptom | Cause | Fix |
+| :--- | :--- | :--- |
+| Preview URL returns 502 | Flutter bound to loopback | Add `--web-hostname 0.0.0.0` |
+| Preview URL returns NXDOMAIN | `*.dev.` wildcard missing | Add the A record (§3.1), wait for TTL |
+| VoiceOver reads nothing on the web preview | Semantics tree never built | `SemanticsBinding.instance.ensureSemantics()` in `main()` |
+| `MAC verification failed` in the keychain step | `.p12` made by OpenSSL 3.x without `-legacy` | Re-export with `-legacy` (§4.3), re-upload the secret |
+| `No signing certificate "iOS Distribution" found` | Certificate expired, or the wrong `.p12` | Re-issue, §4.1–4.6 |
+| `Provisioning profile doesn't match bundle identifier` | Wildcard App ID, or a profile for a different bundle | Create an **explicit** App ID for `com.aistudio.quranblind.a11y` |
+| `Bundle id mismatch` fails the build early | `project.pbxproj` drifted from `env.BUNDLE_ID` | Fix `PRODUCT_BUNDLE_IDENTIFIER`; the workflow will not rewrite it for you |
+| `verify` fails on formatting only | `dart format` not run before pushing | `dart format lib test`, amend, force-push |
+| Build succeeds, TestFlight never appears | Export-compliance question pending | Confirm `ITSAppUsesNonExemptEncryption` is in the built plist (§3.8) |
+| `Invalid Bundle. Missing UIBackgroundModes` | Info.plist edit lost in a `flutter clean` cycle | Re-apply §3.8; the workflow asserts this at `:299` |
+| App is killed the instant you tap the mic | Missing `NSMicrophoneUsageDescription` / `NSSpeechRecognitionUsageDescription` | Both keys, §3.8 — iOS does not warn, it terminates |
+| Recitation stops when VoiceOver speaks | `duckOthers` set on the audio session | Remove it; `ACCESSIBILITY_GUIDELINES_IOS.md` §5 |
+| Playback resumes by itself after a phone call | Ghost resume via `shouldResume` / remote command | `GhostResumePolicy`, 2000 ms window — guidelines §5 |
+| Swiping ayahs works in LTR, jumps backwards in Arabic | `onScrollLeft`/`onScrollRight` are *visual*, not logical | RTL mapping + the widget test — guidelines §3, §9 |
+| macOS job queues for many minutes | Free-tier macOS runner contention | Normal; or make the repo public for unlimited minutes (§10) |
+| code-server drops the connection on the phone | Safari suspended the background tab | Reopen the PWA; the container keeps running, nothing is lost |
+
+---
+
+## 10. Cost and Quota
+
+GitHub bills macOS runners at **10× the minute rate** of Linux. That single multiplier drives the whole two-job design.
+
+| Plan | Included minutes/month | macOS-equivalent | Builds/month at ~12 min |
+| :--- | :--- | :--- | :--- |
+| Free (private repo) | 2 000 | 200 | **~16** |
+| Pro (private repo) | 3 000 | 300 | ~25 |
+| Team | 3 000 | 300 | ~25 |
+| **Any public repo** | unlimited | unlimited | unlimited |
+
+Consequences you should actually act on:
+
+- **Sixteen builds a month is about four a week.** That is enough only if Steps B and C absorb the iteration. Every bug caught by `flutter analyze` on Linux is a build you didn't spend.
+- The `verify` job is 1×. Ten failed verifies cost less than one failed macOS build.
+- `concurrency.cancel-in-progress: true` means pushing twice in a minute kills the first build instead of paying for both.
+- **Making this repository public converts the cost problem into nothing.** For a Quran accessibility app that is plausibly the right call anyway — but audit first: the repo currently contains `key.properties`, `release-upload-key.jks`, and `debug.keystore` for the Android release. Those must be purged from history (`git filter-repo`) and the upload key rotated *before* any visibility change. Do not treat this as a quick win.
+
+---
+
+## 11. The Rhythm
+
+```
+Morning     Step A   Task the agent with one invariant + its test.
+            Step B   Read the diff in code-server. analyze / test / format.
+            Step C   Open the preview. Check labels, tree shape, RTL layout.
+                     ↺ Loop A–C until the structure is right. Costs nothing.
+
+Afternoon   Step D   Push once. verify → macos-15 → TestFlight.
+                     While it builds (~15 min): write the next task's prompt.
+            Device   VoiceOver ON. Screen OFF. Phone in pocket.
+                     Run the 13-point checklist from the guidelines, §9.
+
+Evening     Log      Note what only the device could have told you.
+                     That list is your Step C blind spot — and next week's
+                     widget tests.
+```
+
+The discipline this playbook is really enforcing: **the phone is the only honest test rig for this app, and it is 25 minutes away.** Everything upstream of Step D exists so that when you finally hold the device, you are testing something with a real chance of being right.

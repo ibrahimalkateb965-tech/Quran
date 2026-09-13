@@ -1,6 +1,6 @@
 package com.example
 
-import com.example.data.model.Reciter
+import com.aistudio.quranblind.domain.model.Reciter
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

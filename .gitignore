@@ -67,3 +67,6 @@ replay_pid*.log
 gate.log
 *.gate.log
 
+
+# Local IDE Tools
+tools/ag_context_monitor.py

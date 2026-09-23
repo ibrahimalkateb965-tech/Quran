@@ -16,6 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,7 +64,7 @@ fun HeaderBar(
                 onClickLabel = "فتح قائمة السور",
                 testTag = "surah_index_button",
                 text = "اختيار\nالسورة",
-                contentDescription = "اختيار السورة"
+                contentDescription = "اختيارُ السورة"
             )
             Spacer(modifier = Modifier.weight(1f))
             HeaderAccessibleButton(
@@ -69,7 +72,7 @@ fun HeaderBar(
                 onClickLabel = "تغيير القارئ",
                 testTag = "reciter_select_button",
                 text = "اختيار\nالقارئ",
-                contentDescription = "اختيار القارئ"
+                contentDescription = "اختيارُ القارئ"
             )
         }
     }
@@ -96,6 +99,9 @@ fun HeaderAccessibleButton(
             .background(bgColor, CircleShape)
             .border(1.5.dp, borderColor, CircleShape)
             .testTag(testTag)
+            .semantics(mergeDescendants = true) {
+                this.contentDescription = contentDescription
+            }
     ) {
         Text(
             text = text,
@@ -106,7 +112,9 @@ fun HeaderAccessibleButton(
             ),
             color = textColor,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 4.dp)
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .clearAndSetSemantics { }
         )
     }
 }

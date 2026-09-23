@@ -46,8 +46,8 @@ fun ReciterSelectorSheet(
     onAnnounce: (String) -> Unit
 ) {
     AccessibleBottomSheet(
-        title = "اختيار القارئ",
-        contentDescriptionText = "اختيار القارئ",
+        title = "اختيارُ القارئ",
+        contentDescriptionText = "اختيارُ القارئ",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
         showCloseButton = false
@@ -77,7 +77,7 @@ fun ReciterSelectorSheet(
                         titleColor = if (isSelected) WarmAccentTerracotta else WarmTextPrimary,
                         subtitleColor = WarmTextSecondary,
                         isSelected = isSelected,
-                        onClickLabel = "اختيار القارئ ${reciter.nameArabic}",
+                        onClickLabel = "اختيارُ القارئ ${reciter.nameArabic}",
                         contentDescriptionText = "${reciter.nameArabic}. ${if (isSelected) "مختار حالياً" else "انقر مرتين لاختياره"}",
                         onClick = { onSelectReciter(reciter) },
                         testTag = "reciter_item_${reciter.id}",

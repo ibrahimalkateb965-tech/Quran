@@ -256,12 +256,12 @@ class QuranViewModel @Inject constructor(
 
             if (speechManager.isTalkBackEnabled()) {
                 announce(
-                    "مرحباً بك. تم اختيار سورة الفاتحة كبداية. " +
+                    "مرحباً بك. تم اختيارُ سورة الفاتحة كبداية. " +
                     "قارئ الشاشة يعمل الآن. لتجربة أفضل مع المساعد الصوتي الخاص بالتطبيق، " +
                     "يُفضّل إيقاف قارئ الشاشة بالضغط المطول على زري رفع وخفض الصوت معاً."
                 )
             } else {
-                announce("مرحباً بك. تم اختيار سورة الفاتحة والقارئ الافتراضي كبداية.")
+                announce("مرحباً بك. تم اختيارُ سورة الفاتحة والقارئ الافتراضي كبداية.")
             }
         }
     }
@@ -550,7 +550,7 @@ class QuranViewModel @Inject constructor(
                     showSurahIndex = true
                 ) 
             }
-            performAction("تم اختيار القارئ ${reciter.nameArabic}. الرجاء اختيار السورة", HapticType.CLICK)
+            performAction("تم اختيارُ القارئ ${reciter.nameArabic}. الرجاء اختيارُ السورة", HapticType.CLICK)
         } else {
             _dialogUiState.update { it.copy(showReciterDialog = false) }
             performAction("تم تغيير القارئ إلى ${reciter.nameArabic}", HapticType.CLICK)

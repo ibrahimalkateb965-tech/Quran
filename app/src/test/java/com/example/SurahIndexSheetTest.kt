@@ -47,8 +47,8 @@ class SurahIndexSheetTest {
         composeTestRule.onNodeWithText("سورة الفاتحة", substring = true).performClick()
         composeTestRule.waitForIdle()
         
-        // Check that "اختيار الآية" was announced
-        assert(announced == "اختيار الآية") { "Expected announcement 'اختيار الآية' but was '$announced'" }
+        // Check that "اختيارُ الآية" was announced
+        assert(announced == "اختيارُ الآية") { "Expected announcement 'اختيارُ الآية' but was '$announced'" }
 
         // Check if we are in ayah list (should see الآية 1)
         composeTestRule.onNodeWithText("الآية 1").assertExists()

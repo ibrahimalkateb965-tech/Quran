@@ -87,13 +87,13 @@ fun SurahIndexSheet(
                     append("سورة ${currentSurah.nameArabic} ")
                 }
                 withStyle(SpanStyle(color = WarmAccentTerracotta, fontSize = 20.sp)) {
-                    append("( اختيار الآية )")
+                    append("( اختيارُ الآية )")
                 }
             }
         } else {
             buildAnnotatedString {
                 withStyle(SpanStyle(color = WarmTextPrimary)) {
-                    append("اختيار السورة ")
+                    append("اختيارُ السورة ")
                 }
                 withStyle(SpanStyle(color = WarmAccentTerracotta, fontSize = 20.sp)) {
                     append("(114 سورة)")
@@ -105,14 +105,14 @@ fun SurahIndexSheet(
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics {
-                contentDescription = if (currentSurah != null) "اختيار الآية. سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة"
+                contentDescription = if (currentSurah != null) "اختيارُ الآية. سورة ${currentSurah.nameArabic}" else "اختيارُ السورة. يحتوي على مائة وأربعة عشر سورة"
             }
         )
     }
 
     AccessibleBottomSheet(
-        title = if (currentSurah != null) "اختيار الآية - سورة ${currentSurah.nameArabic}" else "اختيار السورة (114 سورة)",
-        contentDescriptionText = if (currentSurah != null) "اختيار الآية. سورة ${currentSurah.nameArabic}" else "اختيار السورة. يحتوي على مائة وأربعة عشر سورة",
+        title = if (currentSurah != null) "اختيارُ الآية - سورة ${currentSurah.nameArabic}" else "اختيارُ السورة (114 سورة)",
+        contentDescriptionText = if (currentSurah != null) "اختيارُ الآية. سورة ${currentSurah.nameArabic}" else "اختيارُ السورة. يحتوي على مائة وأربعة عشر سورة",
         onDismiss = onDismiss,
         onAnnounce = onAnnounce,
         headerContent = null,
@@ -128,7 +128,7 @@ fun SurahIndexSheet(
 
             LaunchedEffect(currentSurah) {
                 if (currentSurah != null) {
-                    onAnnounce("اختيار الآية")
+                    onAnnounce("اختيارُ الآية")
                     if (currentSurah.id == currentSurahId && currentAyahIndex > 0) {
                         ayahListState.scrollToItem(currentAyahIndex)
                     } else {
@@ -173,7 +173,7 @@ fun SurahIndexSheet(
                             subtitle = "${surah.revelationType} • ${surah.ayahCount} آية",
                             isSelected = isSelected,
                             onClickLabel = "عرض آيات سورة ${surah.nameArabic}",
-                            contentDescriptionText = "سورة ${surah.nameArabic}. رقمها ${surah.id}. آياتها ${surah.ayahCount}. انقر مرتين لاختيار الآية.",
+                            contentDescriptionText = "سورة ${surah.nameArabic}. رقمها ${surah.id}. آياتها ${surah.ayahCount}. انقر مرتين لاختيارِ الآية.",
                             onClick = { selectedSurahForAyahs = surah },
                             testTag = "surah_item_${surah.id}",
                             leadingContent = {

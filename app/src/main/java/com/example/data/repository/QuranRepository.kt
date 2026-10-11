@@ -23,6 +23,9 @@ class QuranRepositoryImpl @Inject constructor(
     @Volatile
     private var cachedQuranJson: JSONObject? = null
 
+    @Volatile
+    private var cachedPageMap: Map<Int, List<Ayah>>? = null
+
     override fun getAllSurahs(): List<Surah> {
         return SurahData.SURAH_LIST
     }
@@ -63,6 +66,26 @@ class QuranRepositoryImpl @Inject constructor(
         emit(assetAyahs)
     }.flowOn(Dispatchers.IO)
 
+    override fun getPageAyahs(
+        pageNumber: Int,
+        reciterIdentifier: String
+    ): Flow<List<Ayah>> = flow {
+        if (pageNumber !in 1..604) {
+            emit(emptyList())
+            return@flow
+        }
+        val pageMap = getOrBuildPageMap()
+        val baseAyahs = pageMap[pageNumber] ?: emptyList()
+        val ayahsWithAudio = if (reciterIdentifier.isNotBlank()) {
+            baseAyahs.map { ayah ->
+                ayah.copy(audioUrl = resolveAudioEndpoint(reciterIdentifier, ayah.surahId, ayah.numberInSurah))
+            }
+        } else {
+            baseAyahs
+        }
+        emit(ayahsWithAudio)
+    }.flowOn(Dispatchers.IO)
+
     private fun getOrLoadQuranJson(): JSONObject? {
         cachedQuranJson?.let { return it }
         return synchronized(this) {
@@ -72,6 +95,40 @@ class QuranRepositoryImpl @Inject constructor(
             } catch (e: Exception) {
                 android.util.Log.e("QuranRepository", "Error reading Quran assets JSON", e)
                 null
+            }
+        }
+    }
+
+    private fun getOrBuildPageMap(): Map<Int, List<Ayah>> {
+        cachedPageMap?.let { return it }
+        return synchronized(this) {
+            cachedPageMap ?: run {
+                val jsonObject = getOrLoadQuranJson() ?: return emptyMap()
+                val map = mutableMapOf<Int, MutableList<Ayah>>()
+                for (surahId in 1..114) {
+                    val ayahsArray = jsonObject.optJSONArray(surahId.toString()) ?: continue
+                    for (i in 0 until ayahsArray.length()) {
+                        val item = ayahsArray.getJSONObject(i)
+                        val numberInSurah = item.getInt("numberInSurah")
+                        val globalNumber = item.getInt("globalNumber")
+                        val text = sanitizeUthmanicText(item.getString("textArabic"))
+                        val page = item.optInt("page", 1)
+                        val juz = item.optInt("juz", 1)
+
+                        val ayah = Ayah(
+                            numberInSurah = numberInSurah,
+                            globalNumber = globalNumber,
+                            textArabic = text,
+                            textTranslation = "",
+                            audioUrl = "",
+                            surahId = surahId,
+                            page = page,
+                            juz = juz
+                        )
+                        map.getOrPut(page) { mutableListOf() }.add(ayah)
+                    }
+                }
+                map.also { cachedPageMap = it }
             }
         }
     }

@@ -8,6 +8,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.flow.first
 
 class QuranRepositoryTest {
 
@@ -59,5 +60,14 @@ class QuranRepositoryTest {
         assertTrue(!sanitized.contains("\uFEFF"))
         assertTrue(!sanitized.contains("\u200A"))
         assertTrue(!sanitized.contains("\u2060"))
+    }
+
+    @Test
+    fun testGetPageAyahs_invalidPage_returnsEmptyList() = kotlinx.coroutines.runBlocking {
+        val ayahs0 = repository.getPageAyahs(0).first()
+        assertTrue(ayahs0.isEmpty())
+
+        val ayahs999 = repository.getPageAyahs(999).first()
+        assertTrue(ayahs999.isEmpty())
     }
 }

@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -75,12 +76,11 @@ fun BlindAccessibleButton(
             .blindAccessibleClickable(
                 onClickLabel = onClickLabel,
                 onClick = { if (enabled) onClick() }
-            ),
+            )
+            .heightIn(min = 48.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Render the actual button but make it technically disabled (or ignore pointer events) 
-        // so our Box modifier handles the touches. Wait, if it's disabled, colors change.
-        
+        // Render the actual button background via Surface
         androidx.compose.material3.Surface(
             color = colors.containerColor,
             contentColor = colors.contentColor,
@@ -90,7 +90,6 @@ fun BlindAccessibleButton(
         
         Box(
             modifier = Modifier
-                .matchParentSize()
                 .padding(contentPadding),
             contentAlignment = Alignment.Center
         ) {

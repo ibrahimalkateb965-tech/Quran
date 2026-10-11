@@ -60,6 +60,8 @@ import com.example.ui.components.player.AyahCard
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.components.player.AyahNumberCard
 import com.example.ui.components.player.SurahNameCard
+import com.example.ui.components.player.EyePageButton
+import com.example.ui.components.player.QuranPageViewSheet
 import com.example.ui.components.player.ControlPanel
 import com.example.ui.components.player.GestureHintChip
 import com.example.ui.components.player.HeaderBar
@@ -144,6 +146,7 @@ fun QuranPlayerScreen(
     val screenModeUiState by viewModel.screenModeUiState.collectAsStateWithLifecycle()
     val isTalkBackEnabled = LocalTalkBackEnabled.current
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
+    val pageAyahs by viewModel.pageAyahs.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Observe announcement events
@@ -203,10 +206,15 @@ fun QuranPlayerScreen(
                             onClick = { viewModel.announce("سورة ${activeSurah?.nameArabic ?: ""}") }
                         )
                         if (currentAyah != null) {
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             AyahNumberCard(
                                 number = currentAyah.numberInSurah,
                                 onClick = { viewModel.announce("الآية ${currentAyah.numberInSurah}") }
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            EyePageButton(
+                                pageNumber = currentAyah.page,
+                                onClick = { viewModel.togglePageViewDialog(true) }
                             )
                         }
                     }
@@ -228,7 +236,7 @@ fun QuranPlayerScreen(
                         // user jumps to a different Surah from the index sheet.
                         val pagerState = key(activeSurah?.id) {
                             rememberPagerState(
-                                initialPage = currentAyahIndex,
+                                initialPage = currentAyahIndex.coerceIn(0, maxOf(0, ayahs.size - 1)),
                                 pageCount = { ayahs.size }
                             )
                         }
@@ -236,7 +244,7 @@ fun QuranPlayerScreen(
                         var userScrolled by remember { mutableStateOf(false) }
 
                         // Sync ViewModel state to Pager (when audio auto-advances or commands change the Ayah or on resume)
-                        LaunchedEffect(currentAyahIndex) {
+                        LaunchedEffect(currentAyahIndex, ayahs) {
                             val target = currentAyahIndex
                             if (target != pagerState.currentPage && target in ayahs.indices && !pagerState.isScrollInProgress) {
                                 isProgrammaticScroll = true
@@ -413,6 +421,24 @@ fun QuranPlayerScreen(
                             viewModel.toggleReciterDialog(false)
                         },
                         onDismiss = { viewModel.toggleReciterDialog(false) },
+                        onAnnounce = { viewModel.announce(it) }
+                    )
+                }
+
+                // Full Quran Page View Sheet (Eye button)
+                if (dialogUiState.showPageViewDialog) {
+                    QuranPageViewSheet(
+                        pageNumber = dialogUiState.pageViewNumber,
+                        currentSurahId = activeSurah?.id,
+                        currentAyahNumberInSurah = currentAyah?.numberInSurah,
+                        ayahs = pageAyahs,
+                        onSelectAyah = { surahId, ayahIndex ->
+                            viewModel.selectAyahFromPage(surahId, ayahIndex)
+                        },
+                        onChangePage = { newPage ->
+                            viewModel.loadPageAyahs(newPage)
+                        },
+                        onDismiss = { viewModel.togglePageViewDialog(false) },
                         onAnnounce = { viewModel.announce(it) }
                     )
                 }

@@ -67,7 +67,9 @@ data class DialogUiState(
     val showSurahIndex: Boolean = false,
     val showReciterDialog: Boolean = true,
     val showHelpDialog: Boolean = false,
-    val showBookmarksSheet: Boolean = false
+    val showBookmarksSheet: Boolean = false,
+    val showPageViewDialog: Boolean = false,
+    val pageViewNumber: Int = 1
 )
 
 data class ScreenModeUiState(
@@ -95,6 +97,7 @@ class QuranViewModel @Inject constructor(
     private var isAwaitingNetworkRecovery = false
     private var networkRetryCount = 0
     private var networkRetryJob: Job? = null
+    private var loadPageJob: Job? = null
 
     private val _playbackUiState = MutableStateFlow(PlaybackUiState(surahs = repository.getAllSurahs()))
     val playbackUiState: StateFlow<PlaybackUiState> = _playbackUiState.asStateFlow()
@@ -107,6 +110,9 @@ class QuranViewModel @Inject constructor(
 
     private val _dialogUiState = MutableStateFlow(DialogUiState())
     val dialogUiState: StateFlow<DialogUiState> = _dialogUiState.asStateFlow()
+
+    private val _pageAyahs = MutableStateFlow<List<Ayah>>(emptyList())
+    val pageAyahs: StateFlow<List<Ayah>> = _pageAyahs.asStateFlow()
 
     private val _screenModeUiState = MutableStateFlow(ScreenModeUiState())
     val screenModeUiState: StateFlow<ScreenModeUiState> = _screenModeUiState.asStateFlow()
@@ -273,6 +279,7 @@ class QuranViewModel @Inject constructor(
                 it.copy(
                     currentSurah = surah,
                     currentAyahIndex = targetAyahIndex,
+                    currentAyahs = emptyList(),
                     isLoadingAudio = true,
                     currentLoopCount = 1,
                     continuousPlayStartIndex = targetAyahIndex
@@ -628,6 +635,51 @@ class QuranViewModel @Inject constructor(
         _dialogUiState.update { it.copy(showHelpDialog = show) }
     }
 
+    fun togglePageViewDialog(show: Boolean, page: Int? = null) {
+        performAction("", HapticType.CLICK)
+        if (show) {
+            if (audioEngine?.isPlaying == true) {
+                audioEngine?.pause()
+            }
+            _playbackUiState.update { it.copy(isLoadingAudio = false) }
+            val currentAyah = _playbackUiState.value.currentAyahs.getOrNull(_playbackUiState.value.currentAyahIndex)
+            val targetPage = page ?: currentAyah?.page ?: 1
+            loadPageAyahs(targetPage)
+            _dialogUiState.update { it.copy(showPageViewDialog = true, pageViewNumber = targetPage) }
+        } else {
+            loadPageJob?.cancel()
+            _dialogUiState.update { it.copy(showPageViewDialog = false) }
+        }
+    }
+
+    fun loadPageAyahs(pageNumber: Int) {
+        val clampedPage = pageNumber.coerceIn(1, 604)
+        _dialogUiState.update { it.copy(pageViewNumber = clampedPage) }
+        loadPageJob?.cancel()
+        loadPageJob = viewModelScope.launch {
+            val reciterId = _settingsUiState.value.selectedReciter.serverIdentifier
+            repository.getPageAyahs(clampedPage, reciterId).collect { ayahs ->
+                _pageAyahs.value = ayahs
+            }
+        }
+    }
+
+    fun selectAyahFromPage(surahId: Int, ayahIndex: Int) {
+        loadPageJob?.cancel()
+        val currentSurah = _playbackUiState.value.currentSurah
+        if (currentSurah != null && currentSurah.id == surahId) {
+            if (_playbackUiState.value.currentAyahIndex == ayahIndex) {
+                playCurrentAyah()
+            } else {
+                goToAyah(ayahIndex, autoPlay = true, isManual = true)
+            }
+        } else {
+            loadSurah(surahId, targetAyahIndex = ayahIndex, autoPlay = true)
+        }
+        // Close page view sheet so main screen immediately reflects the newly selected page and ayah
+        _dialogUiState.update { it.copy(showPageViewDialog = false) }
+    }
+
     fun announce(text: String, forceSpeak: Boolean = false) {
         viewModelScope.launch {
             _announcementEvent.send(text)
@@ -692,6 +744,7 @@ class QuranViewModel @Inject constructor(
         stopProgressTracking(resetProgress = true)
         isControllerReleased = true
         networkRetryJob?.cancel()
+        loadPageJob?.cancel()
         eventsJob?.cancel()
         eventsJob = null
         audioEngine?.release()

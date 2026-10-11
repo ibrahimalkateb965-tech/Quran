@@ -439,7 +439,10 @@ fun QuranPlayerScreen(
                             viewModel.loadPageAyahs(newPage)
                         },
                         onDismiss = { viewModel.togglePageViewDialog(false) },
-                        onAnnounce = { viewModel.announce(it) }
+                        onAnnounce = { viewModel.announce(it) },
+                        onSelectAyahFromSurahPicker = { surahId, ayahIndex ->
+                            viewModel.navigateToAyahInPageView(surahId, ayahIndex)
+                        }
                     )
                 }
 

@@ -70,4 +70,13 @@ class QuranRepositoryTest {
         val ayahs999 = repository.getPageAyahs(999).first()
         assertTrue(ayahs999.isEmpty())
     }
+
+    @Test
+    fun testGetPageForAyah_defaultFallback() {
+        val pageFatiha = repository.getPageForAyah(1, 0)
+        assertEquals(1, pageFatiha)
+
+        val pageBaqarah = repository.getPageForAyah(2, 0)
+        assertEquals(2, pageBaqarah)
+    }
 }

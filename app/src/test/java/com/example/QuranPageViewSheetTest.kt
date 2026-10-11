@@ -205,4 +205,89 @@ class QuranPageViewSheetTest {
             .performScrollToNode(hasText("الآية 2", substring = true))
         composeTestRule.onNodeWithText("الآية 2", substring = true).assertExists()
     }
+
+    @Test
+    fun testSurahPickerButtonOpensSurahIndex() {
+        var selectedSurahId = -1
+        var selectedAyahIndex = -1
+        var changedPage = -1
+
+        composeTestRule.activity.setContent {
+            QuranPageViewSheet(
+                pageNumber = 1,
+                currentSurahId = 1,
+                currentAyahNumberInSurah = 1,
+                ayahs = sampleAyahs,
+                onSelectAyah = { surahId, ayahIndex ->
+                    selectedSurahId = surahId
+                    selectedAyahIndex = ayahIndex
+                },
+                onChangePage = { page ->
+                    changedPage = page
+                },
+                onDismiss = {},
+                onAnnounce = {}
+            )
+        }
+
+        // Switch to Text View Tab
+        composeTestRule.onNodeWithTag("uthmani_text_tab").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify Surah picker button exists
+        composeTestRule.onNodeWithTag("page_sheet_surah_picker_button").assertExists()
+
+        // Click Surah picker button
+        composeTestRule.onNodeWithTag("page_sheet_surah_picker_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify Surah selection sheet opened (114 surahs)
+        composeTestRule.onNodeWithText("اختيارُ السورة", substring = true).assertExists()
+    }
+
+    @Test
+    fun testSurahPickerSelectAyahRoutesToSurahPickerCallbackAndKeepsSheetOpen() {
+        var pickerSurahId = -1
+        var pickerAyahIndex = -1
+        var sheetDismissed = false
+
+        composeTestRule.activity.setContent {
+            QuranPageViewSheet(
+                pageNumber = 1,
+                currentSurahId = 1,
+                currentAyahNumberInSurah = 1,
+                ayahs = sampleAyahs,
+                onSelectAyah = { _, _ -> },
+                onChangePage = {},
+                onDismiss = { sheetDismissed = true },
+                onAnnounce = {},
+                onSelectAyahFromSurahPicker = { surahId, ayahIndex ->
+                    pickerSurahId = surahId
+                    pickerAyahIndex = ayahIndex
+                }
+            )
+        }
+
+        // Switch to Text View Tab
+        composeTestRule.onNodeWithTag("uthmani_text_tab").performClick()
+        composeTestRule.waitForIdle()
+
+        // Click Surah picker button
+        composeTestRule.onNodeWithTag("page_sheet_surah_picker_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Click on Surah Al-Fatihah using its unique item tag
+        composeTestRule.onNodeWithTag("surah_item_1").performClick()
+        composeTestRule.waitForIdle()
+
+        // Click on Ayah 3
+        composeTestRule.onNodeWithText("الآية 3", substring = true).performClick()
+        composeTestRule.waitForIdle()
+
+        // Assert onSelectAyahFromSurahPicker received surahId 1 and ayahIndex 2 (0-indexed)
+        assert(pickerSurahId == 1) { "Expected pickerSurahId 1 but got $pickerSurahId" }
+        assert(pickerAyahIndex == 2) { "Expected pickerAyahIndex 2 but got $pickerAyahIndex" }
+        // Assert sheet was NOT dismissed
+        assert(!sheetDismissed) { "QuranPageViewSheet should NOT be dismissed" }
+    }
 }

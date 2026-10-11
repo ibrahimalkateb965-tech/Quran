@@ -49,6 +49,12 @@ class JsonQuranRepository(private val source: QuranJsonSource) : QuranRepository
         emit(rows.map { it.toAyah(reciterIdentifier) })
     }.flowOn(Dispatchers.Default)
 
+    override fun getPageForAyah(surahId: Int, ayahIndex: Int): Int {
+        val rows = ayahsBySurah[surahId].orEmpty()
+        return rows.getOrNull(ayahIndex)?.page ?: SurahData.SURAH_LIST.find { it.id == surahId }?.startPage ?: 1
+    }
+
+
     private fun AyahJson.toAyah(audioBaseUrl: String): Ayah = Ayah(
         numberInSurah = numberInSurah,
         globalNumber = globalNumber,

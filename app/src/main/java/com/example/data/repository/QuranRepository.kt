@@ -86,6 +86,17 @@ class QuranRepositoryImpl @Inject constructor(
         emit(ayahsWithAudio)
     }.flowOn(Dispatchers.IO)
 
+    override fun getPageForAyah(surahId: Int, ayahIndex: Int): Int {
+        val jsonObject = getOrLoadQuranJson() ?: return SurahData.SURAH_LIST.find { it.id == surahId }?.startPage ?: 1
+        val ayahsArray = jsonObject.optJSONArray(surahId.toString()) ?: return SurahData.SURAH_LIST.find { it.id == surahId }?.startPage ?: 1
+        if (ayahIndex in 0 until ayahsArray.length()) {
+            val item = ayahsArray.optJSONObject(ayahIndex)
+            val p = item?.optInt("page", 0) ?: 0
+            if (p in 1..604) return p
+        }
+        return SurahData.SURAH_LIST.find { it.id == surahId }?.startPage ?: 1
+    }
+
     private fun getOrLoadQuranJson(): JSONObject? {
         cachedQuranJson?.let { return it }
         return synchronized(this) {
@@ -93,7 +104,9 @@ class QuranRepositoryImpl @Inject constructor(
                 val jsonString = context.assets.open("quran/quran_uthmani_tanzil.json").bufferedReader().use { it.readText() }
                 JSONObject(jsonString).also { cachedQuranJson = it }
             } catch (e: Exception) {
-                android.util.Log.e("QuranRepository", "Error reading Quran assets JSON", e)
+                try {
+                    android.util.Log.e("QuranRepository", "Error reading Quran assets JSON", e)
+                } catch (_: Throwable) {}
                 null
             }
         }
@@ -163,7 +176,9 @@ class QuranRepositoryImpl @Inject constructor(
             }
             list
         } catch (e: Exception) {
-            android.util.Log.e("QuranRepository", "Error parsing Ayahs for Surah $surahId", e)
+            try {
+                android.util.Log.e("QuranRepository", "Error parsing Ayahs for Surah $surahId", e)
+            } catch (_: Throwable) {}
             emptyList()
         }
     }

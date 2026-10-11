@@ -680,6 +680,33 @@ class QuranViewModel @Inject constructor(
         _dialogUiState.update { it.copy(showPageViewDialog = false) }
     }
 
+    fun navigateToAyahInPageView(surahId: Int, ayahIndex: Int) {
+        val targetPage = repository.getPageForAyah(surahId, ayahIndex)
+        val targetSurah = repository.getSurahById(surahId)
+
+        // Keep page view dialog open and point to target page
+        _dialogUiState.update {
+            it.copy(
+                showPageViewDialog = true,
+                pageViewNumber = targetPage
+            )
+        }
+        loadPageAyahs(targetPage)
+
+        val currentSurah = _playbackUiState.value.currentSurah
+        if (currentSurah != null && currentSurah.id == surahId) {
+            if (_playbackUiState.value.currentAyahIndex == ayahIndex) {
+                playCurrentAyah()
+            } else {
+                goToAyah(ayahIndex, autoPlay = true, isManual = true)
+            }
+        } else {
+            loadSurah(surahId, targetAyahIndex = ayahIndex, autoPlay = true)
+        }
+
+        announce("تم الانتقالُ إلى سورةِ ${targetSurah?.nameArabic ?: ""}، الآية ${ayahIndex + 1}، صفحة $targetPage")
+    }
+
     fun announce(text: String, forceSpeak: Boolean = false) {
         viewModelScope.launch {
             _announcementEvent.send(text)

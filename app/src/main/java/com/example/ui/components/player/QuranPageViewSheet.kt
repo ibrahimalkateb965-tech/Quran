@@ -63,12 +63,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.ButtonDefaults
 import com.aistudio.quranblind.domain.model.Ayah
 import com.aistudio.quranblind.domain.model.Surah
 import com.aistudio.quranblind.domain.model.SurahData
 import com.example.ui.components.AccessibleBottomSheet
 import com.example.ui.components.BlindAccessibleButton
 import com.example.ui.components.BlindAccessibleIconButton
+import com.example.ui.components.SurahIndexSheet
 import com.example.ui.theme.UthmanTahaFont
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmAccentTerracottaBright
@@ -91,7 +95,8 @@ fun QuranPageViewSheet(
     onSelectAyah: (surahId: Int, ayahIndex: Int) -> Unit,
     onChangePage: (Int) -> Unit,
     onDismiss: () -> Unit,
-    onAnnounce: (String) -> Unit
+    onAnnounce: (String) -> Unit,
+    onSelectAyahFromSurahPicker: ((surahId: Int, ayahIndex: Int) -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
     val pageAyahs = remember(ayahs, pageNumber) {
@@ -103,6 +108,7 @@ fun QuranPageViewSheet(
     }
     val juzNumber = pageAyahs.firstOrNull()?.juz ?: ayahs.firstOrNull()?.juz ?: 1
     var isImageViewMode by remember { mutableStateOf(false) }
+    var showSurahPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(pageNumber, pageAyahs.isNotEmpty()) {
         if (pageAyahs.isNotEmpty()) {
@@ -328,87 +334,126 @@ fun QuranPageViewSheet(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Search by Ayah Number Input Bar
-                OutlinedTextField(
-                    value = ayahSearchQuery,
-                    onValueChange = { input ->
-                        val normalized = normalizeArabicDigits(input)
-                        ayahSearchQuery = normalized
-                        if (normalized.isNotEmpty()) {
-                            val effectiveQuery = normalized.trimStart('0').ifEmpty { "0" }
-                            val count = pageAyahs.count { it.numberInSurah.toString().contains(effectiveQuery) }
-                            if (count == 0) {
-                                onAnnounce("لا توجد آية برقم $normalized في هذه الصفحة")
-                            }
-                        }
-                    },
-                    placeholder = {
-                        Text(
-                            text = "البحث برقم الآية في الصفحة...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = WarmTextSecondary
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = WarmAccentTerracotta
-                        )
-                    },
-                    trailingIcon = {
-                        if (ayahSearchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    ayahSearchQuery = ""
-                                    onAnnounce("تم مسح البحث، عرض جميع آيات الصفحة")
-                                },
-                                modifier = Modifier.semantics {
-                                    this.contentDescription = "مسح البحث برقم الآية"
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = null,
-                                    tint = WarmTextSecondary
-                                )
-                            }
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Search
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                            val queryNum = ayahSearchQuery.trim()
-                            val effectiveQuery = queryNum.trimStart('0').ifEmpty { "0" }
-                            val count = pageAyahs.count { it.numberInSurah.toString().contains(effectiveQuery) }
-                            if (count == 0) {
-                                onAnnounce("لا توجد آية برقم $queryNum في هذه الصفحة")
-                            } else {
-                                onAnnounce("تم العثور على $count آيات برقم $queryNum في هذه الصفحة")
-                            }
-                        }
-                    ),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = WarmAccentTerracotta,
-                        unfocusedBorderColor = WarmCardBorder,
-                        focusedContainerColor = WarmCardLight,
-                        unfocusedContainerColor = WarmCardLight
-                    ),
+                // Search & Surah Navigation Row
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
-                        .testTag("ayah_search_text_field")
-                        .semantics {
-                            this.contentDescription = "حقل البحث برقم الآية في صفحة $pageNumber"
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Search by Ayah Number Input Bar
+                    OutlinedTextField(
+                        value = ayahSearchQuery,
+                        onValueChange = { input ->
+                            val normalized = normalizeArabicDigits(input)
+                            ayahSearchQuery = normalized
+                            if (normalized.isNotEmpty()) {
+                                val effectiveQuery = normalized.trimStart('0').ifEmpty { "0" }
+                                val count = pageAyahs.count { it.numberInSurah.toString().contains(effectiveQuery) }
+                                if (count == 0) {
+                                    onAnnounce("لا توجد آية برقم $normalized في هذه الصفحة")
+                                }
+                            }
+                        },
+                        placeholder = {
+                            Text(
+                                text = "البحث برقم الآية...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = WarmTextSecondary
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = WarmAccentTerracotta
+                            )
+                        },
+                        trailingIcon = {
+                            if (ayahSearchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = {
+                                        ayahSearchQuery = ""
+                                        onAnnounce("تم مسح البحث، عرض جميع آيات الصفحة")
+                                    },
+                                    modifier = Modifier.semantics {
+                                        this.contentDescription = "مسح البحث برقم الآية"
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = null,
+                                        tint = WarmTextSecondary
+                                    )
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Search
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                val queryNum = ayahSearchQuery.trim()
+                                val effectiveQuery = queryNum.trimStart('0').ifEmpty { "0" }
+                                val count = pageAyahs.count { it.numberInSurah.toString().contains(effectiveQuery) }
+                                if (count == 0) {
+                                    onAnnounce("لا توجد آية برقم $queryNum في هذه الصفحة")
+                                } else {
+                                    onAnnounce("تم العثور على $count آيات برقم $queryNum في هذه الصفحة")
+                                }
+                            }
+                        ),
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = WarmAccentTerracotta,
+                            unfocusedBorderColor = WarmCardBorder,
+                            focusedContainerColor = WarmCardLight,
+                            unfocusedContainerColor = WarmCardLight
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("ayah_search_text_field")
+                            .semantics {
+                                this.contentDescription = "حقل البحث برقم الآية في صفحة $pageNumber"
+                            }
+                    )
+
+                    // Surah Picker Button
+                    BlindAccessibleButton(
+                        onClick = { showSurahPicker = true },
+                        onClickLabel = "اختيارُ السورةِ والانتقالُ لصفحاتِها",
+                        modifier = Modifier
+                            .heightIn(min = 52.dp)
+                            .widthIn(min = 60.dp)
+                            .border(1.dp, WarmCardBorder, RoundedCornerShape(16.dp))
+                            .testTag("page_sheet_surah_picker_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = WarmCardLight,
+                            contentColor = WarmAccentTerracotta
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "السور",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                ),
+                                color = WarmAccentTerracotta
+                            )
                         }
-                )
+                    }
+                }
 
                 val displayedAyahs = remember(pageAyahs, ayahSearchQuery) {
                     if (ayahSearchQuery.isBlank()) {
@@ -535,6 +580,28 @@ fun QuranPageViewSheet(
                 }
             }
         }
+    }
+
+    if (showSurahPicker) {
+        SurahIndexSheet(
+            surahs = SurahData.SURAH_LIST,
+            currentSurahId = currentSurahId,
+            currentAyahIndex = 0,
+            onSelectSurah = { selectedSurahId, selectedAyahIndex ->
+                showSurahPicker = false
+                if (onSelectAyahFromSurahPicker != null) {
+                    onSelectAyahFromSurahPicker(selectedSurahId, selectedAyahIndex)
+                } else {
+                    val targetSurah = SurahData.SURAH_LIST.find { it.id == selectedSurahId }
+                    val targetPage = targetSurah?.startPage ?: 1
+                    onChangePage(targetPage)
+                    onSelectAyah(selectedSurahId, selectedAyahIndex)
+                    onAnnounce("تم الانتقالُ إلى سورةِ ${targetSurah?.nameArabic ?: ""}، صفحة $targetPage")
+                }
+            },
+            onDismiss = { showSurahPicker = false },
+            onAnnounce = onAnnounce
+        )
     }
 }
 

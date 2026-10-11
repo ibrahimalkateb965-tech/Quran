@@ -10,4 +10,6 @@ interface QuranRepository {
     fun findSurahByName(query: String): Surah?
     fun getAyahs(surahId: Int, reciterIdentifier: String): Flow<List<Ayah>>
     fun getPageAyahs(pageNumber: Int, reciterIdentifier: String = ""): Flow<List<Ayah>> = kotlinx.coroutines.flow.emptyFlow()
+    fun getPageForAyah(surahId: Int, ayahIndex: Int): Int = getSurahById(surahId)?.startPage ?: 1
 }
+

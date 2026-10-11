@@ -290,4 +290,85 @@ class QuranPageViewSheetTest {
         // Assert sheet was NOT dismissed
         assert(!sheetDismissed) { "QuranPageViewSheet should NOT be dismissed" }
     }
+
+    @Test
+    fun testPageJumpDialogOpensAndNavigatesToTargetPage() {
+        var changedPage = -1
+
+        composeTestRule.activity.setContent {
+            QuranPageViewSheet(
+                pageNumber = 1,
+                currentSurahId = 1,
+                currentAyahNumberInSurah = 1,
+                ayahs = sampleAyahs,
+                onSelectAyah = { _, _ -> },
+                onChangePage = { page -> changedPage = page },
+                onDismiss = {},
+                onAnnounce = {}
+            )
+        }
+
+        // Verify page jump trigger button exists in header
+        composeTestRule.onNodeWithTag("page_jump_trigger_button").assertExists()
+
+        // Click trigger button
+        composeTestRule.onNodeWithTag("page_jump_trigger_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify dialog opened
+        composeTestRule.onNodeWithTag("page_jump_dialog").assertExists()
+        composeTestRule.onNodeWithTag("page_jump_input_field").assertExists()
+
+        // Enter target page number 150
+        composeTestRule.onNodeWithTag("page_jump_input_field").performTextInput("150")
+        composeTestRule.waitForIdle()
+
+        // Click confirm button
+        composeTestRule.onNodeWithTag("page_jump_confirm_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify onChangePage was invoked with 150 and dialog closed
+        assert(changedPage == 150) { "Expected page 150 but got $changedPage" }
+        composeTestRule.onNodeWithTag("page_jump_dialog").assertDoesNotExist()
+    }
+
+    @Test
+    fun testPageJumpDialogValidationForOutOfRangeInput() {
+        var changedPage = -1
+
+        composeTestRule.activity.setContent {
+            QuranPageViewSheet(
+                pageNumber = 1,
+                currentSurahId = 1,
+                currentAyahNumberInSurah = 1,
+                ayahs = sampleAyahs,
+                onSelectAyah = { _, _ -> },
+                onChangePage = { page -> changedPage = page },
+                onDismiss = {},
+                onAnnounce = {}
+            )
+        }
+
+        // Click trigger button
+        composeTestRule.onNodeWithTag("page_jump_trigger_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Enter invalid page 700 (outside 1..604)
+        composeTestRule.onNodeWithTag("page_jump_input_field").performTextInput("700")
+        composeTestRule.waitForIdle()
+
+        // Click confirm button
+        composeTestRule.onNodeWithTag("page_jump_confirm_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Error message must be shown and page must NOT change
+        composeTestRule.onNodeWithTag("page_jump_error_text").assertExists()
+        assert(changedPage == -1) { "Page should not change on invalid input" }
+
+        // Click cancel button to dismiss
+        composeTestRule.onNodeWithTag("page_jump_cancel_button").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("page_jump_dialog").assertDoesNotExist()
+    }
 }

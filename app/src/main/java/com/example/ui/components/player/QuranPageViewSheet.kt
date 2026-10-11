@@ -109,6 +109,7 @@ fun QuranPageViewSheet(
     val juzNumber = pageAyahs.firstOrNull()?.juz ?: ayahs.firstOrNull()?.juz ?: 1
     var isImageViewMode by remember { mutableStateOf(false) }
     var showSurahPicker by remember { mutableStateOf(false) }
+    var showPageJumpDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(pageNumber, pageAyahs.isNotEmpty()) {
         if (pageAyahs.isNotEmpty()) {
@@ -171,25 +172,55 @@ fun QuranPageViewSheet(
                         )
                     }
 
-                    // Page and Juz Badge
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    // Page and Juz Badge / Direct Jump Button
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(WarmCardLight.copy(alpha = 0.7f))
+                            .border(1.dp, WarmCardBorder, RoundedCornerShape(16.dp))
+                            .clickable {
+                                showPageJumpDialog = true
+                                onAnnounce("فتح نافذة البحث برقم الصفحة")
+                            }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .testTag("page_jump_trigger_button")
+                            .semantics(mergeDescendants = true) {
+                                this.contentDescription = "صفحة $pageNumber، الجزء $juzNumber. انقر مرتين للبحث برقم الصفحة والانتقالِ إليها."
+                            }
                     ) {
-                        Text(
-                            text = "صفحة $pageNumber",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            ),
-                            color = WarmAccentTerracotta
-                        )
-                        Text(
-                            text = "الجزء $juzNumber",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = WarmTextSecondary
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "صفحة $pageNumber",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    ),
+                                    color = WarmAccentTerracotta
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = WarmAccentTerracotta,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = "الجزء $juzNumber",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 11.sp
+                                ),
+                                color = WarmTextSecondary
+                            )
+                        }
                     }
 
                     // Next page button (صفحة تالية)
@@ -600,6 +631,19 @@ fun QuranPageViewSheet(
                 }
             },
             onDismiss = { showSurahPicker = false },
+            onAnnounce = onAnnounce
+        )
+    }
+
+    if (showPageJumpDialog) {
+        PageJumpDialog(
+            currentPage = pageNumber,
+            onConfirm = { targetPage ->
+                showPageJumpDialog = false
+                onChangePage(targetPage)
+                onAnnounce("تم الانتقالُ إلى صفحة $targetPage")
+            },
+            onDismiss = { showPageJumpDialog = false },
             onAnnounce = onAnnounce
         )
     }

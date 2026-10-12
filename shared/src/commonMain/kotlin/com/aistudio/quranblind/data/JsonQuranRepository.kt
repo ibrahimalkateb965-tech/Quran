@@ -28,8 +28,18 @@ class JsonQuranRepository(private val source: QuranJsonSource) : QuranRepository
 
     // Parsed once, on first use, then shared. `lazy` is synchronized by default.
     private val ayahsBySurah: Map<Int, List<AyahJson>> by lazy {
-        json.decodeFromString<Map<String, List<AyahJson>>>(source.readQuranJson())
-            .mapKeys { (key, _) -> key.toInt() }
+        try {
+            val raw = source.readQuranJson().trim()
+            if (raw.isEmpty()) emptyMap()
+            else json.decodeFromString<Map<String, List<AyahJson>>>(raw)
+                .mapKeys { (key, _) -> key.toInt() }
+        } catch (_: Throwable) {
+            emptyMap()
+        }
+    }
+
+    private val ayahsByPage: Map<Int, List<AyahJson>> by lazy {
+        ayahsBySurah.values.flatten().groupBy { it.page }
     }
 
     override fun getAllSurahs(): List<Surah> = SurahData.SURAH_LIST
@@ -37,15 +47,35 @@ class JsonQuranRepository(private val source: QuranJsonSource) : QuranRepository
     override fun getSurahById(id: Int): Surah? = SurahData.SURAH_LIST.find { it.id == id }
 
     override fun findSurahByName(query: String): Surah? {
-        val q = query.trim()
+        val q = normalizeArabicText(query)
         if (q.isEmpty()) return null
-        return SurahData.SURAH_LIST.find {
-            it.nameArabic.contains(q) || it.nameEnglish.contains(q, ignoreCase = true)
+        return SurahData.SURAH_LIST.find { surah ->
+            val cleanSurahName = normalizeArabicText(surah.nameArabic)
+            cleanSurahName.contains(q) || q.contains(cleanSurahName) ||
+                surah.nameEnglish.contains(query.trim(), ignoreCase = true)
         }
+    }
+
+    private fun normalizeArabicText(text: String): String {
+        return text.replace(Regex("[\\u064B-\\u0652\\u0640]"), "")
+            .replace("أ", "ا")
+            .replace("إ", "ا")
+            .replace("آ", "ا")
+            .replace("ة", "ه")
+            .trim()
     }
 
     override fun getAyahs(surahId: Int, reciterIdentifier: String): Flow<List<Ayah>> = flow {
         val rows = ayahsBySurah[surahId].orEmpty()
+        emit(rows.map { it.toAyah(reciterIdentifier) })
+    }.flowOn(Dispatchers.Default)
+
+    override fun getPageAyahs(pageNumber: Int, reciterIdentifier: String): Flow<List<Ayah>> = flow {
+        if (pageNumber !in 1..604) {
+            emit(emptyList())
+            return@flow
+        }
+        val rows = ayahsByPage[pageNumber].orEmpty()
         emit(rows.map { it.toAyah(reciterIdentifier) })
     }.flowOn(Dispatchers.Default)
 

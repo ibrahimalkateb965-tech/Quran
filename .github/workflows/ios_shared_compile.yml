@@ -193,3 +193,35 @@ jobs:
           path: ${{ runner.temp }}/xcodebuild.log
           if-no-files-found: ignore
           retention-days: 7
+
+      # -- 5. Build unsigned .ipa for physical devices (Sideloadly / AltStore) ----
+      - name: Build and package unsigned .ipa for physical device
+        working-directory: iosApp
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project QuranBlind.xcodeproj \
+            -scheme QuranBlind \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedDataDevice" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild-device.log" | grep -E "error:|warning:|BUILD |Ld |embedAndSign|SharedKit" || true
+          grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/xcodebuild-device.log"
+
+          DEVICE_APP="$(find "$RUNNER_TEMP/DerivedDataDevice/Build/Products" -maxdepth 2 -name 'QuranBlind.app' -type d | head -n 1)"
+          test -n "$DEVICE_APP" || { echo "::error::QuranBlind.app for device not found"; exit 1; }
+
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$DEVICE_APP" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qr "$RUNNER_TEMP/QuranBlind.ipa" Payload
+          ls -la "$RUNNER_TEMP/QuranBlind.ipa"
+
+      - name: Upload QuranBlind.ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuranBlind-Sideload-ipa
+          path: ${{ runner.temp }}/QuranBlind.ipa
+          retention-days: 14

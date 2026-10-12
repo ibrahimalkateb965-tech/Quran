@@ -1,6 +1,6 @@
 # CURRENT_STATE.md — Blind App (تطبيق القرآن للمكفوفين)
 
-> **Active Branch**: `feat/ios-kmp-phase0` | **HEAD Commit**: `39bb70f`  
+> **Active Branch**: `feat/ios-kmp-phase0` | **HEAD Commit**: `6e94a46`  
 > **Master Orchestrator**: `Claude Code CLI` (Opus Max)  
 > **Interactive Cockpit**: `Antigravity IDE` (Gemini 3.8 Flash High)  
 > **Headless Fleet Mode**: Zero-GPU Headless CLIs (`Claude Code CLI` + `OpenCode CLI`)  

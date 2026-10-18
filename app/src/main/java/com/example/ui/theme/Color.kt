@@ -3,7 +3,7 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Warm Earth Palette (النمط الدافئ البيج الترابي)
-val WarmEarthBg = Color(0xFFB38A5F)           // الخلفية الأساسية لجميع الشاشات
+val WarmEarthBg = Color(0xFFF8F9FA)           // الخلفية الأساسية المحايدة الفاتحة لجميع الشاشات
 val WarmCardLight = Color(0xFFC59E75)         // البطاقات العادية غير المحددة
 val WarmCardActive = Color(0xFFA27448)        // البطاقة المختارة / النشطة (لون ترابي دافئ من نفس فصيلة الخلفية)
 val WarmCardBorder = Color(0xFF8A653F)        // إطار البطاقات وكارت الآية

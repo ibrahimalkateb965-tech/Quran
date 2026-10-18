@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
@@ -179,11 +180,13 @@ fun QuranPlayerScreen(
                     .fillMaxSize()
                     .testTag("quran_player_root")
             ) {
-                // Main Accessible Content
+                // Main Accessible Content — inset below status bar / above 3-button nav;
+                // the Surface behind stays edge-to-edge.
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .safeDrawingPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Header Bar with Status Badges and Quick Controls

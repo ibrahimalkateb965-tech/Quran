@@ -5,10 +5,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
@@ -54,7 +56,21 @@ class MainActivity : ComponentActivity() {
         checkAndRequestPermissions()
 
         setContent {
-            QuranBlindTheme {
+            val darkTheme = isSystemInDarkTheme()
+
+            // Bind system-bar icon tint to the app theme (not raw uiMode), re-applied when the theme flips.
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(
+                        android.graphics.Color.TRANSPARENT,
+                        android.graphics.Color.TRANSPARENT
+                    ) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(LightNavScrim, DarkNavScrim) { darkTheme }
+                )
+                onDispose {}
+            }
+
+            QuranBlindTheme(darkTheme = darkTheme) {
                 val isTalkBackEnabled by viewModel.speechManager.isTalkBackEnabledFlow.collectAsState()
 
                 val lifecycleOwner = LocalLifecycleOwner.current
@@ -106,3 +122,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+// Translucent scrim behind 3-button navigation (gesture nav stays fully transparent).
+private val LightNavScrim = android.graphics.Color.argb(0xE6, 0xF8, 0xF9, 0xFA)
+private val DarkNavScrim = android.graphics.Color.argb(0x80, 0x00, 0x00, 0x00)

@@ -26,3 +26,5 @@ WhatsApp Image*
 *.jks
 *.keystore
 key.properties
+client_delivery_apk/
+app_preview*.png

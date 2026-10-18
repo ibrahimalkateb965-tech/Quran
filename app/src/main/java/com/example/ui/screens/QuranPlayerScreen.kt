@@ -359,17 +359,20 @@ fun QuranPlayerScreen(
                     }
 
                     // Bottom action hint for both sighted and blind users
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 8.dp)
+                            .padding(bottom = 10.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "انقر للتكرار",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
                             color = WarmTextSecondary,
                             modifier = Modifier.clickable { viewModel.replayCurrentAyah() }
                         )

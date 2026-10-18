@@ -27,11 +27,11 @@ data class QuranColors(
     val isDark: Boolean
 )
 
-// Light — neutral #F8F9FA (القيم الحالية دون تغيير)
+// Light — neutral #F8F9FA
 val LightQuranColors = QuranColors(
     background = Color(0xFFF8F9FA),
     cardSurface = Color(0xFFF8F9FA),
-    cardFill = Color(0xFFC59E75),
+    cardFill = Color(0xFFF8F9FA),
     cardActive = Color(0xFFA27448),
     cardBorder = Color(0xFF8A653F),
     cardActiveBorder = Color(0xFF6B4A2D),
@@ -52,7 +52,7 @@ val LightQuranColors = QuranColors(
 val DarkQuranColors = QuranColors(
     background = Color(0xFF000000),
     cardSurface = Color(0xFF000000),
-    cardFill = Color(0xFF1F1914),
+    cardFill = Color(0xFF000000),
     cardActive = Color(0xFF4A2E1B),
     cardBorder = Color(0xFF6E5A48),
     cardActiveBorder = Color(0xFFD9A877),

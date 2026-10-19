@@ -27,24 +27,24 @@ data class QuranColors(
     val isDark: Boolean
 )
 
-// Light — neutral #F8F9FA
+// Light — neutral #F8F9FA؛ وضع أحادي عالي التباين (كتابة سوداء ناصعة حصراً دون أي ألوان بنية)
 val LightQuranColors = QuranColors(
     background = Color(0xFFF8F9FA),
     cardSurface = Color(0xFFF8F9FA),
     cardFill = Color(0xFFF8F9FA),
-    cardActive = Color(0xFFA27448),
-    cardBorder = Color(0xFF8A653F),
-    cardActiveBorder = Color(0xFF6B4A2D),
-    textPrimary = Color(0xFF1A120B),
-    textSecondary = Color(0xFF4E3929),
-    textOnFill = Color(0xFFF5EBE1),
-    textAyah = Color(0xFF120C07),
-    accent = Color(0xFF7C261E),
-    accentBright = Color(0xFFC85A48),
-    accentContainer = Color(0xFF7C261E),
-    highlight = Color(0xFFE5A93C),
-    success = Color(0xFF22C55E),
-    error = Color(0xFFEF4444),
+    cardActive = Color(0xFFE5E5E5),
+    cardBorder = Color(0xFF333333),
+    cardActiveBorder = Color(0xFF000000),
+    textPrimary = Color(0xFF000000),
+    textSecondary = Color(0xFF000000),
+    textOnFill = Color(0xFFFFFFFF),
+    textAyah = Color(0xFF000000),
+    accent = Color(0xFF000000),
+    accentBright = Color(0xFF000000),
+    accentContainer = Color(0xFF000000),
+    highlight = Color(0xFF000000),
+    success = Color(0xFF16A34A),
+    error = Color(0xFFDC2626),
     isDark = false
 )
 

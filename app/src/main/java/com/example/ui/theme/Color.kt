@@ -48,24 +48,24 @@ val LightQuranColors = QuranColors(
     isDark = false
 )
 
-// Dark — OLED true black؛ كل زوج نص/خلفية ≥ 4.5:1 والإطارات ≥ 3:1 على الأسود
+// Dark — OLED true black؛ وضع أحادي عالي التباين (أبيض وأسود حصراً دون أي ألوان أخرى)
 val DarkQuranColors = QuranColors(
     background = Color(0xFF000000),
     cardSurface = Color(0xFF000000),
     cardFill = Color(0xFF000000),
-    cardActive = Color(0xFF4A2E1B),
-    cardBorder = Color(0xFF6E5A48),
-    cardActiveBorder = Color(0xFFD9A877),
-    textPrimary = Color(0xFFF2EDE8),
-    textSecondary = Color(0xFFBFB3A6),
-    textOnFill = Color(0xFFF5EBE1),
-    textAyah = Color(0xFFEDE6DC),
-    accent = Color(0xFFE8836F),
-    accentBright = Color(0xFFF4A592),
-    accentContainer = Color(0xFF8E3426),
-    highlight = Color(0xFFF2C063),
-    success = Color(0xFF4ADE80),
-    error = Color(0xFFF87171),
+    cardActive = Color(0xFF222222),
+    cardBorder = Color(0xFF555555),
+    cardActiveBorder = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFFFFFFFF),
+    textSecondary = Color(0xFFFFFFFF),
+    textOnFill = Color(0xFFFFFFFF),
+    textAyah = Color(0xFFFFFFFF),
+    accent = Color(0xFFFFFFFF),
+    accentBright = Color(0xFFFFFFFF),
+    accentContainer = Color(0xFF2A2A2A),
+    highlight = Color(0xFFFFFFFF),
+    success = Color(0xFFFFFFFF),
+    error = Color(0xFFFFFFFF),
     isDark = true
 )
 

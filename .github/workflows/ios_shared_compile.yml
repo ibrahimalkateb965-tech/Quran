@@ -1,0 +1,195 @@
+# =============================================================================
+#  Blind Quran App — iOS: compile the :shared Kotlin/Native framework + iosApp
+# =============================================================================
+#  Why this file exists
+#  --------------------
+#  Kotlin/Native cannot compile iOS targets on the maintainer's Windows host.
+#  This workflow is the ONLY place the iOS side of the KMP programme is ever
+#  compiled. It proves three things, in order, and nothing else:
+#    1. `:shared` links as SharedKit.framework for the iOS simulator — i.e. all
+#       of iosMain (Keychain SecureStore, Darwin Ktor engine, Koin init, the
+#       AudioEngine placeholder) actually compiles.
+#    2. XcodeGen regenerates the Xcode project from iosApp/project.yml.
+#    3. The SwiftUI shell builds for the simulator, unsigned, with the framework
+#       embedded by the project.yml pre-build script.
+#  No signing, no .ipa, no upload, no secrets. Signing / TestFlight is the
+#  Phase 5 workflow (ios_build.yml keeps that plumbing; it is not wired to KMP).
+#
+#  Cost: macos-15 bills at 10x on private repos. The paths filter keeps it from
+#  running on Android-only or docs-only pushes.
+# =============================================================================
+
+name: iOS Shared Framework Compile
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/ios-**'
+      - 'chore/ios-**'
+    paths:
+      - 'shared/**'
+      - 'iosApp/**'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/ios_shared_compile.yml'
+  workflow_dispatch:
+
+# One run per branch; a newer push cancels the older one.
+concurrency:
+  group: ios-shared-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Link SharedKit + build iosApp (macOS)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # The wrapper script is tracked from a Windows host; make sure it is executable.
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # The runner has ~7 GB RAM. The repo's gradle.properties sizes the daemons for
+      # a 16 GB desktop; ~/.gradle/gradle.properties takes precedence and shrinks them.
+      - name: Size JVM heaps for the runner
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8
+          kotlin.daemon.jvmargs=-Xmx1g
+          kotlin.native.jvmArgs=-Xmx3g
+          org.gradle.workers.max=2
+          EOF
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      # -- 0. Privacy + transport-security audits (no build needed) ------------
+      # The app collects nothing (CLAUDE.md section 4.3): the manifest must say so, and every
+      # network literal must be HTTPS so that no ATS exception is ever needed.
+      - name: Lint the privacy manifest
+        run: |
+          set -euo pipefail
+          M=iosApp/Resources/PrivacyInfo.xcprivacy
+          plutil -lint "$M"
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :NSPrivacyTracking' "$M")" = "false" ] \
+            || { echo "::error::NSPrivacyTracking must be false"; exit 1; }
+          # PlistBuddy fails on index 0 of an empty array — exactly the "must be empty" check we want.
+          if /usr/libexec/PlistBuddy -c 'Print :NSPrivacyCollectedDataTypes:0' "$M" >/dev/null 2>&1; then
+            echo "::error::NSPrivacyCollectedDataTypes must be empty: the app collects no data"; exit 1
+          fi
+          if /usr/libexec/PlistBuddy -c 'Print :NSPrivacyTrackingDomains:0' "$M" >/dev/null 2>&1; then
+            echo "::error::NSPrivacyTrackingDomains must be empty"; exit 1
+          fi
+          echo "Privacy manifest OK: no tracking, no collected data."
+
+      - name: Audit App Transport Security
+        run: |
+          set -euo pipefail
+          # A plain-http literal would need an NSAppTransportSecurity exception; none is allowed.
+          if grep -rnE 'http://' shared/src/commonMain shared/src/iosMain iosApp/Sources --include='*.kt' --include='*.swift'; then
+            echo "::error::plain http:// literal found: every endpoint must be HTTPS"; exit 1
+          fi
+          if grep -nE 'NSAllowsArbitraryLoads|NSExceptionDomains' iosApp/project.yml; then
+            echo "::error::ATS exceptions are not allowed in project.yml"; exit 1
+          fi
+          echo "ATS audit clean: no http:// literals, no ATS exceptions."
+
+      # -- 1. Kotlin/Native framework -----------------------------------------
+      - name: Link SharedKit.framework (iosSimulatorArm64)
+        run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64 --no-daemon --stacktrace
+
+      - name: Verify the framework binary and its ObjC header
+        run: |
+          set -euo pipefail
+          FW=shared/build/bin/iosSimulatorArm64/debugFramework/SharedKit.framework
+          test -d "$FW" || { echo "::error::$FW was not produced"; exit 1; }
+          file "$FW/SharedKit"
+          ls -la "$FW/Headers"
+          # The exported header must mention the iosMain entry points; grep -c exits 1 on zero matches.
+          # Kotlin/Native prefixes `do` to exported functions named init* (ObjC init-family rule).
+          grep -c "doInitKoinIos" "$FW/Headers/SharedKit.h"
+          grep -c "AudioEngine" "$FW/Headers/SharedKit.h"
+          grep -c "SecureStore" "$FW/Headers/SharedKit.h"
+
+      # Apple's "required reason" APIs (file timestamps, boot time, disk space, keyboards, user
+      # defaults). A hit means PrivacyInfo.xcprivacy needs an NSPrivacyAccessedAPITypes entry.
+      # Informational on purpose: the Commander decides, the build does not fail here.
+      - name: Audit required-reason API symbols in SharedKit (informational)
+        run: |
+          set -euo pipefail
+          FW=shared/build/bin/iosSimulatorArm64/debugFramework/SharedKit.framework/SharedKit
+          HITS="$(nm -u "$FW" 2>/dev/null | grep -E '_(f?stat|lstat|fstatat|f?statfs|f?getattrlist(bulk)?)(\$[A-Z0-9_]+)?$|NSUserDefaults|systemUptime|mach_absolute_time|volumeAvailableCapacity|activeInputModes|NSFileCreationDate|NSFileModificationDate' | sort -u || true)"
+          if [ -n "$HITS" ]; then
+            echo "::warning::SharedKit references required-reason API symbols (see job log)"
+            echo "$HITS"
+          else
+            echo "No required-reason API symbols referenced by SharedKit."
+          fi
+
+      # -- 2. Xcode project from project.yml ----------------------------------
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: iosApp
+        run: xcodegen generate
+
+      # -- 3. SwiftUI shell, unsigned, simulator ------------------------------
+      # The project.yml pre-build script runs `./gradlew :shared:embedAndSignAppleFrameworkForXcode`
+      # inside this xcodebuild; with signing disabled the task copies the framework without signing it.
+      - name: Build iosApp for the simulator (unsigned)
+        working-directory: iosApp
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project QuranBlind.xcodeproj \
+            -scheme QuranBlind \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning:|BUILD |Ld |embedAndSign|SharedKit" || true
+          grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/xcodebuild.log"
+
+      # -- 4. The manifest must be INSIDE the product, not just in the repo -----
+      - name: Verify the privacy manifest landed in the app bundle
+        run: |
+          set -euo pipefail
+          APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 2 -name 'QuranBlind.app' -type d | head -n 1)"
+          test -n "$APP" || { echo "::error::QuranBlind.app not found under DerivedData"; exit 1; }
+          test -f "$APP/PrivacyInfo.xcprivacy" \
+            || { echo "::error::PrivacyInfo.xcprivacy is missing from the built .app (check project.yml resources)"; exit 1; }
+          plutil -lint "$APP/PrivacyInfo.xcprivacy"
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP/Info.plist")" = "false" ] \
+            || { echo "::error::ITSAppUsesNonExemptEncryption must be false in the built Info.plist"; exit 1; }
+          echo "CFBundleShortVersionString=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")"
+          echo "CFBundleVersion=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")"
+
+      - name: Upload xcodebuild log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-compile-log-${{ github.run_number }}
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7

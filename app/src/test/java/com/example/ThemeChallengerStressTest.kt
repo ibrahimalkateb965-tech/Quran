@@ -1,6 +1,5 @@
 package com.example
 
-import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -29,8 +28,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.test.core.app.ApplicationProvider
-import com.example.data.local.SessionPreferences
+import com.aistudio.quranblind.store.SessionStore
 import com.example.ui.components.BlindAccessibleIconButton
 import com.example.ui.theme.QuranBlindTheme
 import com.example.ui.theme.QuranTheme
@@ -70,8 +68,8 @@ class ThemeChallengerStressTest {
 
     @Test
     fun stressTest_corruptOrUnexpectedThemeStrings_gracefullyFallbackToSystem() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val sessionPrefs = SessionPreferences(context)
+        val backing = FakeSecureStore()
+        val sessionStore = SessionStore(backing)
 
         val adversarialInputs = listOf(
             null,
@@ -93,15 +91,15 @@ class ThemeChallengerStressTest {
 
         for (input in adversarialInputs) {
             if (input != null) {
-                sessionPrefs.saveThemeMode(input)
-                assertEquals("Persisted raw value must match input", input, sessionPrefs.getThemeMode())
+                sessionStore.saveThemeMode(input)
+                assertEquals("Persisted raw value must match input", input, sessionStore.loadThemeMode())
             } else {
-                sessionPrefs.clearSession()
-                assertNull("Cleared session must yield null theme mode", sessionPrefs.getThemeMode())
+                sessionStore.clear()
+                assertNull("Cleared session must yield null theme mode", sessionStore.loadThemeMode())
             }
 
             // Simulate ViewModel init resolution logic:
-            val savedTheme = sessionPrefs.getThemeMode()
+            val savedTheme = sessionStore.loadThemeMode()
             val resolvedMode = if (savedTheme != null) {
                 when (savedTheme) {
                     "LIGHT" -> AppThemeMode.LIGHT
@@ -138,13 +136,13 @@ class ThemeChallengerStressTest {
 
     @Test
     fun stressTest_rapidSequentialToggling_keepsStateAndPrefsInLockstep() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val sessionPrefs = SessionPreferences(context)
+        val backing = FakeSecureStore()
+        val sessionStore = SessionStore(backing)
         val settingsUiState = MutableStateFlow(SettingsUiState())
 
         fun simulateToggle(isCurrentlyDark: Boolean) {
             val newMode = if (isCurrentlyDark) AppThemeMode.LIGHT else AppThemeMode.DARK
-            sessionPrefs.saveThemeMode(newMode.name)
+            sessionStore.saveThemeMode(newMode.name)
             settingsUiState.update { it.copy(themeMode = newMode) }
         }
 
@@ -154,15 +152,15 @@ class ThemeChallengerStressTest {
             simulateToggle(isCurrentlyDark = isDark)
             val expectedMode = if (isDark) AppThemeMode.LIGHT else AppThemeMode.DARK
             assertEquals("Iteration $i: settingsUiState mismatch", expectedMode, settingsUiState.value.themeMode)
-            assertEquals("Iteration $i: sessionPrefs mismatch", expectedMode.name, sessionPrefs.getThemeMode())
+            assertEquals("Iteration $i: sessionStore mismatch", expectedMode.name, sessionStore.loadThemeMode())
             isDark = (expectedMode == AppThemeMode.DARK)
         }
     }
 
     @Test
     fun stressTest_concurrentToggling_noCrashAndConsistentState() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val sessionPrefs = SessionPreferences(context)
+        val backing = FakeSecureStore()
+        val sessionStore = SessionStore(backing)
         val settingsUiState = MutableStateFlow(SettingsUiState())
 
         val concurrencyLevel = 50
@@ -170,7 +168,7 @@ class ThemeChallengerStressTest {
             async(Dispatchers.Default) {
                 val isDark = (index % 2 == 0)
                 val newMode = if (isDark) AppThemeMode.LIGHT else AppThemeMode.DARK
-                sessionPrefs.saveThemeMode(newMode.name)
+                sessionStore.saveThemeMode(newMode.name)
                 settingsUiState.update { it.copy(themeMode = newMode) }
             }
         }
@@ -178,17 +176,12 @@ class ThemeChallengerStressTest {
         jobs.awaitAll()
 
         // After all concurrent operations finish, preferences and state must be valid enum modes
-        val finalPref = sessionPrefs.getThemeMode()
+        val finalPref = sessionStore.loadThemeMode()
         val finalState = settingsUiState.value.themeMode
 
         assertNotNull("Final preference must not be null", finalPref)
         assertTrue("Final preference must be LIGHT or DARK", finalPref == "LIGHT" || finalPref == "DARK")
         assertTrue("Final state must be LIGHT or DARK", finalState == AppThemeMode.LIGHT || finalState == AppThemeMode.DARK)
-        
-        // Note for Reviewer/Architect:
-        // When toggleTheme is invoked concurrently across disparate threads, SharedPreferences (async apply)
-        // and StateFlow.update are not synchronized under a mutual exclusion lock (Mutex).
-        // On Android, UI clicks are serialized on the Main thread, where lockstep is guaranteed (verified in sequential test).
     }
 
     // =========================================================================
@@ -197,17 +190,15 @@ class ThemeChallengerStressTest {
 
     @Test
     fun stressTest_persistenceAcrossSimulatedRestarts_withCustomPrefs() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val sharedPrefs = context.getSharedPreferences("test_restart_prefs", Context.MODE_PRIVATE)
-        sharedPrefs.edit().clear().commit()
+        val backing = FakeSecureStore()
 
         // 1. First "Run": User sets theme to DARK
-        val prefsRun1 = SessionPreferences(context, customPrefs = sharedPrefs)
-        prefsRun1.saveThemeMode("DARK")
+        val storeRun1 = SessionStore(backing)
+        storeRun1.saveThemeMode("DARK")
 
-        // 2. Simulate Cold App Restart (New SessionPreferences instance with same backing prefs)
-        val prefsRun2 = SessionPreferences(context, customPrefs = sharedPrefs)
-        val restoredString = prefsRun2.getThemeMode()
+        // 2. Simulate Cold App Restart (New SessionStore instance with same backing prefs)
+        val storeRun2 = SessionStore(backing)
+        val restoredString = storeRun2.loadThemeMode()
         assertEquals("Restored string after restart must be DARK", "DARK", restoredString)
 
         val restoredMode = when (restoredString) {
@@ -226,11 +217,11 @@ class ThemeChallengerStressTest {
         assertTrue("DARK preference must override light system default", darkThemeApplied1)
 
         // 3. User switches to LIGHT in run 2
-        prefsRun2.saveThemeMode("LIGHT")
+        storeRun2.saveThemeMode("LIGHT")
 
         // 4. Simulate Second Cold Restart
-        val prefsRun3 = SessionPreferences(context, customPrefs = sharedPrefs)
-        val restoredString3 = prefsRun3.getThemeMode()
+        val storeRun3 = SessionStore(backing)
+        val restoredString3 = storeRun3.loadThemeMode()
         assertEquals("Restored string after 2nd restart must be LIGHT", "LIGHT", restoredString3)
 
         val restoredMode3 = when (restoredString3) {
@@ -319,32 +310,5 @@ class ThemeChallengerStressTest {
 
         assertTrue(isDark)
         composeTestRule.onNodeWithContentDescription("التبديل إلى الوضع النهاري").assertIsDisplayed()
-    }
-
-    // =========================================================================
-    // 5. Empirical Challenge: Latent Wipe Defect in createSecurePrefs Fallback
-    // =========================================================================
-
-    @Test
-    fun challenge_reproduceLatentWipeInSessionPreferencesFallback() {
-        // Regression guard: verify that when Keystore is unavailable (such as in Robolectric/JVM
-        // or devices without KeyStore AES256 support), calling the default SessionPreferences(context)
-        // does NOT wipe previous preferences on restart.
-        val context = ApplicationProvider.getApplicationContext<Context>()
-
-        val instance1 = SessionPreferences(context)
-        instance1.saveThemeMode("DARK")
-        assertEquals("First instance holds DARK", "DARK", instance1.getThemeMode())
-
-        // Now instantiate a second instance with default constructor (simulating app restart without customPrefs)
-        val instance2 = SessionPreferences(context)
-        val restoredFromInstance2 = instance2.getThemeMode()
-
-        // Verified fix: createSecurePrefs must NOT wipe unencrypted preferences when Keystore is unavailable
-        assertEquals(
-            "Preferences must persist across default SessionPreferences instances in fallback mode without being wiped",
-            "DARK",
-            restoredFromInstance2
-        )
     }
 }

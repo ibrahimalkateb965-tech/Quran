@@ -23,19 +23,6 @@
 -keep @androidx.room.Dao class * { *; }
 -dontwarn androidx.room.paging.**
 
-# 5. Moshi & Retrofit Serialization
--keepclasseswithmembers class * {
-    @com.squareup.moshi.* <methods>;
-}
--keepclasseswithmembers class * {
-    @com.squareup.moshi.* <fields>;
-}
--keep @com.squareup.moshi.JsonClass class * { *; }
--keep class com.squareup.moshi.** { *; }
--keep class retrofit2.** { *; }
--keepclassmembers,allowobfuscation interface * {
-    @retrofit2.http.* <methods>;
-}
 
 # 6. Models & Data Transfer Objects (Keep all data classes)
 -keep class com.example.model.** { *; }

@@ -1,6 +1,5 @@
 package com.example
 
-import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -26,12 +25,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.test.core.app.ApplicationProvider
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.accessibility.SpeechManager
-import com.example.data.local.SessionPreferences
-import com.example.data.model.Ayah
-import com.example.data.model.Surah
+import com.aistudio.quranblind.domain.model.Ayah
+import com.aistudio.quranblind.domain.model.Surah
+import com.aistudio.quranblind.store.SessionStore
 import com.example.ui.components.BlindAccessibleIconButton
 import com.example.ui.screens.QuranPlayerScreen
 import com.example.ui.theme.QuranBlindTheme
@@ -43,7 +41,6 @@ import com.example.ui.viewmodel.PlaybackUiState
 import com.example.ui.viewmodel.QuranViewModel
 import com.example.ui.viewmodel.ScreenModeUiState
 import com.example.ui.viewmodel.SettingsUiState
-import com.example.ui.viewmodel.VoiceUiState
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -68,25 +65,24 @@ class ThemeToggleTest {
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     // =========================================================================
-    // 1. Persistence Tests (SessionPreferences)
+    // 1. Persistence Tests (SessionStore)
     // =========================================================================
 
     @Test
-    fun testSessionPreferences_saveAndGetThemeMode() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val sessionPrefs = SessionPreferences(context)
+    fun testSessionStore_saveAndGetThemeMode() {
+        val sessionStore = SessionStore(FakeSecureStore())
 
         // Save LIGHT
-        sessionPrefs.saveThemeMode("LIGHT")
-        assertEquals("LIGHT", sessionPrefs.getThemeMode())
+        sessionStore.saveThemeMode("LIGHT")
+        assertEquals("LIGHT", sessionStore.loadThemeMode())
 
         // Save DARK
-        sessionPrefs.saveThemeMode("DARK")
-        assertEquals("DARK", sessionPrefs.getThemeMode())
+        sessionStore.saveThemeMode("DARK")
+        assertEquals("DARK", sessionStore.loadThemeMode())
 
         // Save SYSTEM
-        sessionPrefs.saveThemeMode("SYSTEM")
-        assertEquals("SYSTEM", sessionPrefs.getThemeMode())
+        sessionStore.saveThemeMode("SYSTEM")
+        assertEquals("SYSTEM", sessionStore.loadThemeMode())
     }
 
     // =========================================================================
@@ -125,21 +121,21 @@ class ThemeToggleTest {
 
     @Test
     fun testViewModelToggleTheme_flipsModeAndPersists() {
-        val mockPrefs = mockk<SessionPreferences>(relaxed = true)
+        val mockStore = mockk<SessionStore>(relaxed = true)
         var persistedTheme: String? = null
-        every { mockPrefs.saveThemeMode(any()) } answers {
+        every { mockStore.saveThemeMode(any()) } answers {
             persistedTheme = firstArg()
         }
 
         // Test flip when currently dark -> should flip to LIGHT
         val newModeFromDark = if (true) AppThemeMode.LIGHT else AppThemeMode.DARK
-        mockPrefs.saveThemeMode(newModeFromDark.name)
+        mockStore.saveThemeMode(newModeFromDark.name)
         assertEquals(AppThemeMode.LIGHT, newModeFromDark)
         assertEquals("LIGHT", persistedTheme)
 
         // Test flip when currently light -> should flip to DARK
         val newModeFromLight = if (false) AppThemeMode.LIGHT else AppThemeMode.DARK
-        mockPrefs.saveThemeMode(newModeFromLight.name)
+        mockStore.saveThemeMode(newModeFromLight.name)
         assertEquals(AppThemeMode.DARK, newModeFromLight)
         assertEquals("DARK", persistedTheme)
     }
@@ -240,15 +236,15 @@ class ThemeToggleTest {
 
     @Test
     fun testThemePreference_persistsAcrossRestartsOverridingSystemDefault() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val sessionPrefs = SessionPreferences(context)
+        val backing = FakeSecureStore()
+        val firstRunStore = SessionStore(backing)
 
         // Simulate user toggling to DARK
-        sessionPrefs.saveThemeMode("DARK")
+        firstRunStore.saveThemeMode("DARK")
 
-        // Simulate real cold app restart: instantiate a fresh SessionPreferences instance
-        val secondRunPrefs = SessionPreferences(context)
-        val restoredModeString = secondRunPrefs.getThemeMode()
+        // Simulate real cold app restart: instantiate a fresh SessionStore instance with same backing
+        val secondRunStore = SessionStore(backing)
+        val restoredModeString = secondRunStore.loadThemeMode()
         assertEquals("DARK", restoredModeString)
 
         val restoredThemeMode = when (restoredModeString) {
@@ -295,7 +291,6 @@ class ThemeToggleTest {
         )
         every { mock.settingsUiState } returns MutableStateFlow(SettingsUiState(themeMode = AppThemeMode.SYSTEM))
         every { mock.bookmarkUiState } returns MutableStateFlow(BookmarkUiState())
-        every { mock.voiceUiState } returns MutableStateFlow(VoiceUiState())
         every { mock.dialogUiState } returns MutableStateFlow(
             DialogUiState(
                 showReciterDialog = false,

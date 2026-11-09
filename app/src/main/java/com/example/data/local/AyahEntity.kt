@@ -2,7 +2,7 @@ package com.example.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.data.model.Ayah
+import com.aistudio.quranblind.domain.model.Ayah
 
 @Entity(tableName = "ayahs")
 data class AyahEntity(

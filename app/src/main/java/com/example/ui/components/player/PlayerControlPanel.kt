@@ -1,28 +1,20 @@
 package com.example.ui.components.player
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -30,20 +22,14 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -56,87 +42,6 @@ import com.example.ui.theme.DarkImmersiveBg
 import com.example.ui.theme.DarkImmersiveBorder
 import com.example.ui.theme.DarkImmersiveCard
 import com.example.ui.theme.TextPrimaryWhite
-
-@Composable
-fun ListeningVoiceBanner(isScreenOffMode: Boolean = false) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = if (isScreenOffMode) 1.0f else 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    Surface(
-        color = AccessibleGold,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .padding(vertical = 4.dp)
-            .semantics {
-                liveRegion = LiveRegionMode.Assertive
-                contentDescription = "جاري الاستماع الآن، تحدث بالأمر الصوتي"
-            }
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Mic, contentDescription = null, tint = DarkImmersiveBg, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "جاري الاستماع لطلبك الصوتي...",
-                style = MaterialTheme.typography.headlineMedium,
-                color = DarkImmersiveBg,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun BigVoiceMicrophoneButton(
-    isListening: Boolean,
-    onClick: () -> Unit
-) {
-    BlindAccessibleButton(
-        onClick = onClick,
-        onClickLabel = "زر الأمر الصوتي الرئيسي. اضغط للتحدث بأسماء السور أو الأوامر",
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .border(1.dp, if (isListening) AccessibleGreenAccent else AccessibleGold, RoundedCornerShape(20.dp))
-            .testTag("voice_mic_main_button"),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isListening) AccessibleGreenAccent else AccessibleGold
-        ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "استماع للأوامر الصوتية",
-                tint = DarkImmersiveBg,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = if (isListening) "جاري الاستماع..." else "تحدث بالأمر الصوتي (أو اضغط مطولاً)",
-                style = MaterialTheme.typography.headlineMedium,
-                color = DarkImmersiveBg,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
 
 @Composable
 fun ControlPanel(

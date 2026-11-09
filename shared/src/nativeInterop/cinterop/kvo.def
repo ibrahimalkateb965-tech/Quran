@@ -1,0 +1,11 @@
+language = Objective-C
+package = com.aistudio.quranblind.kvo
+---
+#import <Foundation/Foundation.h>
+
+// Foundation's NSKeyValueObserving category on NSObject is imported into Kotlin/Native as an
+// extension function and therefore cannot be overridden. Declaring the same selector on a
+// protocol makes it an overridable member for `object : NSObject(), QbKvoObserverProtocol`.
+@protocol QbKvoObserver <NSObject>
+- (void)observeValueForKeyPath:(nullable NSString *)keyPath ofObject:(nullable id)object change:(nullable NSDictionary<NSKeyValueChangeKey, id> *)change context:(nullable void *)context;
+@end

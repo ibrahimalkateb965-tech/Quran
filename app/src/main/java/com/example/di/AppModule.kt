@@ -3,11 +3,11 @@ package com.example.di
 import android.content.Context
 import com.example.accessibility.HapticFeedbackManager
 import com.example.accessibility.SpeechManager
-import com.example.accessibility.VoiceCommandManager
 import com.example.data.local.AyahDao
 import com.example.data.local.BookmarkDao
 import com.example.data.local.QuranDatabase
-import com.example.data.local.SessionPreferences
+import com.aistudio.quranblind.store.SessionStore
+import com.aistudio.quranblind.store.createSecureStore
 import com.example.data.repository.QuranRepositoryImpl
 import com.example.domain.repository.QuranRepository
 import dagger.Binds
@@ -42,8 +42,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSessionPreferences(@ApplicationContext context: Context): SessionPreferences {
-        return SessionPreferences.getInstance(context)
+    fun provideSessionStore(): SessionStore {
+        return SessionStore(createSecureStore(SessionStore.STORE_NAME))
     }
 
     @Provides
@@ -56,15 +56,6 @@ object AppModule {
     @Singleton
     fun provideSpeechManager(@ApplicationContext context: Context): SpeechManager {
         return SpeechManager(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideVoiceCommandManager(
-        @ApplicationContext context: Context,
-        quranRepository: QuranRepository
-    ): VoiceCommandManager {
-        return VoiceCommandManager(context, quranRepository)
     }
 }
 

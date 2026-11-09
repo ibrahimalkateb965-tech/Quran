@@ -45,6 +45,8 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -119,6 +121,7 @@ import com.example.ui.components.SurahIndexSheet
 import com.example.ui.components.BookmarksSheet
 import com.example.ui.components.blindAccessibleClickable
 import androidx.compose.ui.graphics.Brush
+import com.example.ui.theme.QuranTheme
 import com.example.ui.theme.AccessibleGold
 import com.example.ui.theme.AccessibleGoldVariant
 import com.example.ui.theme.AccessibleGreenAccent
@@ -358,15 +361,13 @@ fun QuranPlayerScreen(
                         }
                     }
 
-                    // Bottom action hint for both sighted and blind users
+                    // Bottom action bar: centered repeat hint + bottom-left day/night toggle button
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp)
-                            .padding(bottom = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(bottom = 10.dp)
                     ) {
                         Text(
                             text = "انقر للتكرار",
@@ -374,8 +375,41 @@ fun QuranPlayerScreen(
                                 fontWeight = FontWeight.SemiBold
                             ),
                             color = WarmTextSecondary,
-                            modifier = Modifier.clickable { viewModel.replayCurrentAyah() }
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .clickable { viewModel.replayCurrentAyah() }
                         )
+
+                        val isDark = QuranTheme.colors.isDark
+                        val toggleActionLabel = if (isDark) "التبديل إلى الوضع النهاري" else "التبديل إلى الوضع الليلي"
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .testTag("theme_toggle_button")
+                                .clickable(
+                                    onClickLabel = toggleActionLabel,
+                                    onClick = { viewModel.toggleTheme(isCurrentlyDark = isDark) }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            BlindAccessibleIconButton(
+                                onClick = { viewModel.toggleTheme(isCurrentlyDark = isDark) },
+                                onClickLabel = toggleActionLabel,
+                                modifier = Modifier
+                                    .testTag("day_night_toggle_button")
+                                    .size(52.dp)
+                                    .background(QuranTheme.colors.cardSurface, CircleShape)
+                                    .border(1.5.dp, QuranTheme.colors.cardBorder, CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = if (isDark) Icons.Default.WbSunny else Icons.Default.NightsStay,
+                                    contentDescription = toggleActionLabel,
+                                    tint = QuranTheme.colors.accent,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

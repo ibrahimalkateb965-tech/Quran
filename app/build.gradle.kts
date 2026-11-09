@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.quranblind.a11y"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0.0"
+    versionCode = 2
+    versionName = "1.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "BASE_URL", "\"https://api.alquran.cloud/v1/\"")

@@ -19,12 +19,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.accessibility.LocalTalkBackEnabled
 import com.example.ui.screens.QuranPlayerScreen
 import com.example.ui.theme.QuranBlindTheme
+import com.example.ui.viewmodel.AppThemeMode
 import com.example.ui.viewmodel.QuranViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -56,7 +58,13 @@ class MainActivity : ComponentActivity() {
         checkAndRequestPermissions()
 
         setContent {
-            val darkTheme = isSystemInDarkTheme()
+            val settingsUiState by viewModel.settingsUiState.collectAsStateWithLifecycle()
+            val systemInDark = isSystemInDarkTheme()
+            val darkTheme = when (settingsUiState.themeMode) {
+                AppThemeMode.SYSTEM -> systemInDark
+                AppThemeMode.DARK -> true
+                AppThemeMode.LIGHT -> false
+            }
 
             // Bind system-bar icon tint to the app theme (not raw uiMode), re-applied when the theme flips.
             DisposableEffect(darkTheme) {

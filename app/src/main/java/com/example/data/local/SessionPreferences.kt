@@ -6,9 +6,23 @@ import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
-class SessionPreferences(context: Context) {
+class SessionPreferences(
+    context: Context,
+    customPrefs: SharedPreferences? = null
+) {
 
-    private val prefs: SharedPreferences = createSecurePrefs(context.applicationContext)
+    private val prefs: SharedPreferences = customPrefs ?: createSecurePrefs(context.applicationContext)
+
+    private fun isKeyStoreUnavailable(throwable: Throwable?): Boolean {
+        var current = throwable
+        while (current != null) {
+            if (current is java.security.NoSuchAlgorithmException || current is java.security.NoSuchProviderException) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
+    }
 
     private fun createSecurePrefs(context: Context): SharedPreferences {
         return try {
@@ -24,6 +38,9 @@ class SessionPreferences(context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
+            if (isKeyStoreUnavailable(e)) {
+                return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            }
             android.util.Log.e("SessionPreferences", "فشل التشفير، تم كشف تلف في الـ Keystore. جاري الحذف وإعادة البناء.", e)
             try {
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
@@ -38,6 +55,9 @@ class SessionPreferences(context: Context) {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e2: Exception) {
+                if (isKeyStoreUnavailable(e2)) {
+                    return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                }
                 android.util.Log.e("SessionPreferences", "فشل التشفير كلياً. سيتم الإغلاق لأسباب أمنية (Fail-Closed).", e2)
                 throw IllegalStateException("Critical Security Error: Cannot initialize secure session storage.", e2)
             }
@@ -73,6 +93,16 @@ class SessionPreferences(context: Context) {
         return null
     }
 
+    fun saveThemeMode(themeMode: String) {
+        prefs.edit {
+            putString(KEY_THEME_MODE, themeMode)
+        }
+    }
+
+    fun getThemeMode(): String? {
+        return prefs.getString(KEY_THEME_MODE, null)
+    }
+
     fun clearSession() {
         prefs.edit { clear() }
     }
@@ -82,6 +112,7 @@ class SessionPreferences(context: Context) {
         private const val KEY_LAST_RECITER_ID = "last_reciter_id"
         private const val KEY_LAST_SURAH_ID = "last_surah_id"
         private const val KEY_LAST_AYAH_INDEX = "last_ayah_index"
+        const val KEY_THEME_MODE = "theme_mode"
         
         @Volatile
         private var INSTANCE: SessionPreferences? = null

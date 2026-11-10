@@ -26,6 +26,11 @@ WhatsApp Image*
 *.jks
 *.keystore
 key.properties
+client_delivery_apk/
+app_preview*.png
+surah_sheet*.png
+.agents/fleet_teamwork/
+.agents/teamwork/
 
 # XcodeGen generates this; never commit it.
 iosApp/QuranBlind.xcodeproj/
@@ -66,4 +71,3 @@ replay_pid*.log
 # Local gate logs (CLAUDE.md §6) — never staged
 gate.log
 *.gate.log
-

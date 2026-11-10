@@ -30,6 +30,14 @@ class SessionStore(private val store: SecureStore) {
         return null
     }
 
+    fun saveThemeMode(themeMode: String) {
+        store.putString(KEY_THEME_MODE, themeMode)
+    }
+
+    fun loadThemeMode(): String? {
+        return store.getString(KEY_THEME_MODE)
+    }
+
     fun clear() = store.clear()
 
     companion object {
@@ -37,5 +45,6 @@ class SessionStore(private val store: SecureStore) {
         const val KEY_LAST_RECITER_ID = "last_reciter_id"
         const val KEY_LAST_SURAH_ID = "last_surah_id"
         const val KEY_LAST_AYAH_INDEX = "last_ayah_index"
+        const val KEY_THEME_MODE = "theme_mode"
     }
 }

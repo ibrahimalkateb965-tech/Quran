@@ -70,4 +70,14 @@ class SessionStoreTest {
         backing.putInt("n", 42)
         assertEquals(42, backing.getInt("n", 7))
     }
+
+    @Test
+    fun saveThenLoadThemeMode() {
+        val store = SessionStore(InMemorySecureStore())
+        assertNull(store.loadThemeMode())
+        store.saveThemeMode("DARK")
+        assertEquals("DARK", store.loadThemeMode())
+        store.saveThemeMode("LIGHT")
+        assertEquals("LIGHT", store.loadThemeMode())
+    }
 }

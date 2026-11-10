@@ -50,10 +50,13 @@ data class PlaybackUiState(
     val playbackProgress: Float = 0f
 )
 
+enum class AppThemeMode { SYSTEM, LIGHT, DARK }
+
 data class SettingsUiState(
     val selectedReciter: Reciter = Reciter.DEFAULT_RECITER,
     val tarkizRepeatMode: Int = 1,
-    val isContinuousPlayEnabled: Boolean = false
+    val isContinuousPlayEnabled: Boolean = false,
+    val themeMode: AppThemeMode = AppThemeMode.SYSTEM
 )
 
 data class BookmarkUiState(
@@ -233,6 +236,16 @@ class QuranViewModel @Inject constructor(
                 playAudioUrl(url)
             }
         }, ContextCompat.getMainExecutor(application))
+
+        val savedTheme = sessionStore.loadThemeMode()
+        if (savedTheme != null) {
+            val mode = when (savedTheme) {
+                "LIGHT" -> AppThemeMode.LIGHT
+                "DARK" -> AppThemeMode.DARK
+                else -> AppThemeMode.SYSTEM
+            }
+            _settingsUiState.update { it.copy(themeMode = mode) }
+        }
 
         val savedSession = sessionStore.load()
         if (savedSession != null) {
@@ -627,6 +640,18 @@ class QuranViewModel @Inject constructor(
             _playbackUiState.update { it.copy(isLoadingAudio = false) }
         }
         _dialogUiState.update { it.copy(showReciterDialog = show) }
+    }
+
+    fun toggleTheme(isCurrentlyDark: Boolean) {
+        val newMode = if (isCurrentlyDark) AppThemeMode.LIGHT else AppThemeMode.DARK
+        sessionStore.saveThemeMode(newMode.name)
+        _settingsUiState.update { it.copy(themeMode = newMode) }
+        val msg = if (newMode == AppThemeMode.DARK) {
+            "تم التبديل إلى الوضع الليلي"
+        } else {
+            "تم التبديل إلى الوضع النهاري"
+        }
+        performAction(msg, HapticType.CLICK)
     }
 
     fun toggleHelpDialog(show: Boolean) {

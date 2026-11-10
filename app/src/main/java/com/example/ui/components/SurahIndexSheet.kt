@@ -49,6 +49,7 @@ import com.aistudio.quranblind.domain.model.Surah
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
+import com.example.ui.theme.QuranTheme
 import com.example.ui.theme.WarmAccentTerracotta
 import com.example.ui.theme.WarmAccentTerracottaBright
 import com.example.ui.theme.WarmCardActive
@@ -182,7 +183,7 @@ fun SurahIndexSheet(
                                         .height(44.dp)
                                         .width(44.dp)
                                         .background(
-                                            if (isSelected) WarmAccentTerracotta else WarmCardBorder,
+                                            if (isSelected) QuranTheme.colors.accentContainer else WarmCardBorder,
                                             shape = RoundedCornerShape(22.dp)
                                         ),
                                     contentAlignment = Alignment.Center
@@ -191,7 +192,7 @@ fun SurahIndexSheet(
                                         text = "${surah.id}",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else WarmTextLight
+                                        color = WarmTextLight
                                     )
                                 }
                             },

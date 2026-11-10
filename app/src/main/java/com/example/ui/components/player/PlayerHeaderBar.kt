@@ -21,11 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.BlindAccessibleIconButton
-import com.example.ui.theme.WarmAccentTerracotta
-import com.example.ui.theme.WarmAccentTerracottaBright
-import com.example.ui.theme.WarmCardBorder
-import com.example.ui.theme.WarmCardLight
-import com.example.ui.theme.WarmTextLight
+import com.example.ui.theme.QuranTheme
 
 @Composable
 fun HeaderBar(
@@ -84,15 +80,16 @@ fun HeaderAccessibleButton(
     contentDescription: String,
     isActive: Boolean = false
 ) {
-    val bgColor = if (isActive) WarmAccentTerracotta else WarmCardLight
-    val borderColor = if (isActive) WarmAccentTerracottaBright else WarmCardBorder
-    val textColor = if (isActive) WarmTextLight else WarmAccentTerracotta
+    val colors = QuranTheme.colors
+    val bgColor = if (isActive) colors.accentContainer else colors.cardSurface
+    val borderColor = if (isActive) colors.accentBright else colors.cardBorder
+    val textColor = if (isActive) colors.textOnFill else colors.accent
 
     BlindAccessibleIconButton(
         onClick = onClick,
         onClickLabel = onClickLabel,
         modifier = Modifier
-            .size(76.dp)
+            .size(68.dp)
             .background(bgColor, CircleShape)
             .border(1.5.dp, borderColor, CircleShape)
             .testTag(testTag)

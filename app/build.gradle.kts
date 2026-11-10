@@ -14,12 +14,17 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  val verMajor = 1
+  val verMinor = 1
+  val verPatch = 0
+  val verBuild = 0
+
   defaultConfig {
     applicationId = "com.aistudio.quranblind.a11y"
     minSdk = 24
     targetSdk = 36
-    versionCode = 3
-    versionName = "1.1.0"
+    versionCode = verMajor * 1_000_000 + verMinor * 10_000 + verPatch * 100 + verBuild
+    versionName = "${verMajor}.${verMinor}.${verPatch}"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

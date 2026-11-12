@@ -22,6 +22,7 @@ targets:
       - path: Resources/Assets.xcassets
     settings:
       base:
+        PRODUCT_NAME: QuranBlind
         PRODUCT_BUNDLE_IDENTIFIER: com.aistudio.quranblind.a11y
         SWIFT_VERSION: "5.0"
         # Version keys live in build settings so CI can stamp CURRENT_PROJECT_VERSION per run

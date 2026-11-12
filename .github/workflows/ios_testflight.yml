@@ -122,7 +122,7 @@ jobs:
           [ "$missing" = "0" ] || exit 1
           echo "All required secrets are present (values are never printed)."
 
-      # -- 1. Privacy manifest ----------------------------------------------------
+      # -- 1. Privacy manifest & ATS audit ----------------------------------------
       - name: Lint the privacy manifest
         run: |
           set -euo pipefail
@@ -133,7 +133,22 @@ jobs:
           if /usr/libexec/PlistBuddy -c 'Print :NSPrivacyCollectedDataTypes:0' "$M" >/dev/null 2>&1; then
             echo "::error::NSPrivacyCollectedDataTypes must be empty: the app collects no data"; exit 1
           fi
+          if /usr/libexec/PlistBuddy -c 'Print :NSPrivacyTrackingDomains:0' "$M" >/dev/null 2>&1; then
+            echo "::error::NSPrivacyTrackingDomains must be empty"; exit 1
+          fi
           echo "Privacy manifest OK: no tracking, no collected data."
+
+      - name: Audit App Transport Security
+        run: |
+          set -euo pipefail
+          # A plain-http literal would need an NSAppTransportSecurity exception; none is allowed.
+          if grep -rnE 'http://' shared/src/commonMain shared/src/iosMain iosApp/Sources --include='*.kt' --include='*.swift'; then
+            echo "::error::plain http:// literal found: every endpoint must be HTTPS"; exit 1
+          fi
+          if grep -nE 'NSAllowsArbitraryLoads|NSExceptionDomains' iosApp/project.yml; then
+            echo "::error::ATS exceptions are not allowed in project.yml"; exit 1
+          fi
+          echo "ATS audit clean: no http:// literals, no ATS exceptions."
 
       # -- 2. Signing identity + profile in an ephemeral keychain -------------------
       - name: Import the signing certificate and provisioning profile
@@ -159,7 +174,7 @@ jobs:
           security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           # Lets codesign use the key without an interactive prompt.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
-          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
 
           # Install the profile under the UUID name Xcode expects and check it is for THIS app.
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
@@ -178,7 +193,7 @@ jobs:
 
       # -- 3. Xcode project from project.yml ---------------------------------------
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: which xcodegen >/dev/null 2>&1 || brew install xcodegen
 
       - name: Generate Xcode project
         working-directory: iosApp
@@ -207,6 +222,7 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
             2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" | grep -E "error:|warning:|ARCHIVE |Ld |embedAndSign|SharedKit|Signing" || true
           grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/xcodebuild-archive.log"
 
@@ -275,10 +291,14 @@ jobs:
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          # altool looks the key up by id in this exact directory.
+          # altool searches ~/.appstoreconnect/private_keys and ~/.private_keys
           mkdir -p "$HOME/.appstoreconnect/private_keys"
-          printf '%s' "$APPSTORE_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
-          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+          mkdir -p "$HOME/.private_keys"
+          KEY_FILE="AuthKey_${APPSTORE_KEY_ID}.p8"
+          printf '%s' "$APPSTORE_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/$KEY_FILE"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/$KEY_FILE"
+          cp "$HOME/.appstoreconnect/private_keys/$KEY_FILE" "$HOME/.private_keys/$KEY_FILE"
+          chmod 600 "$HOME/.private_keys/$KEY_FILE"
 
       - name: Validate with App Store Connect
         if: env.UPLOAD == 'true'
@@ -320,4 +340,4 @@ jobs:
         run: |
           security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
           rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision
-          rm -f "$HOME/.appstoreconnect/private_keys/"*.p8
+          rm -f "$HOME/.appstoreconnect/private_keys/"*.p8 "$HOME/.private_keys/"*.p8

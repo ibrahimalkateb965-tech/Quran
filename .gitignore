@@ -34,6 +34,8 @@ surah_sheet*.png
 
 # XcodeGen generates this; never commit it.
 iosApp/QuranBlind.xcodeproj/
+iosApp/build/
+*.mp4
 
 # Stale duplicate the desktop app writes; the live copy is fleet_orders/CURRENT_STATE.md
 Claude outputs/

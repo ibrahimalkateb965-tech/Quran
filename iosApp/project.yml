@@ -1,6 +1,7 @@
 name: QuranBlind
 options:
   bundleIdPrefix: com.aistudio.quranblind
+  xcodeVersion: "27.2"
   deploymentTarget:
     iOS: "15.0"
   createIntermediateGroups: true
@@ -20,17 +21,22 @@ targets:
       - path: Resources/PrivacyInfo.xcprivacy
         buildPhase: resources
       - path: Resources/Assets.xcassets
+      - path: Resources/Fonts/uthman_taha.ttf
+        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: QuranBlind
         PRODUCT_BUNDLE_IDENTIFIER: com.aistudio.quranblind.a11y
+        DEVELOPMENT_TEAM: 3UMLLDSZ4S
+        CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
         # Version keys live in build settings so CI can stamp CURRENT_PROJECT_VERSION per run
         # (TestFlight rejects a re-used build number). Info.plist references them below.
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.1.0"
+        CURRENT_PROJECT_VERSION: "3"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        ALWAYS_SEARCH_USER_PATHS: "NO"
         FRAMEWORK_SEARCH_PATHS:
           - $(inherited)
           - $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
@@ -41,9 +47,11 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: "القرآن للمكفوفين"
+        CFBundleDisplayName: "القرآن"
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIAppFonts:
+          - uthman_taha.ttf
         # Only HTTPS via the OS networking stack is used (exempt encryption). Declaring it here
         # removes the export-compliance question from every TestFlight upload.
         ITSAppUsesNonExemptEncryption: false

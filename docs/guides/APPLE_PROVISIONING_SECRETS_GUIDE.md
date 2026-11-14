@@ -8,7 +8,9 @@ This guide provides the complete, bulletproof operational procedure to prepare A
 
 | Item | Requirement / Value | Notes |
 | :--- | :--- | :--- |
+| **Apple Account** | `ibrahim alkateb` (`pm.ibrahimalkateb965@autovemtech.com`) | Signed in Xcode & Apple Developer Portal |
 | **Developer Program** | Paid Apple Developer Program ($99/year) | Required for App Store / TestFlight signing |
+| **Apple Team ID** | `3UMLLDSZ4S` | Matching `DEVELOPMENT_TEAM` in `iosApp/project.yml` |
 | **App Bundle ID** | `com.aistudio.quranblind.a11y` | Explicit App ID matching `iosApp/project.yml` |
 | **Profile Name** | `BlindQuran AppStore` | App Store distribution profile |
 | **CI Runner** | GitHub Actions `macos-15` | Ephemeral keychain isolated per build |
@@ -182,7 +184,7 @@ REPO="your-org-or-username/blind-app" # Or omit --repo if inside the git repo
 # Values (replace placeholders)
 P12_PASS="YourChosenP12Password"
 KEYCHAIN_PASS="$(openssl rand -base64 24)"
-TEAM_ID="A1B2C3D4E5"
+TEAM_ID="3UMLLDSZ4S"
 KEY_ID="ABCD1234EF"
 ISSUER_ID="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 

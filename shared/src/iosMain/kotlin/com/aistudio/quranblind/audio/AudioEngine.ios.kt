@@ -14,9 +14,11 @@ import platform.AVFoundation.*
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.CoreMedia.CMTimeMakeWithSeconds
 import platform.Foundation.*
+import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 import platform.darwin.NSObject
 import platform.darwin.NSObjectProtocol
 import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_global_queue
 import platform.darwin.dispatch_get_main_queue
 
 /**
@@ -43,6 +45,7 @@ actual class AudioEngine {
     private var lastIsPlaying = false
     private var lastStatus = PlaybackStatus.IDLE
     private var released = false
+    private var isSessionActive = false
 
     private val center = NSNotificationCenter.defaultCenter
     private val notificationTokens = mutableListOf<NSObjectProtocol>()
@@ -65,19 +68,29 @@ actual class AudioEngine {
         }
     }
 
+    private var currentItem: AVPlayerItem? = null
+
     init {
         player.addObserver(kvo, forKeyPath = "timeControlStatus", options = NSKeyValueObservingOptionNew, context = null)
         notificationTokens += center.addObserverForName(
             AVPlayerItemDidPlayToEndTimeNotification, null, NSOperationQueue.mainQueue
         ) { notification ->
-            if (!released && notification?.`object` === player.currentItem) onPlayedToEnd()
+            if (!released) {
+                val notifItem = notification?.`object` as? AVPlayerItem
+                if (notifItem == null || isCurrentItem(notifItem)) {
+                    onPlayedToEnd()
+                }
+            }
         }
         notificationTokens += center.addObserverForName(
             AVPlayerItemFailedToPlayToEndTimeNotification, null, NSOperationQueue.mainQueue
         ) { notification ->
-            if (!released && notification?.`object` === player.currentItem) {
-                val error = notification?.userInfo?.get(AVPlayerItemFailedToPlayToEndTimeErrorKey) as? NSError
-                fail(error)
+            if (!released) {
+                val notifItem = notification?.`object` as? AVPlayerItem
+                if (notifItem == null || isCurrentItem(notifItem)) {
+                    val error = notification?.userInfo?.get(AVPlayerItemFailedToPlayToEndTimeErrorKey) as? NSError
+                    fail(error)
+                }
             }
         }
         notificationTokens += center.addObserverForName(
@@ -167,6 +180,7 @@ actual class AudioEngine {
     actual fun release() {
         if (released) return
         released = true
+        isSessionActive = false
         player.pause()
         detachCurrentItem()
         player.removeObserver(kvo, forKeyPath = "timeControlStatus")
@@ -177,10 +191,21 @@ actual class AudioEngine {
     // --- internals -------------------------------------------------------------------
 
     private fun loadCurrentItem() {
-        detachCurrentItem()
-        val track = queue.current ?: return
+        val oldItem = currentItem
+        if (oldItem != null) {
+            oldItem.removeObserver(kvo, forKeyPath = "status")
+        }
+        val track = queue.current
+        if (track == null) {
+            player.replaceCurrentItemWithPlayerItem(null)
+            currentItem = null
+            ended = false
+            publishState()
+            return
+        }
         val url = NSURL(string = track.url)
         val item = AVPlayerItem.playerItemWithURL(url)
+        currentItem = item
         item.addObserver(kvo, forKeyPath = "status", options = NSKeyValueObservingOptionNew, context = null)
         player.replaceCurrentItemWithPlayerItem(item)
         ended = false
@@ -188,17 +213,33 @@ actual class AudioEngine {
     }
 
     private fun detachCurrentItem() {
-        val item = player.currentItem ?: return
-        item.removeObserver(kvo, forKeyPath = "status")
-        player.replaceCurrentItemWithPlayerItem(null)
+        val item = currentItem ?: player.currentItem
+        if (item != null) {
+            item.removeObserver(kvo, forKeyPath = "status")
+            player.replaceCurrentItemWithPlayerItem(null)
+        }
+        currentItem = null
         ended = false
     }
 
+    private fun isCurrentItem(item: AVPlayerItem): Boolean {
+        val current = currentItem ?: player.currentItem ?: return false
+        if (item == current || item.isEqual(current)) return true
+        val itemUrl = (item.asset as? AVURLAsset)?.URL?.absoluteString
+        val currentUrl = (current.asset as? AVURLAsset)?.URL?.absoluteString
+        if (itemUrl != null && currentUrl != null && itemUrl == currentUrl) return true
+        val queueUrl = queue.current?.url
+        return itemUrl != null && queueUrl != null && itemUrl == queueUrl
+    }
+
     private fun onItemStatusChanged(item: AVPlayerItem?) {
-        if (item == null || item !== player.currentItem) return
+        if (item == null || !isCurrentItem(item)) return
         if (item.status == AVPlayerItemStatusFailed) {
             fail(item.error)
         } else {
+            if (wantPlay && item.status == AVPlayerItemStatusReadyToPlay && player.timeControlStatus != AVPlayerTimeControlStatusPlaying) {
+                player.play()
+            }
             publishState()
         }
     }
@@ -219,6 +260,7 @@ actual class AudioEngine {
         val type = (info[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.unsignedLongValue ?: return
         when (type) {
             AVAudioSessionInterruptionTypeBegan -> {
+                isSessionActive = false
                 if (wantPlay && isPlaying) {
                     pausedByInterruption = true
                     player.pause()
@@ -245,9 +287,15 @@ actual class AudioEngine {
     }
 
     private fun activateSession() {
-        val session = AVAudioSession.sharedInstance()
-        session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-        session.setActive(true, error = null)
+        if (isSessionActive) return
+        isSessionActive = true
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
+            val session = AVAudioSession.sharedInstance()
+            if (session.category != AVAudioSessionCategoryPlayback) {
+                session.setCategory(AVAudioSessionCategoryPlayback, mode = AVAudioSessionModeSpokenAudio, options = 0u, error = null)
+            }
+            session.setActive(true, error = null)
+        }
     }
 
     private fun computeStatus(): PlaybackStatus {

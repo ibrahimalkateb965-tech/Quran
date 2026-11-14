@@ -59,7 +59,13 @@ public struct SurahIndexSheet: View {
                             : "اختيار السورة (114 سورة)"
                     )
                     .font(.headline)
+                    .accessibilityLabel(
+                        selectedSurah != nil
+                            ? A11yLabels.ayahSheetTitle(surahName: selectedSurah!.nameArabic)
+                            : A11yLabels.surahSheetTitle(surahCount: 114)
+                    )
                     .accessibilityRemoveTraits(.isHeader)
+                    .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     if selectedSurah != nil {
@@ -67,13 +73,17 @@ public struct SurahIndexSheet: View {
                             backToSurahs()
                         }
                         .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
+                        .accessibilityLabel(A11yLabels.surahs)
                         .accessibilityRemoveTraits(.isButton)
+                        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
                     } else {
                         Button("إغلاق") {
                             dismissSheet()
                         }
                         .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
+                        .accessibilityLabel(A11yLabels.close)
                         .accessibilityRemoveTraits(.isButton)
+                        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
                     }
                 }
             }
@@ -184,8 +194,9 @@ public struct SurahIndexSheet: View {
                         .buttonStyle(AccessibleHapticButtonStyle(haptic: .click, scaleDown: 0.98))
                         .id(surah.id)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("سورة \(surah.nameArabic)، رقمها \(surah.id)، آياتها \(surah.ayahCount)\(isActive ? "، مفتوحة الآن" : "")")
+                        .accessibilityLabel(A11yLabels.surahRow(name: surah.nameArabic, number: surah.id, ayahCount: surah.ayahCount, isActive: isActive))
                         .accessibilityRemoveTraits([.isButton, .isSelected])
+                        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
 
                         Divider()
                     }
@@ -239,8 +250,9 @@ public struct SurahIndexSheet: View {
                         .buttonStyle(AccessibleHapticButtonStyle(haptic: .click, scaleDown: 0.98))
                         .id(index)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("الآية \(ayahNumber)\(isCurrent ? "، محددة حالياً" : "")")
+                        .accessibilityLabel(A11yLabels.ayahRow(ayahNumber, isCurrent: isCurrent))
                         .accessibilityRemoveTraits([.isButton, .isSelected])
+                        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
 
                         Divider()
                     }

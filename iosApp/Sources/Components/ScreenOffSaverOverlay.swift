@@ -11,24 +11,16 @@ public struct ScreenOffSaverOverlay: View {
 
     // MARK: - Authoritative Accessibility Constants (R4 / Invariant I7)
 
-    /// Accessibility label text announced when VoiceOver touches or focuses the screen-off saver.
-    public static let accessibilityLabelText = "شاشة توفير الطاقة نشطة. انقر مرتين للاستيقاظ"
-
-    /// Accessibility hint text guiding the blind user on waking the screen.
-    public static let accessibilityHintText = "انقر مرتين لإلغاء وضع توفير الطاقة وإيقاظ الشاشة"
+    /// Accessibility label: the element's name only. No "double-tap to…" tutorial and no hint —
+    /// VoiceOver's standard double-tap (default activation action) wakes the screen.
+    public static let accessibilityLabelText = A11yLabels.screenOffActive
 
     /// Modal traits isolating the view hierarchy beneath the overlay.
     /// No `.isButton`: VoiceOver would append the English word "button" after the Arabic label.
     public static let accessibilityTraitsSet: AccessibilityTraits = [.isModal]
 
-    /// Primary accessibility named action for wake.
-    public static let wakeActionName = "استيقاظ"
-
-    /// Secondary accessibility named action for cancelling screen-off mode.
-    public static let cancelActionName = "إلغاء وضع إيقاف الشاشة"
-
-    /// Supported accessibility custom actions list.
-    public static let supportedActionNames: [String] = [wakeActionName, cancelActionName]
+    /// No named custom actions: they make VoiceOver append "Actions available" after the label.
+    public static let supportedActionNames: [String] = []
 
     // MARK: - Properties & Callbacks
 
@@ -78,18 +70,6 @@ public struct ScreenOffSaverOverlay: View {
         wakeUp()
     }
 
-    /// Dispatches an accessibility named custom action. Returns true if recognized and handled.
-    @discardableResult
-    public func performNamedAction(_ name: String) -> Bool {
-        switch name {
-        case Self.wakeActionName, Self.cancelActionName:
-            wakeUp()
-            return true
-        default:
-            return false
-        }
-    }
-
     // MARK: - View Body
 
     public var body: some View {
@@ -113,17 +93,12 @@ public struct ScreenOffSaverOverlay: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Self.accessibilityLabelText)
             .accessibilityAddTraits(Self.accessibilityTraitsSet)
+            .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
             .accessibilityAction {
                 wakeUp()
             }
             .accessibilityAction(.escape) {
                 performAccessibilityEscape()
-            }
-            .accessibilityAction(named: Self.wakeActionName) {
-                _ = performNamedAction(Self.wakeActionName)
-            }
-            .accessibilityAction(named: Self.cancelActionName) {
-                _ = performNamedAction(Self.cancelActionName)
             }
             .onAppear {
                 handleAppear()

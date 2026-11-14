@@ -14,7 +14,6 @@ import UIKit
 /// Enforces Invariant I2 (<= 1 accessibility node on recitation surface) and
 /// Invariant I3 (reactive screen-reader state handling).
 public struct StealthBoxModifier: ViewModifier {
-    @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverRunning: Bool
 
     public let isPlaying: Bool
     public let surahName: String?
@@ -53,21 +52,21 @@ public struct StealthBoxModifier: ViewModifier {
         let surah = surahName?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let surah = surah, !surah.isEmpty {
             if let text = ayahText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, let ayah = ayahNumber {
-                return "الآية \(ayah) من سورة \(surah): \(text)"
+                return "\(A11yLabels.ayah(ayah)) مِنْ سُورَةِ \(surah): \(text)"
             } else if let ayah = ayahNumber, let total = ayahCount, total > 0 {
-                return "سورة \(surah)، الآية \(ayah) من أصل \(total)"
+                return "\(A11yLabels.surah(surah))، \(A11yLabels.ayah(ayah)) مِنْ أَصْلِ \(total)"
             } else if let ayah = ayahNumber {
-                return "سورة \(surah)، الآية \(ayah)"
+                return "\(A11yLabels.surah(surah))، \(A11yLabels.ayah(ayah))"
             } else {
-                return "سورة \(surah)"
+                return A11yLabels.surah(surah)
             }
         } else if let ayah = ayahNumber {
             if let text = ayahText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-                return "الآية \(ayah): \(text)"
+                return "\(A11yLabels.ayah(ayah)): \(text)"
             }
-            return "الآية \(ayah)"
+            return A11yLabels.ayah(ayah)
         } else {
-            return "تلاوة القرآن الكريم"
+            return A11yLabels.quranRecitation
         }
     }
 
@@ -92,15 +91,15 @@ public struct StealthBoxModifier: ViewModifier {
         content
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(surahAyahAccessibilityLabel /* سورة والآية */)
-            .accessibilityValue(isPlaying ? "قيد التلاوة" : "متوقف")
-            .accessibilityHint(isVoiceOverRunning ? "انقر نقراً مزدوجاً للتشغيل أو الإيقاف، أو استخدم إجراءات الروتور" : "تشغيل أو إيقاف التلاوة")
-            .accessibilityAction(named: "إعادة التلاوة") {
+            .accessibilityValue(isPlaying ? A11yLabels.reciting : A11yLabels.stopped)
+            .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
+            .accessibilityAction(named: A11yLabels.replay) {
                 handleReplayAction()
             }
-            .accessibilityAction(named: "الآية التالية") {
+            .accessibilityAction(named: A11yLabels.nextAyah) {
                 onNextAyah?()
             }
-            .accessibilityAction(named: "الآية السابقة") {
+            .accessibilityAction(named: A11yLabels.previousAyah) {
                 onPreviousAyah?()
             }
             .accessibilityAction {
@@ -173,7 +172,9 @@ public extension View {
 /// - Selection / touch-exploration: no label, value, hint, traits or custom actions → nothing is spoken
 ///   (custom actions are deliberately omitted because VoiceOver would append "Actions available").
 /// - Double-tap (activate): toggles play/pause.
-/// - Three-finger horizontal swipe (`accessibilityScroll`): next / previous ayah, silently.
+/// - One-finger only: single tap focuses (silently), double-tap anywhere activates.
+///   No `.allowsDirectInteraction` (VoiceOver speaks "direct touch area") and no multi-finger
+///   gesture recognizers. Ayah paging uses VoiceOver's own three-finger horizontal swipe.
 /// - Magic Tap (two-finger double-tap): toggles play/pause, handled here so it fires exactly once.
 /// - Escape (two-finger scrub "Z"): intentionally NOT overridden, so it bubbles to
 ///   `RootHostingController.accessibilityPerformEscape()` → `.escapeTriggered`.
@@ -240,7 +241,9 @@ public final class SilentAccessibilityElementView: UIView {
     public override var accessibilityAttributedValue: NSAttributedString? { get { nil } set {} }
     public override var accessibilityHint: String? { get { nil } set {} }
     public override var accessibilityAttributedHint: NSAttributedString? { get { nil } set {} }
+    /// No traits at all — `.allowsDirectInteraction` made VoiceOver say "direct touch area".
     public override var accessibilityTraits: UIAccessibilityTraits { get { .none } set {} }
+    public override var accessibilityLanguage: String? { get { A11yLabels.speechLanguage } set {} }
     public override var accessibilityCustomActions: [UIAccessibilityCustomAction]? { get { nil } set {} }
 
     // MARK: Gestures
@@ -251,20 +254,20 @@ public final class SilentAccessibilityElementView: UIView {
         return true
     }
 
-    /// Three-finger swipe → page the ayah. RTL pager: swiping right reveals the next ayah
+    /// Three-finger horizontal swipe → page the ayah (the only paging gesture VoiceOver delivers
+    /// without a "direct touch area"). RTL pager: swiping right reveals the next ayah
     /// (Android `scrollBy`: x < 0 → next, x > 0 → previous). No `.pageScrolled` status is
-    /// posted, so VoiceOver stays silent.
+    /// posted, so VoiceOver stays silent. Vertical scrolls are swallowed silently.
     public override func accessibilityScroll(_ direction: UIAccessibilityScrollDirection) -> Bool {
         switch direction {
         case .right, .next:
             onNext?()
-            return true
         case .left, .previous:
             onPrevious?()
-            return true
         default:
-            return false
+            break
         }
+        return true
     }
 
     /// Two-finger double-tap → play/pause. Returning true stops the responder walk so the

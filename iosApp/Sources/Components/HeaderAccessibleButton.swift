@@ -7,7 +7,6 @@ public struct HeaderAccessibleButton: View {
 
     private let icon: String?
     private let title: String
-    private let hint: String?
     private let accessibilityLabel: String?
     private let accessibilityValue: String?
     private let isActive: Bool
@@ -16,7 +15,6 @@ public struct HeaderAccessibleButton: View {
     public init(
         icon: String? = nil,
         title: String,
-        hint: String? = nil,
         accessibilityLabel: String? = nil,
         accessibilityValue: String? = nil,
         isActive: Bool = false,
@@ -24,7 +22,6 @@ public struct HeaderAccessibleButton: View {
     ) {
         self.icon = icon
         self.title = title
-        self.hint = hint
         self.accessibilityLabel = accessibilityLabel
         self.accessibilityValue = accessibilityValue
         self.isActive = isActive
@@ -60,5 +57,6 @@ public struct HeaderAccessibleButton: View {
         .accessibilityLabel(Text(accessibilityLabel ?? title.replacingOccurrences(of: "\n", with: " ")))
         .accessibilityValue(accessibilityValue != nil ? Text(accessibilityValue!) : Text(""))
         .accessibilityRemoveTraits(.isButton)
+        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
     }
 }

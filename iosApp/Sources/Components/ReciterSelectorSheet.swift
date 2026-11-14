@@ -71,8 +71,9 @@ public struct ReciterSelectorSheet: View {
                         }
                         .buttonStyle(AccessibleHapticButtonStyle(haptic: .click, scaleDown: 0.98))
                         .padding(.horizontal, 16)
-                        .accessibilityLabel("\(reciter.nameArabic)، \(reciter.nameEnglish)\(isSelected ? "، مختار حالياً" : "")")
+                        .accessibilityLabel(A11yLabels.reciterRow(arabicName: reciter.nameArabic, englishName: reciter.nameEnglish, isSelected: isSelected))
                         .accessibilityRemoveTraits([.isButton, .isSelected])
+                        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
                     }
                 }
                 .padding(.vertical, 12)
@@ -83,14 +84,18 @@ public struct ReciterSelectorSheet: View {
                 ToolbarItem(placement: .principal) {
                     Text("اختيار القارئ")
                         .font(.headline)
+                        .accessibilityLabel(A11yLabels.chooseReciter)
                         .accessibilityRemoveTraits(.isHeader)
+                        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("إغلاق") {
                         dismissSheet()
                     }
                     .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
+                    .accessibilityLabel(A11yLabels.close)
                     .accessibilityRemoveTraits(.isButton)
+                    .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
                 }
             }
         }

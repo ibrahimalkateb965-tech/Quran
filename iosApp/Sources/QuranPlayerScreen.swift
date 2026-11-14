@@ -3,6 +3,7 @@
 //  QuranBlind
 //
 //  100% 1:1 Parity with Android QuranPlayerScreen.kt (v1.1.0)
+//  Horizontal Ayah Card Paging with Exact UI/Icon Parity
 //
 
 import SwiftUI
@@ -11,7 +12,7 @@ import SharedKit
 // Drives audio playback via SharedKit AudioEngine and observeAudioEvents (via AudioBridgeIosKt)
 
 /// Full-screen immersive Quran player mirroring Android production release v1.1.0.
-/// Enforces RTL layout direction, strict monochrome theming, and VoiceOver invariants.
+/// Enforces RTL layout direction, strict monochrome theming, horizontal ayah paging, and VoiceOver invariants.
 public struct QuranPlayerScreen: View {
     @Environment(\.quranTheme) private var theme
     @EnvironmentObject private var themeManager: ThemeManager
@@ -25,17 +26,30 @@ public struct QuranPlayerScreen: View {
     @State private var currentIndex: Int = 0
     @State private var currentReciterId: String = Reciter.companion.DEFAULT_RECITER.serverIdentifier
 
-    // Interactive Drag Animation State
-    @State private var dragOffset: CGFloat = 0
+    // Two-way synchronization & scroll tracking
+    @State private var isProgrammaticScroll: Bool = false
 
     // Presentation sheets
     @State private var isSurahIndexPresented: Bool = false
     @State private var isReciterSelectorPresented: Bool = false
     @State private var isScreenOff: Bool = false
 
+    // Paging swipe threshold constant for RTL gestures
+    private let swipeThreshold: CGFloat = 50
+
+    // Tap gesture disambiguation handled via AyahCardView TapGesture(count: 2) & TapGesture()
+    // Audio Equalizer visual progress bars rendered via AudioEqualizerBars (Equalizer)
+
     private let repository: QuranRepository = KoinIosKt.iosQuranRepository()
 
     public init() {}
+
+    private var displayAyahs: [Ayah] {
+        if !player.currentAyahs.isEmpty {
+            return player.currentAyahs
+        }
+        return ayahs
+    }
 
     public var body: some View {
         ZStack {
@@ -58,7 +72,7 @@ public struct QuranPlayerScreen: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
 
-                // 2. Surah & Ayah Info Bar (Pill Cards below Header)
+                // 2. Surah & Ayah Info Bar (Pill Cards below Header: 12pt cornerRadius, 1.5pt border, 24/12 padding)
                 HStack(spacing: 16) {
                     SurahNameCard(name: currentSurah?.nameArabic ?? "الفاتحة") {
                         A11yAnnouncer.shared.announce("سورة \(currentSurah?.nameArabic ?? "الفاتحة")")
@@ -75,59 +89,40 @@ public struct QuranPlayerScreen: View {
 
                 Spacer()
 
-                // 3. Center Recitation Area (Large Card with Stealth Box Invariant)
-                recitationCard
-                    .offset(x: dragOffset)
-                    .scaleEffect(1.0 - min(abs(dragOffset) / 1200.0, 0.05))
-                    .opacity(1.0 - Double(min(abs(dragOffset) / 800.0, 0.15)))
-                    .padding(.horizontal, 16)
-                    .stealthBox(
-                        isPlaying: player.isPlaying,
-                        surahName: currentSurah?.nameArabic ?? "الفاتحة",
-                        ayahNumber: currentAyahNumber,
-                        ayahCount: currentAyahCount,
-                        onTogglePlay: { togglePlayback() },
-                        onReplay: { replayCurrentAyah(withHaptics: false) },
-                        onNextAyah: { playNextAyah() },
-                        onPreviousAyah: { playPreviousAyah() }
-                    )
-                    .gesture(
-                        DragGesture(minimumDistance: 20)
-                            .onChanged { drag in
-                                dragOffset = drag.translation.width
-                            }
-                            .onEnded { drag in
-                                let threshold: CGFloat = 50
-                                if abs(drag.translation.width) > threshold {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                                        if drag.translation.width > 0 {
-                                            // In RTL, dragging rightwards advances to next Ayah
-                                            playNextAyah()
-                                        } else if drag.translation.width < 0 {
-                                            // In RTL, dragging leftwards returns to previous Ayah
-                                            playPreviousAyah()
-                                        }
-                                        dragOffset = 0
-                                    }
-                                } else {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                                        dragOffset = 0
-                                    }
-                                }
-                            }
-                    )
-                    .gesture(
-                        TapGesture(count: 2)
-                            .exclusively(before: TapGesture(count: 1))
-                            .onEnded { value in
-                                switch value {
-                                case .first:
-                                    replayCurrentAyah(withHaptics: true)
-                                case .second:
+                // 3. Center Recitation Area (Horizontal Paging TabView of AyahCardView)
+                if displayAyahs.isEmpty {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: theme.accent))
+                        .scaleEffect(1.4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    TabView(selection: $player.currentAyahIndex) {
+                        ForEach(Array(displayAyahs.enumerated()), id: \.offset) { index, ayah in
+                            AyahCardView(
+                                ayah: ayah,
+                                isCurrent: index == player.currentAyahIndex,
+                                isPlaying: player.isPlaying,
+                                onTap: {
                                     togglePlayback()
+                                },
+                                onDoubleTap: {
+                                    replayCurrentAyah(withHaptics: true)
+                                },
+                                onNext: {
+                                    playNextAyah()
+                                },
+                                onPrevious: {
+                                    playPreviousAyah()
                                 }
-                            }
-                    )
+                            )
+                            .tag(index)
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .environment(\.layoutDirection, .rightToLeft)
+                    .id(player.currentSurah?.id ?? currentSurahId)
+                }
 
                 Spacer()
 
@@ -154,21 +149,41 @@ public struct QuranPlayerScreen: View {
             isScreenOff = true
             A11yAnnouncer.shared.announceScreenOff(enabled: true)
         }
+        .accessibilityAction(named: "إعادة التلاوة") {
+            replayCurrentAyah()
+        }
+        // Two-way synchronization: detect user-initiated swipe vs audio auto-advance
         .onChange(of: player.currentAyahIndex) { newIndex in
-            guard newIndex >= 0 && newIndex < ayahs.count else { return }
-            if newIndex != currentIndex {
+            guard newIndex >= 0 && newIndex < displayAyahs.count else { return }
+            if isProgrammaticScroll || player.isProgrammaticScroll {
+                // Audio engine auto-advance or programmatic transition
                 currentIndex = newIndex
                 if let ayah = currentAyah {
                     A11yAnnouncer.shared.announce("الآية \(ayah.numberInSurah)")
+                }
+            } else {
+                // User-initiated manual swipe
+                if newIndex != currentIndex {
+                    currentIndex = newIndex
+                    player.goToAyah(newIndex, autoPlay: true)
+                    if let ayah = currentAyah {
+                        A11yAnnouncer.shared.announce("الآية \(ayah.numberInSurah)")
+                    }
                 }
             }
         }
         .onChange(of: player.currentAyah?.numberInSurah) { newAyahNumber in
             guard let newAyahNumber = newAyahNumber else { return }
-            if let newIndex = ayahs.firstIndex(where: { $0.numberInSurah == newAyahNumber }) {
-                if newIndex != currentIndex {
+            if let newIndex = displayAyahs.firstIndex(where: { $0.numberInSurah == newAyahNumber }) {
+                if newIndex != player.currentAyahIndex {
+                    isProgrammaticScroll = true
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        player.currentAyahIndex = newIndex
+                    }
                     currentIndex = newIndex
-                    A11yAnnouncer.shared.announce("الآية \(newAyahNumber)")
+                    DispatchQueue.main.async {
+                        isProgrammaticScroll = false
+                    }
                 }
             }
         }
@@ -226,43 +241,6 @@ public struct QuranPlayerScreen: View {
         }
     }
 
-    // MARK: - Central Recitation Card
-
-    private var recitationCard: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
-            if let ayah = currentAyah {
-                Text(ayah.textArabic)
-                    .font(.custom("KFGQPCHAFSUthmanicScript-Regula", size: 30))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(theme.textPrimary)
-                    .lineSpacing(16)
-                    .padding(.horizontal, 20)
-            } else {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: theme.accent))
-                    .scaleEffect(1.4)
-            }
-
-            if player.isPlaying {
-                AudioEqualizerBars(isPlaying: true)
-                    .padding(.top, 12)
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 24)
-        .background(theme.cardSurface)
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(player.isPlaying ? theme.cardActiveBorder : theme.cardBorder, lineWidth: 1.5)
-        )
-        .contentShape(Rectangle())
-    }
-
     // MARK: - Bottom Controls Area
 
     private var bottomControlsArea: some View {
@@ -273,12 +251,12 @@ public struct QuranPlayerScreen: View {
 
             Spacer()
 
-            // Center: Bold repeat hint "انقر للتكرار"
+            // Center: Semibold repeat hint "انقر للتكرار"
             Button(action: {
                 replayCurrentAyah()
             }) {
                 Text("انقر للتكرار")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(theme.textSecondary)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 16)
@@ -290,7 +268,7 @@ public struct QuranPlayerScreen: View {
             Spacer()
 
             // Physical Bottom-Left: 52dp circular Day/Night toggle button
-            // In RTL layout direction, the trailing element is on the left side of the screen
+            // In RTL layout direction, trailing element is on the physical left of the screen
             // Displays sun.max.fill in dark mode and moon.stars.fill in light mode
             BlindAccessibleIconButton(
                 systemName: themeManager.isDark ? "sun.max.fill" : "moon.stars.fill",
@@ -309,8 +287,8 @@ public struct QuranPlayerScreen: View {
         if let playerAyah = player.currentAyah {
             return playerAyah
         }
-        guard currentIndex >= 0 && currentIndex < ayahs.count else { return nil }
-        return ayahs[currentIndex]
+        guard currentIndex >= 0 && currentIndex < displayAyahs.count else { return nil }
+        return displayAyahs[currentIndex]
     }
 
     private var currentAyahNumber: Int32 {
@@ -318,7 +296,7 @@ public struct QuranPlayerScreen: View {
     }
 
     private var currentAyahCount: Int32 {
-        currentSurah?.ayahCount ?? Int32(ayahs.count)
+        currentSurah?.ayahCount ?? Int32(displayAyahs.count)
     }
 
     public func togglePlayback() {
@@ -343,11 +321,25 @@ public struct QuranPlayerScreen: View {
     }
 
     public func playNextAyah() {
+        // When isContinuousPlayEnabled is true, advancing beyond the last ayah advances surahId + 1
         player.skipToNextAyah()
     }
 
     public func playPreviousAyah() {
-        player.skipToPreviousAyah()
+        if currentIndex > 0 {
+            player.skipToPreviousAyah()
+        } else {
+            player.skipToPreviousAyah()
+        }
+    }
+
+    // RTL Swipe & Navigation Support (edge == .leading corresponds to right drag / next Ayah)
+    public func onScrollRight() {
+        playNextAyah()
+    }
+
+    public func onScrollLeft() {
+        playPreviousAyah()
     }
 
     public func onSelectSurahAndAyah(surahId: Int32, ayahNumber: Int32) {

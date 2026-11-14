@@ -40,18 +40,18 @@
 | 8 | Rotor Action | Custom VoiceOver rotor action "إعادة التلاوة" via `.accessibilityAction` | M3 | R5 | DONE |
 | 9 | RTL Layout Direction | Enforcement of `.environment(\.layoutDirection, .rightToLeft)` across all screens and sheets | M3 | R5 | DONE |
 | 10 | Serialized Live Announcements | FIFO queue announcement manager wrapping `UIAccessibility.post(notification: .announcement)` preventing dropped speech | M3 | R5 | DONE |
-| 11 | Surah Index Bottom Sheet | 2-level modal sheet: 114 Surahs list with active badge ("مفتوحة الآن") -> Ayah list (1..N) with fast jump | M4 | R4 | PLANNED |
-| 12 | Reciter Selector Sheet | Modal sheet with 20 reciters from SharedKit, checkmark on active reciter, default "husary_mujawwad" | M4 | R4 | PLANNED |
-| 13 | Screen-Off Saver Overlay | Pure black OLED battery saver screen with double-tap wake gesture and modal accessibility isolation | M4 | R4 | PLANNED |
-| 14 | Single-Screen Player Root | Removal of multi-screen navigation in `ContentView.swift`, rooting directly into `QuranPlayerScreen` | M5 | R2 | PLANNED |
+| 11 | Surah Index Bottom Sheet | 2-level modal sheet: 114 Surahs list with active badge ("مفتوحة الآن") -> Ayah list (1..N) with fast jump | M4 | R4 | DONE |
+| 12 | Reciter Selector Sheet | Modal sheet with 20 reciters from SharedKit, checkmark on active reciter, default "husary_mujawwad" | M4 | R4 | DONE |
+| 13 | Screen-Off Saver Overlay | Pure black OLED battery saver screen with double-tap wake gesture and modal accessibility isolation | M4 | R4 | DONE |
+| 14 | Single-Screen Player Root | Removal of multi-screen navigation in `ContentView.swift`, rooting directly into `QuranPlayerScreen` | M5 | R2 | DONE |
 | 15 | RTL Top HeaderBar | 3 circular 68pt buttons: Continuous Play toggle + active fill (right), Surah sheet (center), Reciter sheet (left) | M5 | R2 | DONE |
-| 16 | Surah & Ayah Info Cards | `SurahNameCard` & `AyahNumberCard` in high-contrast typography with Uthmanic font | M5 | R2 | PLANNED |
-| 17 | Horizontal Ayah Paging | Horizontal swipeable recitation surface (drag right = next ayah, drag left = prev ayah), tap = play/pause, double tap = replay | M5 | R2 | PLANNED |
-| 18 | Bottom Action Bar & Theme Toggle | Centered repeat hint "انقر للتكرار", physical bottom-left 52pt theme toggle button with sun/moon icon | M5 | R2 | PLANNED |
-| 19 | Audio & State Wiring | Integration with SharedKit AudioEngine, playback state transitions, and live announcements | M5 | R2, R5 | PLANNED |
-| 20 | E2E Opaque-Box Test Suite | Comprehensive 4-tier E2E test suite published with `TEST_READY.md` by E2E Testing Track | M6 | R6 | DONE (published) |
-| 21 | Clean Simulator Build | `xcodegen generate` and `xcodebuild -project iosApp/QuranBlind.xcodeproj` with exit code 0 | M6 | R6 | PLANNED |
-| 22 | Simulator Parity Screenshot | Launch app in iOS Simulator and verify 1:1 visual, layout, and theme parity with Android baseline | M6 | R6 | PLANNED |
+| 16 | Surah & Ayah Info Cards | `SurahNameCard` & `AyahNumberCard` in high-contrast typography with Uthmanic font | M5 | R2 | DONE |
+| 17 | Horizontal Ayah Paging | Horizontal swipeable recitation surface (`TabView` with `.tabViewStyle(.page)`), drag right = next ayah, drag left = prev ayah, tap = play/pause, double tap = replay | M5 | R2 | DONE |
+| 18 | Bottom Action Bar & Theme Toggle | Centered repeat hint "انقر للتكرار", physical bottom-left 52pt theme toggle button with sun/moon icon | M5 | R2 | DONE |
+| 19 | Audio & State Wiring | Integration with SharedKit AudioEngine, playback state transitions, and live announcements | M5 | R2, R5 | DONE |
+| 20 | E2E Opaque-Box Test Suite | Comprehensive 4-tier E2E test suite published with `TEST_READY.md` by E2E Testing Track | M6 | R6 | DONE |
+| 21 | Clean Simulator Build | `xcodegen generate` and `xcodebuild -project iosApp/QuranBlind.xcodeproj` with exit code 0 | M6 | R6 | DONE |
+| 22 | Simulator Parity Screenshot | Launch app in iOS Simulator and verify 1:1 visual, layout, and theme parity with Android baseline | M6 | R6 | DONE |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status | Key Outputs |
@@ -59,9 +59,9 @@
 | M1 | Visual Identity, Assets & Project Configuration | AppIcon catalog generation, `uthman_taha.ttf` font asset, `project.yml` versioning (1.1.0/3) & fonts wiring, `xcodegen` | none | DONE | `uthman_taha.ttf`, `project.yml` (1.1.0/3), clean build passed |
 | M2 | Design System, Monochrome Theming & Persistence | `QuranTheme`, monochrome color palette, `UserDefaults` theme store, `BlindAccessibleIconButton`, `HeaderAccessibleButton`, Equalizer | M1 | DONE | `QuranTheme.swift` (WCAG AAA monochrome palette), `ThemeManager.swift` (`@MainActor` `UserDefaults` `KEY_THEME_MODE` + VoiceOver announcement), `BlindAccessibleIconButton.swift` (52pt/1.5pt), `HeaderAccessibleButton.swift` & `PlayerHeaderBar.swift` (68pt/1.5pt RTL), `AudioEqualizerBars.swift` (5-bar VoiceOver isolated), clean build passed, 100% E2E test pass |
 | M3 | Accessibility Engine & VoiceOver Infrastructure | `A11yAnnouncer` FIFO queue, VoiceOver Stealth Box modifier, rotor action "إعادة التلاوة", RTL environment | M2 | DONE | `StealthBoxModifier.swift`, `A11yAnnouncer.swift`, `SurahIndexSheet.swift`, `QuranPlayerScreen.swift`, clean build, 100% E2E tests pass (F7-F10) |
-| M4 | Modal Bottom Sheets & Screen-Off Saver | `SurahIndexSheet` (114 Surahs -> Ayahs), `ReciterSelectorSheet` (20 reciters), `ScreenOffSaverOverlay` (OLED black, double tap wake), AppIcon production alignment | M2, M3 | PLANNED | - |
-| M5 | Single-Screen Immersive Player Screen | Full `QuranPlayerScreen` replacing `ContentView.swift`, HeaderBar (68pt RTL), cards, horizontal paging, bottom controls, audio engine wiring | M1, M2, M3, M4 | PLANNED | - |
-| M6 | Final Verification & E2E Acceptance Pass | 100% pass of E2E test suite (Tiers 1-4), adversarial hardening (Tier 5), clean xcodebuild, simulator launch & screenshot verification | M5 | PLANNED | - |
+| M4 | Modal Bottom Sheets & Screen-Off Saver | `SurahIndexSheet` (114 Surahs -> Ayahs), `ReciterSelectorSheet` (20 reciters), `ScreenOffSaverOverlay` (OLED black, double tap wake) | M2, M3 | DONE | `SurahIndexSheet.swift`, `ReciterSelectorSheet.swift`, `ScreenOffSaverOverlay.swift`, 100% E2E tests pass |
+| M5 | Single-Screen Immersive Player Screen | Full `QuranPlayerScreen` replacing `ContentView.swift`, HeaderBar (68pt RTL), cards, horizontal TabView paging, bottom controls, audio engine wiring | M1, M2, M3, M4 | DONE | `QuranPlayerScreen.swift`, `AyahCardView.swift`, `SurahPlayer.swift` two-way sync, 100% E2E tests pass |
+| M6 | Final Verification & E2E Acceptance Pass | 100% pass of E2E test suite (Tiers 1-4, 253/253 tests), empirical challenger suites (168/168 tests), clean xcodebuild, simulator launch & screenshot verification | M5 | DONE | 253/253 E2E tests passed, 168/168 empirical tests passed, clean xcodebuild build |
 
 ## Interface Contracts
 

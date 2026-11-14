@@ -59,7 +59,7 @@ public struct PlayerHeaderBar: View {
             .buttonStyle(.plain)
             .contentShape(Rectangle())
             .accessibilityLabel("الاستماع المتواصل")
-            .accessibilityValue(isContinuousPlayEnabled ? "مفعّل" : "معطّل")
+            .accessibilityValue(isContinuousPlayEnabled ? "مفعل" : "معطل")
             .accessibilityHint(isContinuousPlayEnabled ? "انقر لإيقاف الاستماع المتواصل" : "انقر لتفعيل الاستماع المتواصل")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction {

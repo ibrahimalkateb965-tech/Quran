@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import AVFoundation
+import SwiftUI
 import SharedKit
 
 // Drives the shared AudioEngine for one surah and mirrors its events into SwiftUI
@@ -16,11 +17,15 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
     @Published private(set) var isPlaying = false
     @Published private(set) var hasEnded = false
     @Published private(set) var failure: String?
+    @Published var isProgrammaticScroll: Bool = false
 
     @Published var currentReciterId: String = Reciter.companion.DEFAULT_RECITER.serverIdentifier
     @Published var currentReciterName: String = Reciter.companion.DEFAULT_RECITER.nameArabic
 
     // MARK: - Computed accessors for cross-screen observation
+
+    /// The list of ayahs for the current surah.
+    var ayahs: [Ayah] { currentAyahs }
 
     /// The surah id of the currently playing ayah, if any.
     var activeSurahId: Int32? { currentAyah?.surahId ?? currentSurah?.id }
@@ -270,6 +275,41 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
         }
     }
 
+    // MARK: - Navigation & Playback Convenience API
+
+    func togglePlayback() {
+        togglePause()
+    }
+
+    func replayCurrentAyah() {
+        playCurrent()
+    }
+
+    func nextAyah() {
+        skipToNextAyah()
+    }
+
+    func previousAyah() {
+        skipToPreviousAyah()
+    }
+
+    /// Jumps to and plays (or sets) the specified Ayah by index from queued/current ayahs.
+    func goToAyah(_ index: Int, autoPlay: Bool = true) {
+        let list = queued.isEmpty ? currentAyahs : queued
+        guard index >= 0 && index < list.count else { return }
+        if autoPlay {
+            play(list, surah: currentSurah, from: index, reciterName: currentReciterName, reciterId: currentReciterId)
+        } else {
+            isProgrammaticScroll = true
+            currentAyahIndex = index
+            currentAyah = list[index]
+            updateNowPlaying()
+            DispatchQueue.main.async { [weak self] in
+                self?.isProgrammaticScroll = false
+            }
+        }
+    }
+
     /// Loads a Surah asynchronously and begins playback seamlessly.
     func loadAndPlaySurah(id: Int32, startAyahIndex: Int = 0) {
         let all = repository.getAllSurahs()
@@ -410,7 +450,13 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
         case let changed as AudioEngineEventTrackChanged:
             if let index = queued.firstIndex(where: { trackId(of: $0) == changed.trackId }) {
                 currentAyah = queued[index]
-                currentAyahIndex = index
+                isProgrammaticScroll = true
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    currentAyahIndex = index
+                }
+                DispatchQueue.main.async { [weak self] in
+                    self?.isProgrammaticScroll = false
+                }
                 updateNowPlaying()
             } else {
                 currentAyah = nil

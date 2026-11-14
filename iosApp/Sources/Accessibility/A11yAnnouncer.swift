@@ -147,6 +147,11 @@ public final class A11yAnnouncer {
         announce(message)
     }
 
+    /// Announces theme mode toggle (alias for announceThemeMode).
+    public func announceTheme(isDark: Bool) {
+        announceThemeMode(isDark: isDark)
+    }
+
     /// Announces continuous play mode toggle ("وضع الاستماع المتواصل مفعّل" / "تم إيقاف الاستماع المتواصل").
     public func announceContinuousPlay(enabled: Bool) {
         let message = enabled ? "وضع الاستماع المتواصل مفعّل" : "تم إيقاف الاستماع المتواصل"

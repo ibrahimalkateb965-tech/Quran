@@ -179,22 +179,20 @@ struct Suite6Main {
             }
 
             mutating func onInterruptionEnded(shouldResume: Bool) {
-                if wasPlayingBeforeInterruption && shouldResume {
-                    isPlaying = true
-                } else {
-                    isPlaying = false
-                }
+                // Invariant I4: Suppress auto-resume after calls/interruptions, maintaining paused state
+                isPlaying = false
                 wasPlayingBeforeInterruption = false
             }
         }
 
-        // Case 1: Playing before call, call ends with shouldResume = true -> resumes
+        // Case 1: Playing before call, call ends with shouldResume = true -> MUST NOT RESUME (Invariant I4)
         var state1 = InterruptionTestState(isPlaying: true, wasPlayingBeforeInterruption: false)
         state1.onInterruptionBegan()
         assertFalse(state1.isPlaying, "State1_InterruptionBegan_Paused")
         assertTrue(state1.wasPlayingBeforeInterruption, "State1_Recorded_WasPlaying")
         state1.onInterruptionEnded(shouldResume: true)
-        assertTrue(state1.isPlaying, "State1_ResumedPlayback")
+        assertFalse(state1.isPlaying, "State1_MaintainsPaused_InvariantI4")
+        assertFalse(state1.wasPlayingBeforeInterruption, "State1_WasPlayingClearedOnEnd")
 
         // Case 2: Paused before call, call ends with shouldResume = true -> MUST NOT RESUME
         var state2 = InterruptionTestState(isPlaying: false, wasPlayingBeforeInterruption: false)
@@ -203,12 +201,22 @@ struct Suite6Main {
         assertFalse(state2.wasPlayingBeforeInterruption, "State2_Recorded_WasNotPlaying")
         state2.onInterruptionEnded(shouldResume: true)
         assertFalse(state2.isPlaying, "State2_MustNotResumeIfPausedBeforeCall")
+        assertFalse(state2.wasPlayingBeforeInterruption, "State2_WasPlayingClearedOnEnd")
 
         // Case 3: Playing before call, call ends with shouldResume = false -> MUST NOT RESUME
         var state3 = InterruptionTestState(isPlaying: true, wasPlayingBeforeInterruption: false)
         state3.onInterruptionBegan()
         state3.onInterruptionEnded(shouldResume: false)
         assertFalse(state3.isPlaying, "State3_MustNotResumeIfShouldResumeFalse")
+        assertFalse(state3.wasPlayingBeforeInterruption, "State3_WasPlayingClearedOnEnd")
+
+        // Case 4: Explicit user tap required to resume playback after interruption ends
+        var state4 = InterruptionTestState(isPlaying: true, wasPlayingBeforeInterruption: false)
+        state4.onInterruptionBegan()
+        state4.onInterruptionEnded(shouldResume: true)
+        assertFalse(state4.isPlaying, "State4_StillPausedUntilExplicitUserTap")
+        state4.isPlaying = true // Explicit user tap (playCurrent / togglePause)
+        assertTrue(state4.isPlaying, "State4_ResumedOnlyByExplicitUserTap")
 
         // MARK: - Test Group 5: Previous Track Command Rewind Logic (> 3s vs <= 3s)
         print("Test Group 5: Previous Track Command Rewind Logic (> 3s vs <= 3s)")

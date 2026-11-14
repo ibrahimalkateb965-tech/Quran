@@ -40,6 +40,11 @@ public struct PlayerHeaderBar: View {
         HStack {
             // Button 1: Continuous Play ("الاستماع المتواصل")
             Button(action: {
+                if isContinuousPlayEnabled {
+                    HapticManager.shared.toggleOff()
+                } else {
+                    HapticManager.shared.toggleOn()
+                }
                 onToggleContinuousPlay()
             }) {
                 ZStack {
@@ -56,20 +61,27 @@ public struct PlayerHeaderBar: View {
                 .frame(width: 68, height: 68)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .contentShape(Rectangle())
             .accessibilityLabel("الاستماع المتواصل")
             .accessibilityValue(isContinuousPlayEnabled ? "مفعل" : "معطل")
-            .accessibilityHint(isContinuousPlayEnabled ? "انقر لإيقاف الاستماع المتواصل" : "انقر لتفعيل الاستماع المتواصل")
-            .accessibilityAddTraits(.isButton)
+            .accessibilityRemoveTraits(.isButton)
             .accessibilityAction {
+                if isContinuousPlayEnabled {
+                    HapticManager.shared.toggleOff()
+                } else {
+                    HapticManager.shared.toggleOn()
+                }
                 onToggleContinuousPlay()
             }
 
             Spacer()
 
             // Button 2: Surah Selection ("اختيار السورة")
-            Button(action: onOpenSurahIndex) {
+            Button(action: {
+                HapticManager.shared.click()
+                onOpenSurahIndex()
+            }) {
                 ZStack {
                     Circle()
                         .fill(theme.cardSurface)
@@ -84,19 +96,22 @@ public struct PlayerHeaderBar: View {
                 .frame(width: 68, height: 68)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .contentShape(Rectangle())
             .accessibilityLabel(Text("اختيار السورة"))
-            .accessibilityHint(Text("يفتح قائمة السور المائة وأربعة عشر"))
-            .accessibilityAddTraits(.isButton)
+            .accessibilityRemoveTraits(.isButton)
             .accessibilityAction {
+                HapticManager.shared.click()
                 onOpenSurahIndex()
             }
 
             Spacer()
 
             // Button 3: Reciter Selection ("اختيار القارئ")
-            Button(action: onOpenReciters) {
+            Button(action: {
+                HapticManager.shared.click()
+                onOpenReciters()
+            }) {
                 ZStack {
                     Circle()
                         .fill(theme.cardSurface)
@@ -111,12 +126,12 @@ public struct PlayerHeaderBar: View {
                 .frame(width: 68, height: 68)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .contentShape(Rectangle())
             .accessibilityLabel(Text("اختيار القارئ"))
-            .accessibilityHint(Text("يفتح قائمة اختيار القارئ"))
-            .accessibilityAddTraits(.isButton)
+            .accessibilityRemoveTraits(.isButton)
             .accessibilityAction {
+                HapticManager.shared.click()
                 onOpenReciters()
             }
         }

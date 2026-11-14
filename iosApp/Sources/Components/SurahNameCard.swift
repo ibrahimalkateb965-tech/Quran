@@ -35,7 +35,6 @@ public struct SurahNameCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("سورة \(name)")
-        .accessibilityHint("انقر للاستماع إلى اسم السورة")
-        .accessibilityAddTraits(.isButton)
+        .accessibilityRemoveTraits(.isButton)
     }
 }

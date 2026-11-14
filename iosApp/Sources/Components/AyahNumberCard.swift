@@ -36,7 +36,6 @@ public struct AyahNumberCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("الآية \(number)")
-        .accessibilityHint("انقر للاستماع إلى رقم الآية")
-        .accessibilityAddTraits(.isButton)
+        .accessibilityRemoveTraits(.isButton)
     }
 }

@@ -12,6 +12,7 @@ public struct AyahCardView: View {
     @Environment(\.quranTheme) private var theme
 
     public let ayah: Ayah
+    public let surahName: String?
     public let isCurrent: Bool
     public let isPlaying: Bool
     public let onTap: (() -> Void)?
@@ -21,6 +22,7 @@ public struct AyahCardView: View {
 
     public init(
         ayah: Ayah,
+        surahName: String? = nil,
         isCurrent: Bool,
         isPlaying: Bool,
         onTap: (() -> Void)? = nil,
@@ -29,6 +31,7 @@ public struct AyahCardView: View {
         onPrevious: (() -> Void)? = nil
     ) {
         self.ayah = ayah
+        self.surahName = surahName
         self.isCurrent = isCurrent
         self.isPlaying = isPlaying
         self.onTap = onTap
@@ -87,33 +90,16 @@ public struct AyahCardView: View {
                 .onEnded { value in
                     switch value {
                     case .first:
+                        HapticManager.shared.doubleTap()
                         onDoubleTap()
                     case .second:
+                        HapticManager.shared.click()
                         onTap?()
                     }
                 }
         )
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("الآية \(ayah.numberInSurah): \(ayah.textArabic)")
-        .accessibilityValue(isCurrent && isPlaying ? "قيد التلاوة" : "")
-        .accessibilityAction(named: "إعادة التلاوة") {
-            onDoubleTap()
-        }
-        .accessibilityAction(named: "الآية التالية") {
-            onNext?()
-        }
-        .accessibilityAction(named: "الآية السابقة") {
-            onPrevious?()
-        }
-        .accessibilityAction {
-            onTap?()
-        }
-        .accessibilityScrollAction { edge in
-            if edge == .leading {
-                onNext?()
-            } else if edge == .trailing {
-                onPrevious?()
-            }
-        }
+        // VoiceOver silence (Android AyahCard.kt:66 `clearAndSetSemantics { }`): no label,
+        // value, hint or actions here. While VoiceOver runs, QuranPlayerScreen hides the whole
+        // pager and overlays the single silent `SilentRecitationSurface`, so this card speaks nothing.
     }
 }

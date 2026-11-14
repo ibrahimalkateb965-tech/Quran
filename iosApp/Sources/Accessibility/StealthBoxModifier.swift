@@ -20,6 +20,7 @@ public struct StealthBoxModifier: ViewModifier {
     public let surahName: String?
     public let ayahNumber: Int32?
     public let ayahCount: Int32?
+    public let ayahText: String?
     public let onTogglePlay: () -> Void
     public let onReplay: () -> Void
     public let onNextAyah: (() -> Void)?
@@ -30,6 +31,7 @@ public struct StealthBoxModifier: ViewModifier {
         surahName: String? = nil,
         ayahNumber: Int32? = nil,
         ayahCount: Int32? = nil,
+        ayahText: String? = nil,
         onTogglePlay: @escaping () -> Void,
         onReplay: @escaping () -> Void,
         onNextAyah: (() -> Void)? = nil,
@@ -39,6 +41,7 @@ public struct StealthBoxModifier: ViewModifier {
         self.surahName = surahName
         self.ayahNumber = ayahNumber
         self.ayahCount = ayahCount
+        self.ayahText = ayahText
         self.onTogglePlay = onTogglePlay
         self.onReplay = onReplay
         self.onNextAyah = onNextAyah
@@ -49,7 +52,9 @@ public struct StealthBoxModifier: ViewModifier {
     private var surahAyahAccessibilityLabel: String {
         let surah = surahName?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let surah = surah, !surah.isEmpty {
-            if let ayah = ayahNumber, let total = ayahCount, total > 0 {
+            if let text = ayahText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, let ayah = ayahNumber {
+                return "الآية \(ayah) من سورة \(surah): \(text)"
+            } else if let ayah = ayahNumber, let total = ayahCount, total > 0 {
                 return "سورة \(surah)، الآية \(ayah) من أصل \(total)"
             } else if let ayah = ayahNumber {
                 return "سورة \(surah)، الآية \(ayah)"
@@ -57,6 +62,9 @@ public struct StealthBoxModifier: ViewModifier {
                 return "سورة \(surah)"
             }
         } else if let ayah = ayahNumber {
+            if let text = ayahText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+                return "الآية \(ayah): \(text)"
+            }
             return "الآية \(ayah)"
         } else {
             return "تلاوة القرآن الكريم"
@@ -84,10 +92,16 @@ public struct StealthBoxModifier: ViewModifier {
         content
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(surahAyahAccessibilityLabel /* سورة والآية */)
-            .accessibilityValue(isPlaying ? "قيد التشغيل" : "متوقف مؤقتاً")
-            .accessibilityHint(isVoiceOverRunning ? "تشغيل أو إيقاف" : "تشغيل أو إيقاف التلاوة")
+            .accessibilityValue(isPlaying ? "قيد التلاوة" : "متوقف")
+            .accessibilityHint(isVoiceOverRunning ? "انقر نقراً مزدوجاً للتشغيل أو الإيقاف، أو استخدم إجراءات الروتور" : "تشغيل أو إيقاف التلاوة")
             .accessibilityAction(named: "إعادة التلاوة") {
                 handleReplayAction()
+            }
+            .accessibilityAction(named: "الآية التالية") {
+                onNextAyah?()
+            }
+            .accessibilityAction(named: "الآية السابقة") {
+                onPreviousAyah?()
             }
             .accessibilityAction {
                 onTogglePlay()
@@ -109,6 +123,7 @@ public extension View {
         surahName: String? = nil,
         ayahNumber: Int32? = nil,
         ayahCount: Int32? = nil,
+        ayahText: String? = nil,
         onTogglePlay: @escaping () -> Void,
         onReplay: @escaping () -> Void,
         onNextAyah: (() -> Void)? = nil,
@@ -120,6 +135,7 @@ public extension View {
                 surahName: surahName,
                 ayahNumber: ayahNumber,
                 ayahCount: ayahCount,
+                ayahText: ayahText,
                 onTogglePlay: onTogglePlay,
                 onReplay: onReplay,
                 onNextAyah: onNextAyah,
@@ -146,5 +162,115 @@ public extension View {
             onNextAyah: onNext,
             onPreviousAyah: onPrevious
         )
+    }
+}
+
+// MARK: - Silent Recitation Surface (Android AyahCard.kt:66 + QuranPlayerScreen.kt:296-302)
+
+/// Single VoiceOver focus target covering the central ayah pager that speaks ZERO text.
+///
+/// Mirrors Android's TalkBack stealth box: `clearAndSetSemantics { onClick(label = "") { togglePlayback() }; scrollBy { … } }`.
+/// - Selection / touch-exploration: no label, value, hint, traits or custom actions → nothing is spoken
+///   (custom actions are deliberately omitted because VoiceOver would append "Actions available").
+/// - Double-tap (activate): toggles play/pause.
+/// - Three-finger horizontal swipe (`accessibilityScroll`): next / previous ayah, silently.
+/// - Magic Tap (two-finger double-tap): toggles play/pause, handled here so it fires exactly once.
+/// - Escape (two-finger scrub "Z"): intentionally NOT overridden, so it bubbles to
+///   `RootHostingController.accessibilityPerformEscape()` → `.escapeTriggered`.
+///
+/// Only mount it while VoiceOver is running; with VoiceOver off it would swallow sighted touches.
+public struct SilentRecitationSurface: UIViewRepresentable {
+    public let onActivate: () -> Void
+    public let onNext: () -> Void
+    public let onPrevious: () -> Void
+    public let onMagicTap: () -> Void
+
+    public init(
+        onActivate: @escaping () -> Void,
+        onNext: @escaping () -> Void,
+        onPrevious: @escaping () -> Void,
+        onMagicTap: @escaping () -> Void
+    ) {
+        self.onActivate = onActivate
+        self.onNext = onNext
+        self.onPrevious = onPrevious
+        self.onMagicTap = onMagicTap
+    }
+
+    public func makeUIView(context: Context) -> SilentAccessibilityElementView {
+        let view = SilentAccessibilityElementView()
+        updateUIView(view, context: context)
+        return view
+    }
+
+    public func updateUIView(_ view: SilentAccessibilityElementView, context: Context) {
+        view.onActivate = onActivate
+        view.onNext = onNext
+        view.onPrevious = onPrevious
+        view.onMagicTap = onMagicTap
+    }
+}
+
+/// UIKit element whose every speakable accessibility property is pinned to empty.
+/// Getters are overridden (setters ignored) so nothing upstream — SwiftUI bridging,
+/// a stray modifier, or a future edit — can inject spoken text.
+public final class SilentAccessibilityElementView: UIView {
+    var onActivate: (() -> Void)?
+    var onNext: (() -> Void)?
+    var onPrevious: (() -> Void)?
+    var onMagicTap: (() -> Void)?
+
+    public override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isAccessibilityElement = true
+        accessibilityIdentifier = "silent_recitation_surface"
+    }
+
+    @available(*, unavailable)
+    public required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    // MARK: Zero speech
+
+    public override var accessibilityLabel: String? { get { nil } set {} }
+    public override var accessibilityAttributedLabel: NSAttributedString? { get { nil } set {} }
+    public override var accessibilityValue: String? { get { nil } set {} }
+    public override var accessibilityAttributedValue: NSAttributedString? { get { nil } set {} }
+    public override var accessibilityHint: String? { get { nil } set {} }
+    public override var accessibilityAttributedHint: NSAttributedString? { get { nil } set {} }
+    public override var accessibilityTraits: UIAccessibilityTraits { get { .none } set {} }
+    public override var accessibilityCustomActions: [UIAccessibilityCustomAction]? { get { nil } set {} }
+
+    // MARK: Gestures
+
+    /// VoiceOver double-tap → play/pause (Android `onClick(label = "")`).
+    public override func accessibilityActivate() -> Bool {
+        onActivate?()
+        return true
+    }
+
+    /// Three-finger swipe → page the ayah. RTL pager: swiping right reveals the next ayah
+    /// (Android `scrollBy`: x < 0 → next, x > 0 → previous). No `.pageScrolled` status is
+    /// posted, so VoiceOver stays silent.
+    public override func accessibilityScroll(_ direction: UIAccessibilityScrollDirection) -> Bool {
+        switch direction {
+        case .right, .next:
+            onNext?()
+            return true
+        case .left, .previous:
+            onPrevious?()
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Two-finger double-tap → play/pause. Returning true stops the responder walk so the
+    /// root controller's handler doesn't toggle a second time.
+    public override func accessibilityPerformMagicTap() -> Bool {
+        onMagicTap?()
+        return true
     }
 }

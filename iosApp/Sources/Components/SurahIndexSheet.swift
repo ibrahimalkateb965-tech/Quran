@@ -48,22 +48,32 @@ public struct SurahIndexSheet: View {
                     surahListView
                 }
             }
-            .navigationTitle(
-                selectedSurah != nil
-                    ? "سورة \(selectedSurah!.nameArabic) ( اختيار الآية )"
-                    : "اختيار السورة (114 سورة)"
-            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Custom title instead of .navigationTitle: the system title carries the header
+                // trait, which made VoiceOver append the English word "heading".
+                ToolbarItem(placement: .principal) {
+                    Text(
+                        selectedSurah != nil
+                            ? "سورة \(selectedSurah!.nameArabic) ( اختيار الآية )"
+                            : "اختيار السورة (114 سورة)"
+                    )
+                    .font(.headline)
+                    .accessibilityRemoveTraits(.isHeader)
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     if selectedSurah != nil {
                         Button("السور") {
                             backToSurahs()
                         }
+                        .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
+                        .accessibilityRemoveTraits(.isButton)
                     } else {
                         Button("إغلاق") {
                             dismissSheet()
                         }
+                        .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
+                        .accessibilityRemoveTraits(.isButton)
                     }
                 }
             }
@@ -85,11 +95,13 @@ public struct SurahIndexSheet: View {
     // MARK: - Navigation helpers
 
     private func backToSurahs() {
+        HapticManager.shared.selection()
         selectedSurah = nil
         A11yAnnouncer.shared.announce("تم العودة لقائمة السور")
     }
 
     private func dismissSheet() {
+        HapticManager.shared.selection()
         onDismiss()
         dismiss()
     }
@@ -169,13 +181,11 @@ public struct SurahIndexSheet: View {
                                     .stroke(isActive ? theme.cardActiveBorder : Color.clear, lineWidth: isActive ? 1.5 : 0)
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AccessibleHapticButtonStyle(haptic: .click, scaleDown: 0.98))
                         .id(surah.id)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("سورة \(surah.nameArabic)، رقمها \(surah.id)، آياتها \(surah.ayahCount). \(isActive ? "مفتوحة الآن. " : "")انقر مرتين لاختيار الآية.")
-                        .if(isActive) { view in
-                            view.accessibilityAddTraits(.isSelected)
-                        }
+                        .accessibilityLabel("سورة \(surah.nameArabic)، رقمها \(surah.id)، آياتها \(surah.ayahCount)\(isActive ? "، مفتوحة الآن" : "")")
+                        .accessibilityRemoveTraits([.isButton, .isSelected])
 
                         Divider()
                     }
@@ -226,13 +236,11 @@ public struct SurahIndexSheet: View {
                                     .stroke(isCurrent ? theme.cardActiveBorder : Color.clear, lineWidth: isCurrent ? 1.5 : 0)
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AccessibleHapticButtonStyle(haptic: .click, scaleDown: 0.98))
                         .id(index)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("الآية \(ayahNumber). \(isCurrent ? "محددة حالياً. " : "")انقر مرتين للتشغيل من هذه الآية.")
-                        .if(isCurrent) { view in
-                            view.accessibilityAddTraits(.isSelected)
-                        }
+                        .accessibilityLabel("الآية \(ayahNumber)\(isCurrent ? "، محددة حالياً" : "")")
+                        .accessibilityRemoveTraits([.isButton, .isSelected])
 
                         Divider()
                     }

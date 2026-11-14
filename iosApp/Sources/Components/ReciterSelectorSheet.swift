@@ -69,22 +69,28 @@ public struct ReciterSelectorSheet: View {
                                     .stroke(isSelected ? theme.cardActiveBorder : theme.cardBorder, lineWidth: 1.5)
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AccessibleHapticButtonStyle(haptic: .click, scaleDown: 0.98))
                         .padding(.horizontal, 16)
                         .accessibilityLabel("\(reciter.nameArabic)، \(reciter.nameEnglish)\(isSelected ? "، مختار حالياً" : "")")
-                        .accessibilityHint("انقر لاختيار هذا القارئ")
-                        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                        .accessibilityRemoveTraits([.isButton, .isSelected])
                     }
                 }
                 .padding(.vertical, 12)
             }
-            .navigationTitle("اختيار القارئ")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Custom title: the system title would make VoiceOver append "heading".
+                ToolbarItem(placement: .principal) {
+                    Text("اختيار القارئ")
+                        .font(.headline)
+                        .accessibilityRemoveTraits(.isHeader)
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("إغلاق") {
                         dismissSheet()
                     }
+                    .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
+                    .accessibilityRemoveTraits(.isButton)
                 }
             }
         }
@@ -96,6 +102,7 @@ public struct ReciterSelectorSheet: View {
     }
 
     private func dismissSheet() {
+        HapticManager.shared.selection()
         onDismiss()
         dismiss()
     }

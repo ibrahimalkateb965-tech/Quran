@@ -50,7 +50,6 @@ public final class ThemeManager: ObservableObject {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
-        let announcement = wasDark ? "تم التبديل إلى الوضع النهاري" : "تم التبديل إلى الوضع الليلي"
-        UIAccessibility.post(notification: .announcement, argument: announcement)
+        A11yAnnouncer.shared.announceTheme(isDark: currentMode == .dark)
     }
 }

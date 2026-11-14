@@ -18,6 +18,7 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
     @Published private(set) var hasEnded = false
     @Published private(set) var failure: String?
     @Published var isProgrammaticScroll: Bool = false
+    @Published public var isVoiceOverRunning: Bool = UIAccessibility.isVoiceOverRunning
 
     @Published var currentReciterId: String = Reciter.companion.DEFAULT_RECITER.serverIdentifier
     @Published var currentReciterName: String = Reciter.companion.DEFAULT_RECITER.nameArabic
@@ -99,6 +100,14 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
         ) { [weak self] notification in
             self?.handleRouteChange(notification)
         }
+
+        NotificationCenter.default.addObserver(
+            forName: UIAccessibility.voiceOverStatusDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isVoiceOverRunning = UIAccessibility.isVoiceOverRunning
+        }
     }
 
     private func handleAudioInterruption(_ notification: Notification) {
@@ -115,17 +124,9 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
             pause()
         case .ended:
             lastInterruptionEndTime = Date()
-            var shouldResume = false
-            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
-                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                shouldResume = options.contains(.shouldResume)
-            }
-            // Crucial Rule 2: Resume ONLY IF wasPlayingBeforeInterruption == true AND shouldResume == true
-            if wasPlayingBeforeInterruption && shouldResume {
-                playCurrent()
-            } else {
-                pause()
-            }
+            // Invariant I4: Suppress auto-resume after phone calls / system interruptions.
+            // Never auto-resume unbidden; maintain paused state until an explicit user tap.
+            pause()
             wasPlayingBeforeInterruption = false
         @unknown default:
             break
@@ -237,9 +238,6 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
         if currentAyahIndex < queued.count - 1 {
             let nextIndex = currentAyahIndex + 1
             play(queued, surah: currentSurah, from: nextIndex, reciterName: currentReciterName, reciterId: currentReciterId)
-            if let ayah = currentAyah {
-                A11yAnnouncer.shared.announce("الآية \(ayah.numberInSurah)")
-            }
         } else {
             // Reached the end of the Surah: advance to next Surah if available
             let nextSurahId = (currentSurah?.id ?? 1) + 1
@@ -263,9 +261,6 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
         } else if currentAyahIndex > 0 {
             let prevIndex = currentAyahIndex - 1
             play(queued, surah: currentSurah, from: prevIndex, reciterName: currentReciterName, reciterId: currentReciterId)
-            if let ayah = currentAyah {
-                A11yAnnouncer.shared.announce("الآية \(ayah.numberInSurah)")
-            }
         } else if let surah = currentSurah, surah.id > 1 {
             // Rewind to previous Surah, last Ayah
             loadAndPlaySurah(id: surah.id - 1, startAyahIndex: -1)
@@ -440,9 +435,7 @@ final class SurahPlayer: ObservableObject, NowPlayingControllable {
     private func handlePlaybackEnded() {
         hasEnded = true
         stop()
-        if let surah = currentSurah {
-            A11yAnnouncer.shared.announceSurahCompletion(name: surah.nameArabic)
-        }
+        // Silent by design: nothing is spoken when the recitation of the card finishes.
     }
 
     private func handle(_ event: AudioEngineEvent) {

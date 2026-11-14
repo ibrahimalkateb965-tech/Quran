@@ -56,9 +56,9 @@ public struct HeaderAccessibleButton: View {
             }
             .frame(width: 68, height: 68)
         }
+        .buttonStyle(AccessibleHapticButtonStyle(haptic: .click))
         .accessibilityLabel(Text(accessibilityLabel ?? title.replacingOccurrences(of: "\n", with: " ")))
         .accessibilityValue(accessibilityValue != nil ? Text(accessibilityValue!) : Text(""))
-        .accessibilityHint(Text(hint ?? ""))
-        .accessibilityAddTraits(.isButton)
+        .accessibilityRemoveTraits(.isButton)
     }
 }

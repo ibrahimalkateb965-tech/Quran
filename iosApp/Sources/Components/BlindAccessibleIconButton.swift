@@ -46,8 +46,8 @@ public struct BlindAccessibleIconButton: View {
             }
             .frame(width: 52, height: 52)
         }
+        .buttonStyle(AccessibleHapticButtonStyle(haptic: .click))
         .accessibilityLabel(Text(accessibilityLabel))
-        .accessibilityHint(Text(accessibilityHint ?? ""))
-        .accessibilityAddTraits(.isButton)
+        .accessibilityRemoveTraits(.isButton)
     }
 }

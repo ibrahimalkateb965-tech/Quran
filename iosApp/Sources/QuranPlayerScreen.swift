@@ -18,6 +18,7 @@ public struct QuranPlayerScreen: View {
     @EnvironmentObject private var themeManager: ThemeManager
 
     @EnvironmentObject private var player: SurahPlayer
+    @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverRunning: Bool
 
     // Surah & Ayah state
     @State private var currentSurahId: Int32 = 1
@@ -43,6 +44,15 @@ public struct QuranPlayerScreen: View {
     private let repository: QuranRepository = KoinIosKt.iosQuranRepository()
 
     public init() {}
+
+    /// VoiceOver stealth layout active. DEBUG builds accept `-simulateVoiceOver` so the silent
+    /// surface can be audited in Accessibility Inspector on Simulator (VoiceOver can't run there).
+    private var isStealthLayoutActive: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-simulateVoiceOver") { return true }
+        #endif
+        return isVoiceOverRunning
+    }
 
     private var displayAyahs: [Ayah] {
         if !player.currentAyahs.isEmpty {
@@ -85,7 +95,9 @@ public struct QuranPlayerScreen: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 8)
-                .accessibilityElement(children: .combine)
+                // Two separate focus stops (Android Row of two clickable pills): these are the
+                // ONLY places on screen that speak the surah name / ayah number.
+                .accessibilityElement(children: .contain)
 
                 Spacer()
 
@@ -100,13 +112,14 @@ public struct QuranPlayerScreen: View {
                         ForEach(Array(displayAyahs.enumerated()), id: \.offset) { index, ayah in
                             AyahCardView(
                                 ayah: ayah,
+                                surahName: player.currentSurah?.nameArabic ?? currentSurah?.nameArabic,
                                 isCurrent: index == player.currentAyahIndex,
                                 isPlaying: player.isPlaying,
                                 onTap: {
-                                    togglePlayback()
+                                    togglePlayback(withHaptics: false)
                                 },
                                 onDoubleTap: {
-                                    replayCurrentAyah(withHaptics: true)
+                                    replayCurrentAyah(withHaptics: false)
                                 },
                                 onNext: {
                                     playNextAyah()
@@ -117,11 +130,27 @@ public struct QuranPlayerScreen: View {
                             )
                             .tag(index)
                             .padding(.horizontal, 16)
+                            // Must be applied per page: the paged TabView hosts pages in UIKit
+                            // cells, so a TabView-level accessibilityHidden does not reach them.
+                            .accessibilityHidden(isStealthLayoutActive)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .environment(\.layoutDirection, .rightToLeft)
                     .id(player.currentSurah?.id ?? currentSurahId)
+                    // Stealth Box (Android QuranPlayerScreen.kt:296-302): with VoiceOver on, the pager
+                    // and its cards (hidden per page above) are replaced by ONE silent element.
+                    .accessibilityHidden(isStealthLayoutActive)
+                    .overlay {
+                        if isStealthLayoutActive {
+                            SilentRecitationSurface(
+                                onActivate: { togglePlayback(withHaptics: true, announce: false) },
+                                onNext: { onScrollRight() },
+                                onPrevious: { onScrollLeft() },
+                                onMagicTap: { togglePlayback(withHaptics: true, announce: false) }
+                            )
+                        }
+                    }
                 }
 
                 Spacer()
@@ -137,38 +166,38 @@ public struct QuranPlayerScreen: View {
             if isScreenOff {
                 ScreenOffSaverOverlay(onWakeUp: {
                     isScreenOff = false
-                    A11yAnnouncer.shared.announceScreenOff(enabled: false)
                 })
             }
         }
         .environment(\.layoutDirection, .rightToLeft)
         .accessibilityAction(.magicTap) {
-            togglePlayback()
+            togglePlayback(withHaptics: true)
         }
-        .accessibilityAction(named: "تفعيل شاشة توفير الطاقة") {
-            isScreenOff = true
-            A11yAnnouncer.shared.announceScreenOff(enabled: true)
+        .accessibilityAction(.escape) {
+            handleEscape()
         }
-        .accessibilityAction(named: "إعادة التلاوة") {
-            replayCurrentAyah()
+        // No screen-level named actions: SwiftUI copies them onto every child element, which made
+        // VoiceOver append "Actions available" to every button. Replay stays on the bottom button.
+        .onReceive(NotificationCenter.default.publisher(for: .magicTapTriggered)) { _ in
+            togglePlayback(withHaptics: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .escapeTriggered)) { _ in
+            handleEscape()
         }
         // Two-way synchronization: detect user-initiated swipe vs audio auto-advance
         .onChange(of: player.currentAyahIndex) { newIndex in
             guard newIndex >= 0 && newIndex < displayAyahs.count else { return }
             if isProgrammaticScroll || player.isProgrammaticScroll {
                 // Audio engine auto-advance or programmatic transition
+                // Silent by design (Android parity): the ayah number is spoken ONLY when the
+                // user taps the top AyahNumberCard pill — never on page change.
                 currentIndex = newIndex
-                if let ayah = currentAyah {
-                    A11yAnnouncer.shared.announce("الآية \(ayah.numberInSurah)")
-                }
             } else {
                 // User-initiated manual swipe
                 if newIndex != currentIndex {
+                    HapticManager.shared.selection()
                     currentIndex = newIndex
                     player.goToAyah(newIndex, autoPlay: true)
-                    if let ayah = currentAyah {
-                        A11yAnnouncer.shared.announce("الآية \(ayah.numberInSurah)")
-                    }
                 }
             }
         }
@@ -253,7 +282,8 @@ public struct QuranPlayerScreen: View {
 
             // Center: Semibold repeat hint "انقر للتكرار"
             Button(action: {
-                replayCurrentAyah()
+                HapticManager.shared.doubleTap()
+                replayCurrentAyah(withHaptics: false)
             }) {
                 Text("انقر للتكرار")
                     .font(.system(size: 16, weight: .semibold))
@@ -261,9 +291,9 @@ public struct QuranPlayerScreen: View {
                     .padding(.vertical, 8)
                     .padding(.horizontal, 16)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .accessibilityLabel("انقر للتكرار")
-            .accessibilityHint("انقر مرتين لإعادة تلاوة الآية الحالية")
+            .accessibilityRemoveTraits(.isButton)
 
             Spacer()
 
@@ -272,10 +302,8 @@ public struct QuranPlayerScreen: View {
             // Displays sun.max.fill in dark mode and moon.stars.fill in light mode
             BlindAccessibleIconButton(
                 systemName: themeManager.isDark ? "sun.max.fill" : "moon.stars.fill",
-                accessibilityLabel: themeManager.isDark ? "التبديل إلى الوضع النهاري" : "التبديل إلى الوضع الليلي",
-                accessibilityHint: "انقر للتبديل بين الوضعين النهاري والليلي"
+                accessibilityLabel: themeManager.isDark ? "التبديل إلى الوضع النهاري" : "التبديل إلى الوضع الليلي"
             ) {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 themeManager.toggleTheme()
             }
         }
@@ -299,14 +327,23 @@ public struct QuranPlayerScreen: View {
         currentSurah?.ayahCount ?? Int32(displayAyahs.count)
     }
 
-    public func togglePlayback() {
+    /// - Parameter announce: false for the silent recitation surface (zero speech on the card).
+    public func togglePlayback(withHaptics: Bool = false, announce: Bool = true) {
+        if withHaptics {
+            HapticManager.shared.click()
+        }
+        // `isPlaying` is published asynchronously, so announce the state we are switching TO,
+        // derived from the state before the toggle (reading it after announced the stale state).
+        let wasPlaying = player.isPlaying
         player.togglePause()
-        A11yAnnouncer.shared.announcePlaybackState(isPlaying: player.isPlaying)
+        if announce {
+            A11yAnnouncer.shared.announcePlaybackState(isPlaying: !wasPlaying)
+        }
     }
 
-    public func replayCurrentAyah(withHaptics: Bool = true) {
+    public func replayCurrentAyah(withHaptics: Bool = false) {
         if withHaptics {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            HapticManager.shared.doubleTap()
         }
         let targetAyahs = player.currentAyahs.isEmpty ? ayahs : player.currentAyahs
         if !targetAyahs.isEmpty {
@@ -335,11 +372,25 @@ public struct QuranPlayerScreen: View {
 
     // RTL Swipe & Navigation Support (edge == .leading corresponds to right drag / next Ayah)
     public func onScrollRight() {
+        HapticManager.shared.selection()
         playNextAyah()
     }
 
     public func onScrollLeft() {
+        HapticManager.shared.selection()
         playPreviousAyah()
+    }
+
+    private func handleEscape() {
+        if isScreenOff {
+            isScreenOff = false
+            HapticManager.shared.doubleTap()
+            A11yAnnouncer.shared.announceScreenOff(enabled: false)
+        } else if isSurahIndexPresented {
+            isSurahIndexPresented = false
+        } else if isReciterSelectorPresented {
+            isReciterSelectorPresented = false
+        }
     }
 
     public func onSelectSurahAndAyah(surahId: Int32, ayahNumber: Int32) {

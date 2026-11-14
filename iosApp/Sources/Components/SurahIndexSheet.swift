@@ -25,6 +25,8 @@ public struct SurahIndexSheet: View {
 
     @State private var surahs: [Surah] = []
     @State private var selectedSurah: Surah? = nil
+    @StateObject private var surahPager = SilentScrollPager()
+    @StateObject private var ayahPager = SilentScrollPager()
     private let repository: QuranRepository = KoinIosKt.iosQuranRepository()
 
     init(
@@ -197,10 +199,12 @@ public struct SurahIndexSheet: View {
                         .accessibilityLabel(A11yLabels.surahRow(name: surah.nameArabic, number: surah.id, ayahCount: surah.ayahCount, isActive: isActive))
                         .accessibilityRemoveTraits([.isButton, .isSelected])
                         .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
+                        .silentPageScroll(surahPager)
 
                         Divider()
                     }
                 }
+                .silentPagingContainer(surahPager)
             }
             .onAppear {
                 if let activeId = player.activeSurahId {
@@ -253,10 +257,12 @@ public struct SurahIndexSheet: View {
                         .accessibilityLabel(A11yLabels.ayahRow(ayahNumber, isCurrent: isCurrent))
                         .accessibilityRemoveTraits([.isButton, .isSelected])
                         .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
+                        .silentPageScroll(ayahPager)
 
                         Divider()
                     }
                 }
+                .silentPagingContainer(ayahPager)
             }
             .onAppear {
                 A11yAnnouncer.shared.announce("اختيار الآية")

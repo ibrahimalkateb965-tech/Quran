@@ -2,23 +2,21 @@ import SwiftUI
 
 /// 52pt circular accessible icon button for blind users with 1.5pt border stroke.
 /// Enforces minimum 52pt touch target; inner icons do NOT use frames under 52pt.
+/// VoiceOver speaks the label only: no hint, no trait words (standard tap-to-inspect, double-tap-to-activate).
 public struct BlindAccessibleIconButton: View {
     @Environment(\.quranTheme) private var theme
 
     private let systemName: String
     private let accessibilityLabel: String
-    private let accessibilityHint: String?
     private let action: () -> Void
 
     public init(
         systemName: String,
         accessibilityLabel: String,
-        accessibilityHint: String? = nil,
         action: @escaping () -> Void
     ) {
         self.systemName = systemName
         self.accessibilityLabel = accessibilityLabel
-        self.accessibilityHint = accessibilityHint
         self.action = action
     }
 
@@ -28,8 +26,7 @@ public struct BlindAccessibleIconButton: View {
         action: @escaping () -> Void
     ) {
         self.systemName = isDark ? "sun.max.fill" : "moon.stars.fill"
-        self.accessibilityLabel = isDark ? "التبديل إلى الوضع النهاري" : "التبديل إلى الوضع الليلي"
-        self.accessibilityHint = isDark ? "انقر مرتين للتبديل إلى الوضع النهاري" : "انقر مرتين للتبديل إلى الوضع الليلي"
+        self.accessibilityLabel = A11yLabels.dayNightToggle(isDark: isDark)
         self.action = action
     }
 
@@ -47,7 +44,8 @@ public struct BlindAccessibleIconButton: View {
             .frame(width: 52, height: 52)
         }
         .buttonStyle(AccessibleHapticButtonStyle(haptic: .click))
-        .accessibilityLabel(Text(accessibilityLabel))
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityRemoveTraits(.isButton)
+        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
     }
 }

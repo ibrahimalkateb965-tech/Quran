@@ -78,34 +78,32 @@ class StealthBoxHarness {
         let surah = surahName?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let surah = surah, !surah.isEmpty {
             if let text = ayahText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, let ayah = ayahNumber {
-                return "الآية \(ayah) من سورة \(surah): \(text)"
+                return "الْآيَةُ \(ayah) مِنْ سُورَةِ \(surah): \(text)"
             } else if let ayah = ayahNumber, let total = ayahCount, total > 0 {
-                return "سورة \(surah)، الآية \(ayah) من أصل \(total)"
+                return "سُورَةُ \(surah)، الْآيَةُ \(ayah) مِنْ أَصْلِ \(total)"
             } else if let ayah = ayahNumber {
-                return "سورة \(surah)، الآية \(ayah)"
+                return "سُورَةُ \(surah)، الْآيَةُ \(ayah)"
             } else {
-                return "سورة \(surah)"
+                return "سُورَةُ \(surah)"
             }
         } else if let ayah = ayahNumber {
             if let text = ayahText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-                return "الآية \(ayah): \(text)"
+                return "الْآيَةُ \(ayah): \(text)"
             }
-            return "الآية \(ayah)"
+            return "الْآيَةُ \(ayah)"
         } else {
-            return "تلاوة القرآن الكريم"
+            return "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ"
         }
     }
 
     // Accessibility Value reporting playback state identical to StealthBoxModifier.swift:95
     var accessibilityValueText: String {
-        isPlaying ? "قيد التلاوة" : "متوقف"
+        isPlaying ? "قَيْدَ التِّلَاوَةِ" : "مُتَوَقِّفٌ"
     }
 
-    // Context-sensitive hint identical to StealthBoxModifier.swift:96
-    var accessibilityHintText: String {
-        isVoiceOverRunning
-            ? "انقر نقراً مزدوجاً للتشغيل أو الإيقاف، أو استخدم إجراءات الروتور"
-            : "تشغيل أو إيقاف التلاوة"
+    // Name-only policy: StealthBoxModifier sets NO accessibilityHint in either VoiceOver state.
+    var accessibilityHintText: String? {
+        nil
     }
 
     // Replay action identical to StealthBoxModifier.swift:75-84
@@ -128,13 +126,13 @@ class StealthBoxHarness {
     // Custom rotor action dispatch matching StealthBoxModifier.swift:97-105
     func performRotorAction(named name: String) -> Bool {
         switch name {
-        case "إعادة التلاوة":
+        case "إِعَادَةُ التِّلَاوَةِ":
             handleReplayAction()
             return true
-        case "الآية التالية":
+        case "الْآيَةُ التَّالِيَةُ":
             nextAyahCallCount += 1
             return true
-        case "الآية السابقة":
+        case "الْآيَةُ السَّابِقَةُ":
             prevAyahCallCount += 1
             return true
         default:
@@ -204,7 +202,7 @@ assertTrue(fullHarness.hapticCallCount == 1, "FullyPopulated_HapticFired")
 // -----------------------------------------------------------------------------
 print("Test Group 3: R2 Production Label formatting matrix & graceful fallbacks")
 
-// 3A: Full R2 Specification: "الآية \(ayah) من سورة \(surah): \(text)"
+// 3A: Full R2 Specification: "الْآيَةُ \(ayah) مِنْ سُورَةِ \(surah): \(text)"
 let labelR2Full = StealthBoxHarness(
     isPlaying: true,
     surahName: "الفاتحة",
@@ -212,9 +210,9 @@ let labelR2Full = StealthBoxHarness(
     ayahCount: 7,
     ayahText: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"
 ).surahAyahAccessibilityLabel
-assertEqual(labelR2Full, "الآية 1 من سورة الفاتحة: بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "Label_R2_FullSurahAndAyahText")
+assertEqual(labelR2Full, "الْآيَةُ 1 مِنْ سُورَةِ الفاتحة: بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "Label_R2_FullSurahAndAyahText")
 
-// 3B: Ayah + Text fallback (no surah): "الآية \(ayah): \(text)"
+// 3B: Ayah + Text fallback (no surah): "الْآيَةُ \(ayah): \(text)"
 let labelAyahTextOnly = StealthBoxHarness(
     isPlaying: true,
     surahName: nil,
@@ -222,35 +220,35 @@ let labelAyahTextOnly = StealthBoxHarness(
     ayahCount: nil,
     ayahText: "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ"
 ).surahAyahAccessibilityLabel
-assertEqual(labelAyahTextOnly, "الآية 2: الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ", "Label_R2_AyahAndTextFallback")
+assertEqual(labelAyahTextOnly, "الْآيَةُ 2: الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ", "Label_R2_AyahAndTextFallback")
 
-// 3C: Legacy metadata with total ayahs (no text): "سورة \(surah)، الآية \(ayah) من أصل \(total)"
+// 3C: Legacy metadata with total ayahs (no text): "سُورَةُ \(surah)، الْآيَةُ \(ayah) مِنْ أَصْلِ \(total)"
 let labelLegacyTotal = StealthBoxHarness(isPlaying: true, surahName: "الفاتحة", ayahNumber: 1, ayahCount: 7).surahAyahAccessibilityLabel
-assertEqual(labelLegacyTotal, "سورة الفاتحة، الآية 1 من أصل 7", "Label_Legacy_FullMetadata")
+assertEqual(labelLegacyTotal, "سُورَةُ الفاتحة، الْآيَةُ 1 مِنْ أَصْلِ 7", "Label_Legacy_FullMetadata")
 
-// 3D: Surah and Ayah only (no text, no total): "سورة \(surah)، الآية \(ayah)"
+// 3D: Surah and Ayah only (no text, no total): "سُورَةُ \(surah)، الْآيَةُ \(ayah)"
 let labelSurahAyah = StealthBoxHarness(isPlaying: true, surahName: "الفاتحة", ayahNumber: 1, ayahCount: nil).surahAyahAccessibilityLabel
-assertEqual(labelSurahAyah, "سورة الفاتحة، الآية 1", "Label_Legacy_NoAyahCount")
+assertEqual(labelSurahAyah, "سُورَةُ الفاتحة، الْآيَةُ 1", "Label_Legacy_NoAyahCount")
 
-// 3E: Surah only: "سورة \(surah)"
+// 3E: Surah only: "سُورَةُ \(surah)"
 let labelSurahOnly = StealthBoxHarness(isPlaying: true, surahName: "الفاتحة", ayahNumber: nil, ayahCount: nil).surahAyahAccessibilityLabel
-assertEqual(labelSurahOnly, "سورة الفاتحة", "Label_Legacy_SurahOnly")
+assertEqual(labelSurahOnly, "سُورَةُ الفاتحة", "Label_Legacy_SurahOnly")
 
-// 3F: Ayah only (no text): "الآية \(ayah)"
+// 3F: Ayah only (no text): "الْآيَةُ \(ayah)"
 let labelAyahOnly = StealthBoxHarness(isPlaying: true, surahName: nil, ayahNumber: 5, ayahCount: nil).surahAyahAccessibilityLabel
-assertEqual(labelAyahOnly, "الآية 5", "Label_Legacy_AyahOnly")
+assertEqual(labelAyahOnly, "الْآيَةُ 5", "Label_Legacy_AyahOnly")
 
-// 3G: Nil fallback: "تلاوة القرآن الكريم"
+// 3G: Nil fallback: "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ"
 let labelNil = StealthBoxHarness(isPlaying: false, surahName: nil, ayahNumber: nil, ayahCount: nil).surahAyahAccessibilityLabel
-assertEqual(labelNil, "تلاوة القرآن الكريم", "Label_NilFallback")
+assertEqual(labelNil, "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ", "Label_NilFallback")
 
-// 3H: Whitespace fallback: "تلاوة القرآن الكريم"
+// 3H: Whitespace fallback: "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ"
 let labelWhitespace = StealthBoxHarness(isPlaying: false, surahName: "   ", ayahNumber: nil, ayahCount: nil).surahAyahAccessibilityLabel
-assertEqual(labelWhitespace, "تلاوة القرآن الكريم", "Label_WhitespaceFallback")
+assertEqual(labelWhitespace, "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ", "Label_WhitespaceFallback")
 
-// 3I: Empty string fallback: "تلاوة القرآن الكريم"
+// 3I: Empty string fallback: "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ"
 let labelEmpty = StealthBoxHarness(isPlaying: false, surahName: "", ayahNumber: nil, ayahCount: nil).surahAyahAccessibilityLabel
-assertEqual(labelEmpty, "تلاوة القرآن الكريم", "Label_EmptyFallback")
+assertEqual(labelEmpty, "تِلَاوَةُ الْقُرْآنِ الْكَرِيمِ", "Label_EmptyFallback")
 
 // -----------------------------------------------------------------------------
 // TEST GROUP 4: R2 Accessibility Value State Verification
@@ -258,29 +256,21 @@ assertEqual(labelEmpty, "تلاوة القرآن الكريم", "Label_EmptyFall
 print("Test Group 4: R2 Accessibility Value state verification")
 
 let playingValueHarness = StealthBoxHarness(isPlaying: true)
-assertEqual(playingValueHarness.accessibilityValueText, "قيد التلاوة", "Value_PlayingIsQaydAlTilawah")
+assertEqual(playingValueHarness.accessibilityValueText, "قَيْدَ التِّلَاوَةِ", "Value_PlayingIsQaydAlTilawah")
 
 let pausedValueHarness = StealthBoxHarness(isPlaying: false)
-assertEqual(pausedValueHarness.accessibilityValueText, "متوقف", "Value_PausedIsMutawaqqif")
+assertEqual(pausedValueHarness.accessibilityValueText, "مُتَوَقِّفٌ", "Value_PausedIsMutawaqqif")
 
 // -----------------------------------------------------------------------------
 // TEST GROUP 5: R2 Accessibility Hint Switching
 // -----------------------------------------------------------------------------
-print("Test Group 5: Context-sensitive accessibilityHint switching")
+print("Test Group 5: No accessibilityHint in any VoiceOver state (name-only policy)")
 
 let voOnHarness = StealthBoxHarness(isPlaying: false, isVoiceOverRunning: true)
-assertEqual(
-    voOnHarness.accessibilityHintText,
-    "انقر نقراً مزدوجاً للتشغيل أو الإيقاف، أو استخدم إجراءات الروتور",
-    "Hint_VoiceOverRunning"
-)
+assertTrue(voOnHarness.accessibilityHintText == nil, "Hint_Absent_VoiceOverRunning")
 
 let voOffHarness = StealthBoxHarness(isPlaying: false, isVoiceOverRunning: false)
-assertEqual(
-    voOffHarness.accessibilityHintText,
-    "تشغيل أو إيقاف التلاوة",
-    "Hint_VoiceOverStopped"
-)
+assertTrue(voOffHarness.accessibilityHintText == nil, "Hint_Absent_VoiceOverStopped")
 
 // -----------------------------------------------------------------------------
 // TEST GROUP 6: Custom Rotor Actions & Universal Tap
@@ -289,19 +279,19 @@ print("Test Group 6: Custom VoiceOver Rotor Actions and Universal Activation")
 
 let rotorHarness = StealthBoxHarness(isPlaying: true, surahName: "الفاتحة", ayahNumber: 3)
 
-// 6A: Rotor "إعادة التلاوة"
-let replayResult = rotorHarness.performRotorAction(named: "إعادة التلاوة")
+// 6A: Rotor "إِعَادَةُ التِّلَاوَةِ"
+let replayResult = rotorHarness.performRotorAction(named: "إِعَادَةُ التِّلَاوَةِ")
 assertTrue(replayResult, "Rotor_Replay_Handled")
 assertEqual(rotorHarness.replayCallCount, 1, "Rotor_Replay_FiresReplay")
 assertEqual(rotorHarness.hapticCallCount, 1, "Rotor_Replay_FiresHaptic")
 
-// 6B: Rotor "الآية التالية"
-let nextResult = rotorHarness.performRotorAction(named: "الآية التالية")
+// 6B: Rotor "الْآيَةُ التَّالِيَةُ"
+let nextResult = rotorHarness.performRotorAction(named: "الْآيَةُ التَّالِيَةُ")
 assertTrue(nextResult, "Rotor_NextAyah_Handled")
 assertEqual(rotorHarness.nextAyahCallCount, 1, "Rotor_NextAyah_Advances")
 
-// 6C: Rotor "الآية السابقة"
-let prevResult = rotorHarness.performRotorAction(named: "الآية السابقة")
+// 6C: Rotor "الْآيَةُ السَّابِقَةُ"
+let prevResult = rotorHarness.performRotorAction(named: "الْآيَةُ السَّابِقَةُ")
 assertTrue(prevResult, "Rotor_PrevAyah_Handled")
 assertEqual(rotorHarness.prevAyahCallCount, 1, "Rotor_PrevAyah_Decrements")
 

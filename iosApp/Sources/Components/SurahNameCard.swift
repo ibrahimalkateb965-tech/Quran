@@ -34,7 +34,8 @@ public struct SurahNameCard: View {
                 )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("سورة \(name)")
+        .accessibilityLabel(A11yLabels.surah(name))
         .accessibilityRemoveTraits(.isButton)
+        .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
     }
 }

@@ -63,9 +63,10 @@ public struct PlayerHeaderBar: View {
             }
             .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .contentShape(Rectangle())
-            .accessibilityLabel("الاستماع المتواصل")
-            .accessibilityValue(isContinuousPlayEnabled ? "مفعل" : "معطل")
+            .accessibilityLabel(A11yLabels.continuousPlay)
+            .accessibilityValue(A11yLabels.continuousPlayValue(isEnabled: isContinuousPlayEnabled))
             .accessibilityRemoveTraits(.isButton)
+            .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
             .accessibilityAction {
                 if isContinuousPlayEnabled {
                     HapticManager.shared.toggleOff()
@@ -98,8 +99,9 @@ public struct PlayerHeaderBar: View {
             }
             .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .contentShape(Rectangle())
-            .accessibilityLabel(Text("اختيار السورة"))
+            .accessibilityLabel(A11yLabels.chooseSurah)
             .accessibilityRemoveTraits(.isButton)
+            .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
             .accessibilityAction {
                 HapticManager.shared.click()
                 onOpenSurahIndex()
@@ -128,8 +130,9 @@ public struct PlayerHeaderBar: View {
             }
             .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
             .contentShape(Rectangle())
-            .accessibilityLabel(Text("اختيار القارئ"))
+            .accessibilityLabel(A11yLabels.chooseReciter)
             .accessibilityRemoveTraits(.isButton)
+            .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
             .accessibilityAction {
                 HapticManager.shared.click()
                 onOpenReciters()

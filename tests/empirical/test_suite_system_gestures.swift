@@ -143,13 +143,13 @@ struct TestSuiteSystemGestures {
         // 3D: Single accessibility node metadata verification directly on ScreenOffSaverOverlay
         assertEqual(
             ScreenOffSaverOverlay.accessibilityLabelText,
-            "شاشة توفير الطاقة نشطة. انقر مرتين للاستيقاظ",
+            "شَاشَةُ تَوْفِيرِ الطَّاقَةِ نَشِطَةٌ",
             "ScreenOffOverlay_LabelAccuracy"
         )
-        assertEqual(
-            ScreenOffSaverOverlay.accessibilityHintText,
-            "انقر مرتين لإلغاء وضع توفير الطاقة وإيقاظ الشاشة",
-            "ScreenOffOverlay_HintAccuracy"
+        // Label is a clean name: no "double-tap to…" tutorial text
+        assertFalse(
+            ScreenOffSaverOverlay.accessibilityLabelText.contains("انقر"),
+            "ScreenOffOverlay_LabelHasNoTutorial"
         )
 
         // -----------------------------------------------------------------------------
@@ -208,29 +208,19 @@ struct TestSuiteSystemGestures {
         assertEqual(escapeHapticCount, 1, "ScreenOff_Escape_TriggersHaptics")
         assertFalse(escapeScreenOff, "ScreenOff_Escape_SetsScreenOffFalse")
 
-        // 4D: Named actions: "استيقاظ" and "إلغاء وضع إيقاف الشاشة" on production ScreenOffSaverOverlay
-        var actionWakeCount = 0
-        var actionScreenOff = true
-
-        let actionsOverlay = ScreenOffSaverOverlay(
-            isScreenOff: actionScreenOff,
-            onWakeUp: {
-                actionWakeCount += 1
-                actionScreenOff = false
-            }
+        // 4D: No named custom actions (VoiceOver would append "Actions available").
+        //     Waking relies solely on the standard VoiceOver double-tap (default activation).
+        assertTrue(
+            ScreenOffSaverOverlay.supportedActionNames.isEmpty,
+            "ScreenOff_NoNamedCustomActions"
         )
-
-        let action1Result = actionsOverlay.performNamedAction(ScreenOffSaverOverlay.wakeActionName)
-        assertTrue(action1Result, "ScreenOff_NamedAction_Istiqaadh_Handled")
-        assertEqual(actionWakeCount, 1, "ScreenOff_NamedAction_Istiqaadh_Wakes")
-
-        actionScreenOff = true
-        let action2Result = actionsOverlay.performNamedAction(ScreenOffSaverOverlay.cancelActionName)
-        assertTrue(action2Result, "ScreenOff_NamedAction_Cancel_Handled")
-        assertEqual(actionWakeCount, 2, "ScreenOff_NamedAction_Cancel_Wakes")
-
-        let unknownActionResult = actionsOverlay.performNamedAction("إجراء مجهول")
-        assertFalse(unknownActionResult, "ScreenOff_NamedAction_Unknown_Rejected")
+        var activateWakeCount = 0
+        let activateOverlay = ScreenOffSaverOverlay(
+            isScreenOff: true,
+            onWakeUp: { activateWakeCount += 1 }
+        )
+        activateOverlay.wakeUp()
+        assertEqual(activateWakeCount, 1, "ScreenOff_DefaultActivation_Wakes")
 
         // -----------------------------------------------------------------------------
         // TEST GROUP 5: VoiceOverObserver Dynamic Observation (R1 / Invariant I3)

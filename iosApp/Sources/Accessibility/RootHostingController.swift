@@ -25,6 +25,17 @@ public extension Notification.Name {
 /// - `accessibilityPerformEscape()`: Universal two-finger scrub ("Z" gesture) to dismiss modal bottom sheets & overlays (R3).
 open class RootHostingController<Content: View>: UIHostingController<Content> {
 
+    #if DEBUG
+    open override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard AXTreeDumper.isRequested else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let root = self?.view.window ?? self?.view else { return }
+            AXTreeDumper.dump(from: root)
+        }
+    }
+    #endif
+
     // MARK: - Magic Tap (Two-Finger Double Tap)
 
     public override func accessibilityPerformMagicTap() -> Bool {

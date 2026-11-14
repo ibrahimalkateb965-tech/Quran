@@ -292,8 +292,10 @@ public struct QuranPlayerScreen: View {
                     .padding(.horizontal, 16)
             }
             .buttonStyle(AccessibleHapticButtonStyle(haptic: .none))
-            .accessibilityLabel("انقر للتكرار")
+            // VoiceOver speaks exactly what the button shows (vocalized); double-tap replays.
+            .accessibilityLabel(A11yLabels.tapToRepeat)
             .accessibilityRemoveTraits(.isButton)
+            .accessibilitySpeechLanguage(A11yLabels.speechLanguage)
 
             Spacer()
 
@@ -302,7 +304,7 @@ public struct QuranPlayerScreen: View {
             // Displays sun.max.fill in dark mode and moon.stars.fill in light mode
             BlindAccessibleIconButton(
                 systemName: themeManager.isDark ? "sun.max.fill" : "moon.stars.fill",
-                accessibilityLabel: themeManager.isDark ? "التبديل إلى الوضع النهاري" : "التبديل إلى الوضع الليلي"
+                accessibilityLabel: A11yLabels.dayNightToggle(isDark: themeManager.isDark)
             ) {
                 themeManager.toggleTheme()
             }
